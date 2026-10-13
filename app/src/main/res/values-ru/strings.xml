@@ -104,6 +104,10 @@
     <string name="guide_agree_full">Я согласен с %1$s и %2$s</string>
     <string name="guide_terms_of_service">Условиями использования</string>
     <string name="guide_agree_required">Примите политику конфиденциальности</string>
+    <string name="guide_next">Далее</string>
+    <string name="guide_page_1">Сканируйте бумагу и фото в чёткие PDF</string>
+    <string name="guide_page_2">Открывайте Word, Excel и PPT в одном месте</string>
+    <string name="guide_page_3">Находите недавние файлы и продолжайте работу</string>
     <string name="guide_skip">Пропустить</string>
     <string name="guide_allow">Разрешить</string>
     <string name="guide_overlay_headline">Не пропускайте важные уведомления</string>

@@ -18,10 +18,6 @@ object SpAdSession {
     var lastAdClickAtMs: Long = 0L
         private set
 
-    // ponytail: 原生广告的点击收不到。Apollo 那版 SDK（`ads_mobile_sdk`）有 `setAdEventCallback`，
-    // 我们用的 GMA `NativeAd` 没有点击回调，只有 `setOnPaidEventListener`。原生广告的点击因此
-    // 不会触发 `ad_click` 提醒；要补得换 SDK 或改成在 `NativeAdView` 上自己挂监听。天上的上限就这一条。
-
     fun markAdClicked() {
         lastAdClickAtMs = System.currentTimeMillis()
     }

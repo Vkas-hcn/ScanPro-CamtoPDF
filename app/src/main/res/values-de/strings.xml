@@ -104,6 +104,10 @@
     <string name="guide_agree_full">Ich stimme der %1$s und den %2$s zu</string>
     <string name="guide_terms_of_service">Nutzungsbedingungen</string>
     <string name="guide_agree_required">Bitte stimmen Sie der Datenschutzrichtlinie zu</string>
+    <string name="guide_next">Weiter</string>
+    <string name="guide_page_1">Papier und Fotos in klare PDF-Dateien scannen</string>
+    <string name="guide_page_2">Word, Excel und PPT an einem Ort öffnen</string>
+    <string name="guide_page_3">Aktuelle Dateien finden und weiterarbeiten</string>
     <string name="guide_skip">Überspringen</string>
     <string name="guide_allow">Erlauben</string>
     <string name="guide_overlay_headline">Verpassen Sie keine wichtigen Benachrichtigungen</string>

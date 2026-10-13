@@ -104,6 +104,10 @@
     <string name="guide_agree_full">Saya setuju dengan %1$s dan %2$s</string>
     <string name="guide_terms_of_service">Ketentuan Layanan</string>
     <string name="guide_agree_required">Harap setujui kebijakan privasi</string>
+    <string name="guide_next">Berikutnya</string>
+    <string name="guide_page_1">Pindai kertas dan foto menjadi PDF yang jelas</string>
+    <string name="guide_page_2">Buka Word, Excel, dan PPT di satu tempat</string>
+    <string name="guide_page_3">Temukan file terbaru dan lanjutkan kerja</string>
     <string name="guide_skip">Lewati</string>
     <string name="guide_allow">Izinkan</string>
     <string name="guide_overlay_headline">Jangan lewatkan notifikasi penting</string>

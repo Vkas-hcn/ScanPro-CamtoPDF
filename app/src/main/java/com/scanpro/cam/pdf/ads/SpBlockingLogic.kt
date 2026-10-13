@@ -15,7 +15,7 @@ import java.util.Locale
  * 出处：`data/apks/apollo/sources/sources/com/zj/apollopdf/filter/BlockingLogic.java`
  *
  * 去掉维度后的等价语义（原文里每个方法都是 `switch == 0 放行 → 特殊用户拦 → 兜底放行`，
- * 掐掉中间那段后只剩首尾）：
+ * 掐掉中间那段后只剩首尾）。五个开关现在从 `api/dispatch` 的 `data` 写入。
  */
 class SpBlockingLogic private constructor(context: Context) {
 

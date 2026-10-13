@@ -7,11 +7,13 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.commit
 import androidx.lifecycle.lifecycleScope
+import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamOfficeReaderBinding
 import com.scanpro.cam.pdf.home.FileType
@@ -34,7 +36,16 @@ class CamOfficeReaderActivity : SpActivity<ActivityCamOfficeReaderBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         applyToolbarInset()
-        binding.btnBack.setOnClickListener { finish() }
+        SpPageAdTriggers.preloadMainBack(this)
+        binding.btnBack.setOnClickListener { leaveWithBackAd() }
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    leaveWithBackAd()
+                }
+            },
+        )
 
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val uri = intent.getStringExtra(EXTRA_URI).orEmpty()
@@ -77,6 +88,13 @@ class CamOfficeReaderActivity : SpActivity<ActivityCamOfficeReaderBinding>() {
             supportFragmentManager.commit {
                 replace(binding.docContainer.id, DocViewerFragment.newInstance(config))
             }
+        }
+    }
+
+    private fun leaveWithBackAd() {
+        if (isFinishing || isDestroyed) return
+        SpPageAdTriggers.showBackHomeIntThen(this) {
+            if (!isFinishing && !isDestroyed) finish()
         }
     }
 

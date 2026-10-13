@@ -36,7 +36,7 @@ class CamMadeFragment : SpFragment<FragmentCamMadeBinding>() {
     private val viewModel: CamMadeViewModel by viewModels()
 
     private val fileAdapter = CamFileListAdapter(
-        onItemClick = { item -> CamDocRouter.open(requireContext(), item) },
+        onItemClick = { item -> CamDocRouter.open(requireActivity(), item) },
         onMoreClick = { item, anchor -> showFileMenu(anchor, item) },
     )
 

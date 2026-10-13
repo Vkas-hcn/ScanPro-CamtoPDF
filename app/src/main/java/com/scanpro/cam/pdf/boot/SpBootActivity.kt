@@ -22,18 +22,23 @@ import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.analytics.SpSceneCode
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.guide.SpFirstLaunch
+import com.scanpro.cam.pdf.guide.SpGuideLanguageActivity
 import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
+import com.scanpro.cam.pdf.leave.SpUnInstall01Activity
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.scanpro.cam.pdf.notice.SpNotifyPermit
 import com.scanpro.cam.pdf.notice.SpSendManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 冷启动。Apollo `SplashActivity` 的等价：预加载 `ac_launch` 开屏广告 →
- * 到点（或超时）展示 → 进 [CamShellActivity]。
+ * 到点（或超时）展示 → 卸载页 / 首次语言页 / [CamShellActivity]。
  */
 class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
@@ -86,9 +91,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         handleNotificationEntry()
 
-        // Apollo `SplashActivity`：进来先报一次「有展示机会」，再补一次开屏预加载，
-        // 然后用 timer 等缓存就绪。timer 由 `checkNotifyPermission` 的结论触发
-        // （Apollo 也是权限框答完才开始计时）。
+        // 先走 UMP（2.5 秒兜底），再预加载开屏。计时仍等通知权限框结束才开始。
         SpTracker.log(
             this,
             SpTracker.SHARK_AD_CHANCE,
@@ -97,8 +100,11 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 putString(KEY_TYPE, entrySceneType)
             },
         )
-        SpAdsHub.getOrNull()?.preloadLaunchAd()
-        checkNotifyPermission()
+        lifecycleScope.launch {
+            SpAdsHub.getOrNull()?.requestStartupConsent(this@SpBootActivity)
+            SpAdsHub.getOrNull()?.preloadLaunchAd()
+            checkNotifyPermission()
+        }
     }
 
     // region Notification entry (Apollo `SplashActivity.onCreate` 开头那段)
@@ -178,6 +184,12 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         lifecycleScope.launch {
             delay(minDelayMs.coerceAtLeast(0L))
+            val remaining = (maxTimeoutMs - minDelayMs).coerceAtLeast(0L)
+            runCatching {
+                withTimeoutOrNull(remaining) {
+                    SpAdsHub.getOrNull()?.configApplied?.first { it }
+                }
+            }
             tryPresentOpenIfReady()
         }
     }
@@ -259,18 +271,26 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         continueToShell()
     }
 
-    /** 开屏结束（展示完 / 超时）后进主界面。 */
+    /**
+     * 开屏结束（展示完 / 超时）后的下一页。对照 Apollo `SplashActivity.nextPage`：
+     * 卸载入口优先，其次首次语言页，否则首页。
+     */
     private fun continueToShell() {
         if (finished || isFinishing) return
         finished = true
-        val next = Intent(this, CamShellActivity::class.java).apply {
-            // Apollo `nextPage`：把 jump_type 转给主界面，由主界面落到对应文件类型页
-            entryJumpType?.let { putExtra(SpNotifyExtras.JUMP_TYPE, it) }
-            if (SpLeaveEntry.isLeaveLaunch(intent)) {
-                SpLeaveEntry.markOpenLeave(this)
-            }
+        val next = when {
+            SpLeaveEntry.isLeaveLaunch(intent) ->
+                Intent(this, SpUnInstall01Activity::class.java)
+            SpFirstLaunch.isFirstOpen(this) ->
+                Intent(this, SpGuideLanguageActivity::class.java).apply {
+                    entryJumpType?.let { putExtra(SpNotifyExtras.JUMP_TYPE, it) }
+                }
+            else ->
+                Intent(this, CamShellActivity::class.java).apply {
+                    entryJumpType?.let { putExtra(SpNotifyExtras.JUMP_TYPE, it) }
+                }
         }
-        Log.i(TAG, "finishToMain")
+        Log.i(TAG, "finishToMain target=${next.component?.className}")
         startActivity(next)
         finish()
     }

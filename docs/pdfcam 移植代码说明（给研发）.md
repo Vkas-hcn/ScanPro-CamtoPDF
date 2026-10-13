@@ -19,8 +19,8 @@
 
 | 模块 | 包 | 内容 | 状态 |
 |---|---|---|---|
-| 广告编排 | `ads/`、`ads/manager/` | 17 个广告位、位置→单元 fallback 链、缓存 TTL、500ms 遮罩、原生关闭键误触、UMP、收入上报 | 代码全在；**只有 5 个位接到页面**（见 §5.8） |
-| 配置下发 | `config/` | 中台配置请求 / 缓存 / 解析（key 与 Apollo 远端一致） | 代码全在；**接口地址空占位，未联调** |
+| 广告编排 | `ads/`、`ads/manager/` | 17 个广告位、位置→单元 fallback 链、缓存 TTL、500ms 遮罩、原生关闭键误触、UMP、收入上报 | 代码全在；16 个位已接到页面，`ac_recent_nat` 反编译无调用（见 §5.8） |
+| 配置下发 | `config/` | `api/dispatch` 请求 / 缓存 / 解析（key 与 Apollo 远端一致） | 代码全在；debug 地址和 8 个混淆 Key 已填，**未联调**；release Base URL 仍空 |
 | 通知拉活 | `notice/` | 7 个触发场景、3 类通知、两套频控、重发循环、文案与 ID 轮换、3 个广播接收器 | 代码全在；受「远端配置未到」影响，见 §11 |
 | 进程保活 | `keepalive/` | 前台服务 + JobScheduler 兜底 + 空 binder 服务 + 开机接收器 | 代码全在 |
 | 卸载挽留 | `leave/` | 桌面快捷方式 → 中转页 → 两步挽留页 + 插屏/原生 | 代码全在，入口**已开** |
@@ -55,17 +55,21 @@ ads/                      广告编排
   SpUmpGate.kt              EEA/UK 同意表单（UMP）
   SpWebWarmup.kt            WebView 预热（解 App Open 拿不到 JS 引擎的问题）
   SpFullScreenMask.kt       全屏广告前的 500ms 遮罩
+  SpPageAdTriggers.kt       首页/文件/返回插屏的共用触发（60 秒节流）
   manager/
     SpFullScreenAdManager.kt  开屏 + 插屏
     SpNativeAdManager.kt      原生
     SpBannerAdManager.kt      Banner
     SpNativeAdStyle.kt        原生版式枚举（big / small）
 
-config/                   中台配置下发
-  SpConfigStore.kt          本地缓存 + 7 组配置解析
-  SpConfigWire.kt           key 常量 + 接口地址（占位）+ 3 小时节流
-  SpConfigRemoteSource.kt   POST JSON + 10s 超时 + 3 次重试
-  SpConfigIdentity.kt       请求字段组装
+config/                   中台配置下发（`POST {baseUrl}api/dispatch`，对齐 EfileScan）
+  SpConfigWire.kt           从 `sp_dispatch_config.xml` 读地址和 8 个混淆 Key，校验不通过则跳过
+  SpConfigRemoteSource.kt   POST + 公共头 + `{code,msg,data}` 解包
+  SpConfigRepository.kt     3 次 × 20s 重试，远端 → 缓存 → Unavailable
+  SpConfigStore.kt          data 按块解析（广告 / 通知 / 5 个总闸）
+  SpConfigBootstrapper.kt   缓存优先、3 小时节流、后台刷新、cloak、`configApplied`
+  SpConfigIdentity.kt       请求字段组装（version 去后缀、languageTag、本机 UUID、Referrer 缓存）
+  SpPlayInstallReferrerProvider.kt  Play Install Referrer，5s 超时，取到后落盘
 
 notice/                   通知拉活
   SpNotifyModels.kt         场景枚举（7 个）/ 跳转类型 / 通知文案项 / intent extras 名
@@ -92,6 +96,11 @@ leave/                    卸载挽留
   SpUnInstall01Activity.kt  第 1 步
   SpUnInstall02Activity.kt  第 2 步 + 卸载确认框
 
+guide/                    首次语言页 + 引导页
+  SpFirstLaunch.kt          `IS_FIRST_OPEN` 标记
+  SpGuideLanguageActivity.kt  语言页（`ac_language_nat` / `ac_language_int`）
+  SpGuideInfoActivity.kt    三页引导（`ac_guide_nat` / `ac_guide_int`）
+
 analytics/                SpTracker.kt（事件名）/ SpSceneCode.kt（场景码）
 boot/                     SpBootActivity.kt（冷启动，等价 Apollo `SplashActivity`）
 ```
@@ -110,7 +119,7 @@ boot/                     SpBootActivity.kt（冷启动，等价 Apollo `SplashA
 | 4 | `SpAdsHub.get(this, scope).initialize()` | 起广告与配置 |
 | 5 | `startKeepAliveAndNotice()` | 起通知与保活 |
 
-第 4 步内部（`SpAdsHub.initialize`）：装 Activity 生命周期回调 → `MobileAds.initialize` → 拉一次配置。**三个都用 `AtomicBoolean` 保证只跑一次。**
+第 4 步内部（`SpAdsHub.initialize`）：装 Activity 生命周期回调 → `MobileAds.initialize` → `SpConfigBootstrapper.start()`。**前两个用 `AtomicBoolean` 保证只跑一次。**
 
 第 5 步逐项：`SpTriggerManager.startWhileTask` → `startAlarmTask` → `SpForegroundServiceLauncher.startAppCreateTask` → `SpKeyReceiver.register` → `SpNoticeLifecycle.register`。
 
@@ -122,8 +131,8 @@ boot/                     SpBootActivity.kt（冷启动，等价 Apollo `SplashA
 2. 通知入口处理（`handleNotificationEntry`）：按 `from_type` 报点击埋点、撤掉媒体式提醒、停掉重发循环，并把 `from_type` 映射成开屏场景码。
 3. 报一次 `Shark_ad_chance`（带 `scene` / `type`）。
 4. `checkNotifyPermission()` —— **这一步的真正作用是「开屏计时什么时候开始」**，不是进主界面前补授权。
-5. 授权框答完（或无需询问）→ 计时开始 → 等 `minDelay` 后取 `ac_launch` 缓存展示；没缓存或超时就进 `CamShellActivity`。
-6. 进主界面时把 `jump_type` 转交过去；若是挽留入口，补 `sp_open_leave=true`。
+5. 授权框答完（或无需询问）→ 计时开始 → 等 `minDelay` 后取 `ac_launch` 缓存展示；没缓存或超时走 `nextPage`。
+6. `nextPage`（Apollo 同序）：卸载入口 → `SpUnInstall01Activity`；首次打开 → `SpGuideLanguageActivity`；否则把 `jump_type` 转交给 `CamShellActivity`。
 
 `from_type` → 场景码映射（Apollo `SplashActivity.fromTypeToSceneCode`）：
 
@@ -140,52 +149,93 @@ boot/                     SpBootActivity.kt（冷启动，等价 Apollo `SplashA
 
 ---
 
-## 4. 配置下发（中台）
+## 4. 配置下发（中台 `api/dispatch`）
+
+调度对齐 EfileScan《买量配置接口(api-dispatch)接入文档》：缓存优先、3 小时节流（失败也写 attempt 时间）、一轮 3 次 × 20s、`{code,msg,data}` 包装。`data` 里放本项目的 Apollo 格式 JSON（对象或 JSON 字符串都认）。
 
 ### 4.1 链路
 
 ```
-SpAdsHub.refreshConfig()
-  └─ SpConfigStore.refreshIfStale(SpConfigIdentity.build(app))
-       ├─ SpConfigWire.isConfigured() 为 false → 直接返回本地缓存（不请求、不报错）
-       ├─ 距上次 ≥ 3 小时才请求
-       └─ SpConfigRemoteSource.fetch()  →  POST JSON，10s 超时，最多 3 次
-            成功 → 覆盖写 SharedPreferences 并返回
-            失败 → 保留旧缓存，返回旧缓存
-  └─ applyPayload(payload)
-       设置 remotePayloadReady = true
-       解析 7 组配置 → 清空 SpAdCache → 预加载 ac_launch
+SpAdsHub.initialize()
+  └─ SpConfigBootstrapper.start()
+       ├─ loadAndApplyConfig()          // Mutex：有缓存先 dispatch，满 3 小时再拉远端
+       ├─ reportCloakIfNeeded()         // POST api/cloak，安装周期内成功一次即止
+       └─ monitorRemoteConfig()         // configApplied 之后每 3 小时刷新
+            └─ SpConfigRepository.load()
+                 └─ SpConfigRemoteSource.fetch()  POST {baseUrl}api/dispatch
+                      成功（HTTP 2xx 且 code∈{0,200} 且 data 非空）→ 写缓存 → dispatch(Available)
+                      失败 → 回落缓存；没缓存 → dispatch(Unavailable)
+  └─ dispatch
+       Available   → applyPayload：7 组业务配置 + 5 个总闸 → 清广告缓存 → 预加载 ac_launch
+                     remotePayloadReady = true
+       Unavailable → adConfig 置空（关广告），remotePayloadReady 保持 false
+       无论成败都把 configApplied 置 true
 ```
 
-**解析容错**：值既可以是嵌套 JSON 对象，也可以是 JSON 字符串（Apollo 从 Remote Config 取出的是字符串形态），两种都认；缺项回落本地默认；未列出的 key 忽略；单个位置格式错只丢那个位置。
+**远端请求前**（`buildDispatchRequest`，对齐 EfileScan）：Referrer / Distinct ID / GAID **并行**取齐后才 `POST`。Referrer 流程见下；Distinct ID 为空则不发 dispatch。有配置缓存时先立刻生效，不堵在 Referrer 上；只有真正打接口时才等。
 
-### 4.2 请求字段（`SpConfigWire`）
+**Install Referrer**（`SpPlayInstallReferrerProvider`，对齐 `PlayInstallReferrerProvider`）：
 
-| 字段 | 语义 | 现状 |
+```
+resolveInstallReferrer()
+  ├─ SharedPreferences 已有非空值 → 直接用，不再连 Play
+  └─ 否则 InstallReferrerClient.startConnection
+       ├─ 5 秒超时（withTimeoutOrNull）→ null
+       ├─ responseCode == OK → 读 installReferrer，去控制字符 / trim / 截断 2048
+       │    非空 → 落盘，之后只读本地
+       └─ 其他响应码 / 断连 / 异常 → null
+  返回值（可能是空串）写入请求字段 tsd589，然后才 POST
+```
+
+EfileScan **没有** Referrer 重试循环：连一次、等最多 5 秒，失败就带空串继续请求。本工程相同。sideload / 没接 Play 商店时 `tsd589` 仍会是空串，这是 SDK 拿不到，不是没等。
+
+**解析容错**：值既可以是嵌套 JSON 对象，也可以是 JSON 字符串。缺项回落本地默认；未列出 key 忽略；单个位置格式错只丢那个位置。
+
+debug 的 Base URL 是 `https://testserver.googletogoogle.com/`；release 留空（prod 地址待后端分配）。8 个请求字段 Key 已写入两份 `sp_dispatch_config.xml`：`hne8oo` / `ke3har` / `1bfui7` / `pz9zqb` / `b3dgej` / `tsd589` / `0ifdut` / `y1ywr3`。校验不通过（地址不是 https 且以 `/` 结尾，或 Key 为空 / 重复 / `REPLACE_KEY`）就不发请求，不崩溃。
+
+### 4.2 请求字段
+
+请求 JSON **不使用语义化字段名**，8 个混淆 Key 始终全部发送，取不到的发空串。取值对齐 EfileScan §3.2：
+
+| 语义 | 取值 | 现状 |
 |---|---|---|
-| `appName` | applicationId | 已实现 |
-| `version` | `versionName.versionCode` | 已实现 |
-| `distinctId` | 设备标识 | 本机持久 UUID 占位，**尚未与 BI / Adjust 对齐** |
-| `gaid` | Google 广告 ID | 已实现（IO 线程取，主线程会抛异常） |
-| `phoneModel` | `Build.MODEL` | 已实现 |
-| `refer` | Install Referrer 原文 | **恒为空串**，ScanPro 未接 Install Referrer |
-| `language` / `osVersion` | 语言 / 系统版本 | 已实现 |
+| 包名 | `application.packageName` | 已实现 |
+| 版本号 | `VERSION_NAME.substringBefore('-')` | 已实现 |
+| Distinct ID | 本机持久 UUID | **尚未与 BI / Adjust 对齐**；为空则不发 dispatch |
+| GAID | `AdvertisingIdClient`（IO 线程） | 取不到发空串 |
+| 机型 | `Build.MODEL`，空则 `unknown` | 已实现 |
+| Install Referrer | Play Install Referrer SDK | 首次取到后持久化，之后只读本地；去控制字符、trim、截断 2048；超时/失败发空串。不接 Adjust，不追加 `adjust-pass` |
+| 语言 | `toLanguageTag()`，如 `en-US` | 已实现 |
+| 系统版本 | `Build.VERSION.RELEASE`，空则 `unknown` | 已实现 |
 
-⚠️ **`BASE_URL` 和 `PATH` 都是空串**。字段的混淆名要等「中台配置接入文档」到手才能定，**不许照抄别的包的域名或混淆字段**。配置未接入时整个 config 模块整体跳过。
+公共头：`Accept: */*`、`Content-Type: application/json; charset=UTF-8`、`X-App-Id`、`X-App-Version`、`X-Environment`（debug=`staging`，release=`prod`）。每次 dispatch 前报 `biconfig_request`。
 
-### 4.3 响应 key（照抄 Apollo，中台原样透传即可）
+`api/cloak` 入参相同；成功条件是 HTTP 2xx **且** `code == 200`（不认 0）。
+
+### 4.3 响应 key（照抄 Apollo，放在 `data` 里）
 
 | 容器 key | 内容 | 使用方 |
 |---|---|---|
 | `ac_ad_config` | 17 个位置 → 单元列表 | 广告层 |
 | `ac_nat_config` | `switch_open` / `jump_percent` | 原生关闭键 |
 | `new_config` | 退后台通知策略（4 场景 × 冷却/上限/延迟） | 通知层「新」判据 |
-| `acpop_config` | 广告点击弹窗策略 + 免打扰时段 + `ac_a`（闹钟间隔分钟） | 通知层「老」判据、闹钟排程 |
-| `pop_refresh` | 通知重发（`pop_refresh_switch` / `times` / `interval`） | 重发循环 |
+| `acpop_config` | 广告点击弹窗策略 + 免打扰时段 + `ac_a` | 通知层「老」判据、闹钟排程 |
+| `pop_refresh` | 通知重发 | 重发循环 |
 | `media_config` | `switch` / `intervalTime` | media2 一路 |
 | `win_pop_config` | 窗口弹窗误触 | **仅解析，未接线** |
+| `ads_limit` | `ac_ads_limit` | `SpBlockingLogic` |
+| `global_block` | `global_block_switch` | 总闸 |
+| `google_play_block` | `google_play_block` | 总闸 |
+| `vpn_config_switch` | `vpn_config_switch` | VPN 拦截 |
+| `virtual_block_switch` | `virtual_block_switch` | 虚拟键 |
 
-位置白名单校验：不在 `SpAdPosition.ALL` 里的 key 会被丢弃并打 warn，防止下发拼错的 key 被当成新位置。
+`ac_u_limit` 以小写 l 为准（`AcPopConfig` 的 SerializedName）；`ac_u_Limit` 是 Apollo DefaultConfig 的笔误，解析时两种都认。
+
+**下发可保留、客户端忽略**（依赖未移植的买量 / 设备 / 用户维度）：`gsbnnsk`、`ac_black_refer_user`、`adb_block_switch`、`samsung_ac_pop`、`samsung_new_config`、`code_config`。
+
+位置白名单校验：不在 `SpAdPosition.ALL` 里的 key 会被丢弃并打 warn。
+
+总闸解析：key 缺失保持当前值；解析异常按 Apollo 回落（`ads_limit=30`、`global=1`、`google_play=0`、`vpn=1`、`virtual=1`）。
 
 ---
 
@@ -215,7 +265,7 @@ SpAdsHub.refreshConfig()
 | `isShowPartialAdsOnly(position)` | **恒 `false`** | 原逻辑是「保量位 且 用户是特殊/自然量」，用户维度不迁 |
 | `PART_SHOW_POSITIONS` | 常量表保留 | 将来接回用户维度用，现在不参与判断 |
 
-> **这 5 个开关目前没有任何远端下发入口**，全部取代码里写死的默认值。若要让运营能动，需要单独定 key（现在没定，不许自己加）。
+> 这 5 个开关已从 `data` 里的 `ads_limit` / `global_block` / `google_play_block` / `vpn_config_switch` / `virtual_block_switch` 解析写入。key 缺失保持当前默认值。
 
 ### 5.3 缓存 `SpAdCache`
 
@@ -287,15 +337,30 @@ Apollo 三路，我们只接了一路：
 
 ### 5.8 现在真正接到页面的位置（重要）
 
-| 位置 | 接在哪 | 形态 |
+开屏结束按 Apollo `SplashActivity.nextPage`：卸载入口 → `SpUnInstall01Activity`；首次打开 → `SpGuideLanguageActivity` → `SpGuideInfoActivity`；否则 → `CamShellActivity`。引导页 Skip 才把 `IS_FIRST_OPEN` 写成 false。
+
+| 位置 | 接在哪 | 形态 / 触发 |
 |---|---|---|
 | `ac_launch` | `CamPdfApp` 启动预加载 + `SpBootActivity` 展示 | 开屏 |
+| `ac_language_nat` | `SpGuideLanguageActivity` 进页先 `GONE`，就绪才显示 | 原生 small |
+| `ac_language_int` | 进页预加载；点 Next 或 5 秒倒计时结束 `showInterstitialAdNoWait` | 插屏，无缓存不等待 |
+| `ac_guide_nat` | `SpGuideInfoActivity` 进页先 `GONE`，就绪才显示 | 原生 big |
+| `ac_guide_int` | 进页预加载；点 Skip 后 `showInterstitialAdNoWait` | 插屏，无缓存不等待 |
+| `ac_main_nat` | `CamShellActivity` 进页加载 | 原生 small，挂在底栏上方 |
+| `ac_recent_banner` | `CamShellActivity` 进页加载 | Banner，挂在原生与底栏之间。Apollo 位名叫 recent，但是挂在首页 Activity 上 |
+| `ac_file_int` | 底栏切 Home / Recent / Made；点扫描 | 插屏。距上次展示不足 60 秒不弹；无缓存只预加载。扫描会等关闭再进拍照页 |
+| `ac_top_int` | 首页 PDF / Word / Excel / PPT / TXT 类型切换 | 插屏，同样 60 秒节流；默认 PDF 第一次选中不弹 |
+| `ac_check_int` | `CamDocRouter.open` 打开文件 | 插屏，关掉或无缓存后再进阅读器 |
+| `ac_mainback_int` | `CamPdfReaderActivity` / `CamOfficeReaderActivity` / 设置里的 `CamLanguageActivity` 返回 | 插屏，进页预加载 |
+| `ac_setting_nat` | `CamSettingsActivity` 进页加载 | 原生 big |
 | `ac_uninstall1_int` | `SpUnInstall01Activity` 进页预加载 + 点「卸载」展示 | 插屏 |
 | `ac_uninstall1_nat` | `SpUnInstall01Activity` 进页加载展示 | 原生 small |
 | `ac_uninstall2_int` | `SpUnInstall02Activity` 进页预加载 + 确认框「卸载」后展示 | 插屏 |
 | `ac_uninstall2_nat` | `SpUnInstall02Activity` 进页先 `GONE`，就绪才显示 | 原生 small |
 
-**其余 12 个位置只有常量、配置解析和管理器能力，页面上没有接。** 首页 / 最近 / 语言 / 引导 / 结果页目前都没有广告容器（`res/layout` 里带广告容器的只有两个挽留页）。要接的话是新增工作，不是「已有功能没生效」。
+**`ac_recent_nat` 不展示。** Apollo `HomeActivity` 没有任何页面调用这个位置，本工程也不新建展示位。
+
+展示前仍走 `SpBlockingLogic`（部分展示、次数、VPN、总闸）。插屏「不等待」与两步卸载页同一套 `showInterstitialAdNoWait`。
 
 ### 5.9 UMP / WebView 预热
 
@@ -444,11 +509,12 @@ Apollo 还有两件事这里不做（与通知无关）：`toReStartApp` 触发�
 桌面「卸载」快捷方式（app_shortcuts.xml / delete_action）
   → SpLeaveEntryActivity           中转一帧，补 NEW_TASK | CLEAR_TASK
   → SpBootActivity                 冷启动（isTaskRoot 才能过）
-  → CamShellActivity               摘掉 sp_open_leave 标记 → 开第 1 步
-  → SpUnInstall01Activity          第 1 步
+  → SpUnInstall01Activity          第 1 步（开屏 nextPage 优先于首次引导）
   → SpUnInstall02Activity          第 2 步
   → 系统「应用详情」页（ACTION_APPLICATION_DETAILS_SETTINGS）
 ```
+
+`CamShellActivity` 仍保留 `maybeOpenLeaveFlow`，防止以后还有人把 `sp_open_leave` 直接丢给首页。
 
 **为什么要有中转页**：静态快捷方式的 intent **带不了 flag**，而开屏要求自己必须是 task root（否则直接 `finish()`）——App 已在后台时点快捷方式就会什么都不发生。所以由 `SpLeaveEntryActivity` 把 action / extras / data / categories 原样搬到去开屏的 intent 上，补 `NEW_TASK | CLEAR_TASK`（Apollo 的 `268468224` 就是这两位）再拉起，清掉旧任务栈让开屏成为新的 task root。界面沿用开屏布局，只活一帧，切过去不闪。
 
@@ -514,6 +580,7 @@ Apollo 还有两件事这里不做（与通知无关）：`toReStartApp` 触发�
 | `Shark_ad_impression_error` | 全屏 | `code`、`message` |
 | `Shark_ad_click` | 全屏、Banner | 无参数 |
 | `Shark_ad_close` | 全屏 | 无参数 |
+| `biconfig_request` | `SpConfigRemoteSource` 每次 dispatch 前 | 无 |
 | `system_notification_trigger` | `SpSendManager` | `type`（场景） |
 | `media_notification_trigger` | `SpSendManager` | `type` |
 | `always_notification_trigger` | `SpPersistentNotifyManager`、`SpApoForegroundService` | 无 |
@@ -552,14 +619,14 @@ Apollo 还有两件事这里不做（与通知无关）：`toReStartApp` 触发�
 
 | 现象 | 原因 |
 |---|---|
-| **一个广告都不会加载** | 中台 `BASE_URL` / `PATH` 是空串 → 配置拿不到 → `ac_ad_config` 里没有任何单元 ID |
+| **一个广告都不会加载** | release 的 Base URL 仍空，不发请求；debug 会发 `api/dispatch`，但远端 `data` 里还没有本项目的广告单元时同样不会加载 |
 | **开屏直接进主界面** | `ac_launch` 没有单元，`presentLaunchAd` 立刻回调 `onDone` |
-| **四个延迟场景的通知不发**（`home_click` / `recent_click` / `no_page_exist` / `ad_click`） | 它们要求「远端配置已到过一次」，`remotePayloadReady` 恒 `false` |
+| **四个延迟场景的通知不发**（`home_click` / `recent_click` / `no_page_exist` / `ad_click`） | 它们要求「远端配置已到过一次」，`remotePayloadReady` 在 Unavailable 时保持 `false` |
 | **三个无延迟场景的通知会发**（`scheduled` / `unlock` / `alarm_clock`） | 它们**没有**这道前置，只要通知权限 + 总闸 + 频控 + 不在 0–6 点就发 |
 | **保活会起来** | 与配置无关，冷启动 5s 后挂常驻通知（12+ 只发通知） |
 | **卸载挽留两步页能打开、但没有广告** | 入口已开（`ENABLED = true` + 快捷方式），广告位没 ID |
 
-**所以联调的第一件事是把中台配置接上**（`SpConfigWire.BASE_URL` / `PATH` + 接入文档给的字段混淆名），否则看不到广告链路和四个延迟场景的任何效果。
+**debug 混淆 Key 已填。** 联调看的是远端 `data` 是否下发了本项目的 Apollo JSON（尤其 `ac_ad_config`）。release 的 Base URL 还空着，等 prod 地址。
 
 ---
 
@@ -567,13 +634,13 @@ Apollo 还有两件事这里不做（与通知无关）：`toReStartApp` 触发�
 
 | # | 事项 | 卡住什么 | 谁回 |
 |---|---|---|---|
-| 1 | 中台「ScanPro 配置接入文档」：`BASE_URL` / `PATH` / 请求字段混淆名 | 全部配置、全部广告、四个延迟场景通知 | 中台 / Black |
+| 1 | release 的 `api/dispatch` Base URL；以及后端 `data` 按本项目 Apollo JSON 下发 | 线上包配置、广告、四个延迟场景通知、cloak | 中台 / Black |
 | 2 | `ad_impression_revenue` 的 `currency` 要不要从硬编码 `"USD"` 改成 `AdValue.currencyCode` | 非美元地区的收入口径 | Black |
 | 3 | 要不要补 Adjust / Facebook 依赖（三路收入上报） | 收入回传完整度 | Black |
 | 4 | `refer` 字段：ScanPro 是否接 Install Referrer | 归因字段拿不到真实值 | Black |
 | 5 | `distinctId` 与 BI / Adjust 的设备标识对齐 | 配置请求里的设备标识目前是本机 UUID 占位 | Black |
-| 6 | `SpBlockingLogic` 的 5 个开关要不要做成远端可下发 | 运营能不能动态调总闸和日限 | Black |
-| 7 | 其余 12 个广告位（首页 / 最近 / 语言 / 引导 / 结果 / mainback / Banner）要不要接 | 变现密度 | Black |
+| 6 | `SpBlockingLogic` 的 5 个开关已从 dispatch `data` 解析；运营要能动需后端下发对应 key | 已接线，待联调 | — |
+| 7 | 16 个广告位已接到对应页面；`ac_recent_nat` 按反编译不展示 | 已接线 | — |
 | 8 | 原生广告点击收不到（`ad_click` 提醒少一路触发）要不要补 | 一个通知触发场景 | Black |
 | 9 | `SpSceneCode.kt` 文件头注释写「45 个常量」，实际是 42 个（40 场景码 + 2 个 `from_type` 取值） | 注释与代码不符，需核对 Apollo 原表 | 研发 |
 

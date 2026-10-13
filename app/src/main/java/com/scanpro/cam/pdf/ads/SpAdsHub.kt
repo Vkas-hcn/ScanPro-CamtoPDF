@@ -7,16 +7,23 @@ import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpFullScreenAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.analytics.SpSceneCode
-import com.scanpro.cam.pdf.config.SpConfigIdentity
+import com.scanpro.cam.pdf.config.SpConfigBootstrapper
+import com.scanpro.cam.pdf.config.SpConfigLoadResult
+import com.scanpro.cam.pdf.config.SpConfigRemoteSource
+import com.scanpro.cam.pdf.config.SpConfigRepository
 import com.scanpro.cam.pdf.config.SpConfigStore
 import com.scanpro.cam.pdf.notice.SpAcPopConfig
 import com.scanpro.cam.pdf.notice.SpMediaConfig
 import com.scanpro.cam.pdf.notice.SpNewConfig
 import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.scanpro.cam.pdf.notice.SpWinPopConfig
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 
 /**
  * 广告总入口。合并 ApolloPDF 里散在 `ApoApplication` / `RemoteConfig` / `BaseActivity`
@@ -27,15 +34,23 @@ import kotlinx.coroutines.launch
  * - `remote/RemoteConfig.java`（`getAcAdConfig` / `getNatConfig` / `getNewConfig` …）
  * - `ui/base/BaseActivity.java`（`FullScreenAdManager(this)`）
  *
- * **远端配置不走 Apollo 的实现**（Firebase Remote Config），改走我们自己的中台配置下发
- * （`config/SpConfigStore`），按 Black 的要求。
+ * **远端配置不走 Apollo 的 Firebase Remote Config**，改走中台 `api/dispatch`
+ * （`config/SpConfigBootstrapper`），按 Black 的要求。
  */
 class SpAdsHub private constructor(
     private val app: Application,
     private val scope: CoroutineScope,
 ) {
 
-    private val configStore = SpConfigStore(app)
+    private val configStore = SpConfigStore()
+    private val remoteSource = SpConfigRemoteSource(app)
+    private val configRepository = SpConfigRepository(app, remoteSource)
+    private val bootstrapper = SpConfigBootstrapper(
+        app,
+        configRepository,
+        remoteSource,
+        ::onConfigResult,
+    )
     private val blocking = SpBlockingLogic.get(app)
 
     @Volatile
@@ -58,12 +73,27 @@ class SpAdsHub private constructor(
     @Volatile
     private var remotePayloadReady = false
 
+    /** 开屏 UMP 结束（或超时）后完成。预加载最多等 [SpUmpGate.DEFAULT_TIMEOUT_MS]。 */
+    private val umpGate = CompletableDeferred<Unit>()
+
     fun initialize() {
         if (!booted.compareAndSet(false, true)) return
         SpAdSession.attachLifecycle(app)
-        SpAdMobInit.get(app).init(scope)
-        refreshConfig()
+        scope.launch(Dispatchers.Main.immediate) {
+            SpWebWarmup.awaitWarmupReady(app)
+            SpAdMobInit.get(app).init(scope)
+            bootstrapper.start()
+        }
     }
+
+    /** 冷启动页调用。2.5 秒兜底在 [SpUmpGate] 内部。 */
+    suspend fun requestStartupConsent(activity: Activity) {
+        if (umpGate.isCompleted) return
+        runCatching { SpUmpGate(app).requestUmpConsent(activity) }
+        if (!umpGate.isCompleted) umpGate.complete(Unit)
+    }
+
+    val configApplied: StateFlow<Boolean> get() = bootstrapper.configApplied
 
     // region 配置
 
@@ -80,16 +110,17 @@ class SpAdsHub private constructor(
 
     /** 冷启动 / 回前台拉一次配置；未到 3 小时直接读缓存，零网络开销。 */
     fun refreshConfig() {
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                val payload = configStore.refreshIfStale(SpConfigIdentity.build(app))
-                applyPayload(payload)
-            }.onFailure { Log.w(TAG, "config refresh failed safely", it) }
+        bootstrapper.refresh()
+    }
+
+    private fun onConfigResult(result: SpConfigLoadResult) {
+        when (result) {
+            is SpConfigLoadResult.Available -> applyPayload(result.payload)
+            is SpConfigLoadResult.Unavailable -> applyUnavailable(result.reason)
         }
     }
 
-    private fun applyPayload(payload: org.json.JSONObject?) {
-        if (payload == null) return
+    private fun applyPayload(payload: JSONObject) {
         // Apollo 每个触发器开头都有 `if (remoteConfig.newConfig == null) return`：
         // 远端配置没回来之前不发通知。这里用同一语义的开关表达。
         remotePayloadReady = true
@@ -101,18 +132,34 @@ class SpAdsHub private constructor(
         popRefresh = configStore.popRefresh(payload)
         mediaConfig = configStore.mediaConfig(payload)
         winPopConfig = configStore.winPopConfig(payload)
+        applyBlocking(payload)
         Log.i(
             TAG,
             "config applied positions=${next.byPosition.keys} nat=${natConfig.switchOpen}/${natConfig.jumpPercent}",
         )
-        // 位置集合变了，旧缓存的 TTL 口径可能不同，清一次
         SpAdCache.clearAll()
         preloadLaunchAd()
+    }
+
+    private fun applyUnavailable(reason: String) {
+        adConfig = SpAdConfig()
+        SpAdCache.clearAll()
+        Log.w(TAG, "config unavailable ads off: $reason")
+    }
+
+    private fun applyBlocking(payload: JSONObject) {
+        val patch = configStore.blockingConfig(payload)
+        patch.acAdsLimit?.let { blocking.acAdsLimit = it }
+        patch.globalBlockSwitch?.let { blocking.globalBlockSwitch = it }
+        patch.googlePlayBlock?.let { blocking.googlePlayBlock = it }
+        patch.vpnConfigSwitch?.let { blocking.vpnConfigSwitch = it }
+        patch.virtualBlockSwitch?.let { blocking.virtualBlockSwitch = it }
     }
 
     /** 用 `ac_launch` 预算开屏广告。Apollo 在 Application 初始化后就会预热。 */
     fun preloadLaunchAd() {
         scope.launch(Dispatchers.Main) {
+            withTimeoutOrNull(SpUmpGate.DEFAULT_TIMEOUT_MS) { umpGate.await() }
             runCatching { preloadManager.checkAndLoadAd(SpAdPosition.AC_LAUNCH) }
                 .onFailure { Log.w(TAG, "preloadLaunchAd failed", it) }
         }

@@ -12,6 +12,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
+import com.scanpro.cam.pdf.ads.SpAdPosition
+import com.scanpro.cam.pdf.ads.SpPageAdTriggers
+import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
+import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.made.CamMadeFragment
 import com.scanpro.cam.pdf.databinding.ActivityCamShellBinding
@@ -30,6 +34,8 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
 
     private var currentTab = Tab.HOME
     private var appliedLocaleGeneration = SpLocale.generation
+    private var mainNativeAdManager: SpNativeAdManager? = null
+    private var bannerAdManager: SpBannerAdManager? = null
 
     override fun inflateBinding(inflater: LayoutInflater): ActivityCamShellBinding {
         return ActivityCamShellBinding.inflate(inflater)
@@ -38,10 +44,12 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     override fun initView(savedInstanceState: Bundle?) {
         appliedLocaleGeneration = SpLocale.generation
         applyShellNavInset()
-        binding.tabHome.setOnClickListener { switchShellTab(Tab.HOME) }
-        binding.tabScan.setOnClickListener { CamCaptureActivity.start(this) }
-        binding.tabRecent.setOnClickListener { switchShellTab(Tab.RECENT) }
-        binding.tabMade.setOnClickListener { switchShellTab(Tab.CREATION) }
+        binding.tabHome.setOnClickListener { onBottomTabClicked(Tab.HOME) }
+        binding.tabScan.setOnClickListener {
+            SpPageAdTriggers.showFileIntThen(this) { CamCaptureActivity.start(this) }
+        }
+        binding.tabRecent.setOnClickListener { onBottomTabClicked(Tab.RECENT) }
+        binding.tabMade.setOnClickListener { onBottomTabClicked(Tab.CREATION) }
 
         if (savedInstanceState == null) {
             switchShellTab(Tab.HOME)
@@ -55,6 +63,7 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             currentTab = Tab.entries[savedInstanceState.getInt(KEY_TAB, 0)]
             refreshTabChrome(currentTab)
         }
+        loadHomeAds()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -90,6 +99,14 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         }
     }
 
+    override fun onDestroy() {
+        mainNativeAdManager?.release()
+        mainNativeAdManager = null
+        bannerAdManager?.release()
+        bannerAdManager = null
+        super.onDestroy()
+    }
+
     private fun applyShellNavInset() {
         val nav = binding.shellNav
         val initialBottom = nav.paddingBottom
@@ -99,6 +116,21 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             insets
         }
         ViewCompat.requestApplyInsets(binding.shellRoot)
+    }
+
+    private fun onBottomTabClicked(tab: Tab) {
+        if (currentTab == tab) return
+        switchShellTab(tab)
+        SpPageAdTriggers.checkLoadAdByTab(this, SpAdPosition.AC_FILE_INT)
+    }
+
+    private fun loadHomeAds() {
+        if (mainNativeAdManager == null) {
+            mainNativeAdManager = SpPageAdTriggers.bindMainNative(this, binding.nativeAdLayout)
+        }
+        if (bannerAdManager == null) {
+            bannerAdManager = SpPageAdTriggers.bindRecentBanner(this, binding.bannerAdLayout)
+        }
     }
 
     private fun switchShellTab(tab: Tab) {

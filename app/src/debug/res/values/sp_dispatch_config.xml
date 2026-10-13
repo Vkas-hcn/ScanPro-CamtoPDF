@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sp_dispatch_base_url" translatable="false">https://testserver.googletogoogle.com/</string>
+    <string name="sp_dispatch_request_package" translatable="false">hne8oo</string>
+    <string name="sp_dispatch_request_version" translatable="false">ke3har</string>
+    <string name="sp_dispatch_request_distinct_id" translatable="false">1bfui7</string>
+    <string name="sp_dispatch_request_gaid" translatable="false">pz9zqb</string>
+    <string name="sp_dispatch_request_device_model" translatable="false">b3dgej</string>
+    <string name="sp_dispatch_request_referrer" translatable="false">tsd589</string>
+    <string name="sp_dispatch_request_language" translatable="false">0ifdut</string>
+    <string name="sp_dispatch_request_os_version" translatable="false">y1ywr3</string>
+</resources>

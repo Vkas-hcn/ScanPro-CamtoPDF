@@ -172,5 +172,8 @@ object SpTracker {
     /** Prefix for sanitized Adjust network event (keep total name ≤ 40). */
     const val ADJUST_NETWORK_PREFIX = "adj_net_"
     const val ADJUST_CAMPAIGN_PREFIX = "adj_camp_"
+
+    /** 每次发起 `api/dispatch` 前上报（EfileScan `biconfig_request`）。 */
+    const val BICONFIG_REQUEST = "biconfig_request"
     // endregion
 }

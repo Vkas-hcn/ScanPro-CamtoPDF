@@ -20,6 +20,7 @@ firebaseBom = "33.7.0"
 googleServices = "4.4.2"
 userMessagingPlatform = "3.2.0"
 androidxWork = "2.9.1"
+installReferrer = "2.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -49,6 +50,7 @@ user-messaging-platform = { group = "com.google.android.ump", name = "user-messa
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-config = { group = "com.google.firebase", name = "firebase-config" }
+install-referrer = { group = "com.android.installreferrer", name = "installreferrer", version.ref = "installReferrer" }
 google-services-plugin = { group = "com.google.gms", name = "google-services", version.ref = "googleServices" }
 
 [plugins]

@@ -82,6 +82,7 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.work.runtime)
     implementation(libs.play.services.ads.identifier)
+    implementation(libs.install.referrer)
     implementation(libs.play.services.ads)
     implementation(libs.play.review)
     implementation(libs.play.review.ktx)

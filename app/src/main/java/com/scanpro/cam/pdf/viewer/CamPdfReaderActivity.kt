@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -15,6 +16,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.scanpro.cam.pdf.R
+import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamPdfReaderBinding
 import com.scanpro.cam.pdf.home.CamFileItem
@@ -34,7 +36,16 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         applyInsets()
-        binding.btnBack.setOnClickListener { finish() }
+        SpPageAdTriggers.preloadMainBack(this)
+        binding.btnBack.setOnClickListener { leaveWithBackAd() }
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    leaveWithBackAd()
+                }
+            },
+        )
 
         val uri = intent.getStringExtra(EXTRA_URI).orEmpty()
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
@@ -104,6 +115,13 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
                     }
                 }
             }
+        }
+    }
+
+    private fun leaveWithBackAd() {
+        if (isFinishing || isDestroyed) return
+        SpPageAdTriggers.showBackHomeIntThen(this) {
+            if (!isFinishing && !isDestroyed) finish()
         }
     }
 

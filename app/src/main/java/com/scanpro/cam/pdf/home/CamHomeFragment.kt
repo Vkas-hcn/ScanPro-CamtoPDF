@@ -25,6 +25,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.scanpro.cam.pdf.R
+import com.scanpro.cam.pdf.ads.SpAdPosition
+import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.base.SpFragment
 import com.scanpro.cam.pdf.made.CamRenameResult
 import com.scanpro.cam.pdf.databinding.FragmentCamHomeBinding
@@ -68,11 +70,11 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
         binding.rvFiles.layoutManager = LinearLayoutManager(requireContext())
         binding.rvFiles.adapter = fileAdapter
 
-        binding.typeTxt.setOnClickListener { viewModel.selectType(FileType.TXT) }
-        binding.typePdf.setOnClickListener { viewModel.selectType(FileType.PDF) }
-        binding.typePpt.setOnClickListener { viewModel.selectType(FileType.PPT) }
-        binding.typeXls.setOnClickListener { viewModel.selectType(FileType.XLS) }
-        binding.typeDoc.setOnClickListener { viewModel.selectType(FileType.DOC) }
+        binding.typeTxt.setOnClickListener { selectTypeAndMaybeAd(FileType.TXT) }
+        binding.typePdf.setOnClickListener { selectTypeAndMaybeAd(FileType.PDF) }
+        binding.typePpt.setOnClickListener { selectTypeAndMaybeAd(FileType.PPT) }
+        binding.typeXls.setOnClickListener { selectTypeAndMaybeAd(FileType.XLS) }
+        binding.typeDoc.setOnClickListener { selectTypeAndMaybeAd(FileType.DOC) }
 
         binding.btnGrantPermission.setOnClickListener { requestStorageAccess() }
         binding.btnSettings.setOnClickListener {
@@ -87,6 +89,8 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
         })
 
         refreshStorageAccess()
+        // 默认 PDF 算第一次选中，之后用户点类型才弹 `ac_top_int`
+        typeAdArmed = true
     }
 
     override fun observeData() {
@@ -134,9 +138,24 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
         viewModel.onPermissionResult(granted)
     }
 
+    /**
+     * Apollo `HomeActivity.initTabs` 的 `isJudgeTimeAndLoadTabAd`：
+     * 第一次选中只记账，之后的类型切换才弹 `ac_top_int`。
+     */
+    private var typeAdArmed = false
+
+    private fun selectTypeAndMaybeAd(type: FileType) {
+        viewModel.selectType(type)
+        if (!typeAdArmed) {
+            typeAdArmed = true
+            return
+        }
+        activity?.let { SpPageAdTriggers.checkLoadAdByTab(it, SpAdPosition.AC_TOP_INT) }
+    }
+
     private fun openCamFile(item: CamFileItem) {
         if (isAdded) {
-            CamDocRouter.open(requireContext(), item)
+            CamDocRouter.open(requireActivity(), item)
         }
     }
 

@@ -114,6 +114,10 @@
     <string name="guide_agree_full">I Agree To %1$s And %2$s</string>
     <string name="guide_terms_of_service">Terms Of Service</string>
     <string name="guide_agree_required">Please agree to the privacy policy</string>
+    <string name="guide_next">Next</string>
+    <string name="guide_page_1">Scan paper and photos into clear PDF files</string>
+    <string name="guide_page_2">Open Word, Excel and PPT in one place</string>
+    <string name="guide_page_3">Find recent files and keep working</string>
     <string name="guide_skip">Skip</string>
     <string name="guide_allow">Allow</string>
     <string name="guide_overlay_headline">Don\'t Miss Important Notifications</string>

@@ -104,6 +104,10 @@
     <string name="guide_agree_full">J\'accepte la %1$s et les %2$s</string>
     <string name="guide_terms_of_service">Conditions d\'utilisation</string>
     <string name="guide_agree_required">Veuillez accepter la politique de confidentialité</string>
+    <string name="guide_next">Suivant</string>
+    <string name="guide_page_1">Numérisez papier et photos en PDF nets</string>
+    <string name="guide_page_2">Ouvrez Word, Excel et PPT au même endroit</string>
+    <string name="guide_page_3">Retrouvez les fichiers récents et continuez</string>
     <string name="guide_skip">Passer</string>
     <string name="guide_allow">Autoriser</string>
     <string name="guide_overlay_headline">Ne manquez pas les notifications importantes</string>

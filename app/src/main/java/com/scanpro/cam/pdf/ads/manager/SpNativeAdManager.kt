@@ -160,9 +160,17 @@ class SpNativeAdManager internal constructor(
                             putString("message", error.message)
                         },
                     )
-                    // Apollo：换下一个单元
                     val current = loadIndexOfAdPositionMap[position] ?: 0
                     tryLoadAd(position, current + 1)
+                }
+
+                override fun onAdImpression() {
+                    SpTracker.log(appContext, SpTracker.SHARK_AD_IMPRESSION)
+                }
+
+                override fun onAdClicked() {
+                    SpAdSession.markAdClicked()
+                    SpTracker.log(appContext, SpTracker.SHARK_AD_CLICK)
                 }
             })
             .withNativeAdOptions(

@@ -104,6 +104,10 @@
     <string name="guide_agree_full">मैं %1$s और %2$s से सहमत हूँ</string>
     <string name="guide_terms_of_service">सेवा की शर्तें</string>
     <string name="guide_agree_required">कृपया गोपनीयता नीति से सहमत हों</string>
+    <string name="guide_next">आगे</string>
+    <string name="guide_page_1">कागज़ और फ़ोटो को साफ़ PDF में स्कैन करें</string>
+    <string name="guide_page_2">Word, Excel और PPT एक जगह खोलें</string>
+    <string name="guide_page_3">हाल की फ़ाइलें ढूँढें और काम जारी रखें</string>
     <string name="guide_skip">छोड़ें</string>
     <string name="guide_allow">अनुमति दें</string>
     <string name="guide_overlay_headline">महत्वपूर्ण सूचनाएँ न चूकें</string>

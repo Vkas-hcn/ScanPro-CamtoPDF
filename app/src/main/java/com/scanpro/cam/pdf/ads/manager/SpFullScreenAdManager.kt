@@ -110,7 +110,19 @@ class SpFullScreenAdManager(
         sessionIdTryCountMap[sessionId] = 0
         loadingAdStateMap[adInfo.adUnitId] = true
         reportStartLoading(scene, adInfo.adUnitId, sessionId)
+        requestOpenAd(position, adInfo, scene, sessionId)
+    }
 
+    private fun loadInterstitialAd(position: String, adInfo: SpAdInfo, scene: String) {
+        val sessionId = SpAdSession.newId()
+        sessionIdTryCountMap[sessionId] = 0
+        loadingAdStateMap[adInfo.adUnitId] = true
+        reportStartLoading(scene, adInfo.adUnitId, sessionId)
+        requestInterstitialAd(position, adInfo, scene, sessionId)
+    }
+
+    /** 同一 [sessionId] 的一次开屏请求。重试走这里，避免重新发 session、把计数清零。 */
+    private fun requestOpenAd(position: String, adInfo: SpAdInfo, scene: String, sessionId: String) {
         AppOpenAd.load(
             appContext,
             adInfo.adUnitId,
@@ -137,12 +149,13 @@ class SpFullScreenAdManager(
         )
     }
 
-    private fun loadInterstitialAd(position: String, adInfo: SpAdInfo, scene: String) {
-        val sessionId = SpAdSession.newId()
-        sessionIdTryCountMap[sessionId] = 0
-        loadingAdStateMap[adInfo.adUnitId] = true
-        reportStartLoading(scene, adInfo.adUnitId, sessionId)
-
+    /** 同一 [sessionId] 的一次插屏请求。 */
+    private fun requestInterstitialAd(
+        position: String,
+        adInfo: SpAdInfo,
+        scene: String,
+        sessionId: String,
+    ) {
         InterstitialAd.load(
             appContext,
             adInfo.adUnitId,
@@ -170,8 +183,9 @@ class SpFullScreenAdManager(
     }
 
     /**
-     * Apollo `getPreloadCallback().onAdFailedToPreload`：先原地重试满 [tryCountLimit] 次，
-     * 用完才清 loading、清 session，并**换列表里的下一个单元**重来。
+     * Apollo `onAdFailedToPreload`：同一 session 失败次数小于 [tryCountLimit] 时再请求一次，
+     * 满了才换列表里的下一个单元。白牌 SDK 会自己再次回调；GMA 的 `onAdFailedToLoad` 只来一次，
+     * 所以这里必须重新 `load`。
      */
     private fun onPreloadFailed(
         position: String,
@@ -193,11 +207,13 @@ class SpFullScreenAdManager(
         val tried = (sessionIdTryCountMap[sessionId] ?: 0) + 1
         if (tried < tryCountLimit) {
             sessionIdTryCountMap[sessionId] = tried
+            Log.d(TAG, "retry $tried/$tryCountLimit position=$position unit=${adInfo.adUnitId}")
+            if (adInfo.isOpen) requestOpenAd(position, adInfo, scene, sessionId)
+            else requestInterstitialAd(position, adInfo, scene, sessionId)
             return
         }
         loadingAdStateMap[adInfo.adUnitId] = false
         sessionIdTryCountMap.remove(sessionId)
-        // 换下一个单元
         val current = loadIndexOfAdPositionMap[position] ?: 0
         checkAndLoadAd(position, scene, current + 1)
     }
