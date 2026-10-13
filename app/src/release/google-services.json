@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "613491143844",
+    "project_id": "scanpro-cam-to-pdf-e2f41",
+    "storage_bucket": "scanpro-cam-to-pdf-e2f41.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613491143844:android:a0e631162ae5b8a38d2231",
+        "android_client_info": {
+          "package_name": "com.scanpro.cam.pdf"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5FxOfkwjy-rfGcG9qsy82Ew_-yOOe-CA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

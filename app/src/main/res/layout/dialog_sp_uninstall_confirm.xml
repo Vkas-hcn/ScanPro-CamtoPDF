@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 2 步点「卸载」后的确认弹窗。照 ApolloPDF `res/layout/dialog_uninstall_confirm.xml`：
+  标题 + 说明 + 左右两个按钮（卸载 / 继续使用）。弹窗本身在 `SpUnInstall02Activity.showUninstallConfirm`
+  里按 Apollo 的窗口参数摆到底部（宽 MATCH_PARENT、高 WRAP_CONTENT、dim 0.7、不可取消）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/confirm_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_sp_rate_sheet"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingBottom="20dp">
+
+    <TextView
+        android:id="@+id/tv_confirm_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:text="@string/sp_uninstall_exit_title"
+        android:textColor="@color/text_primary"
+        android:textSize="19sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tv_confirm_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:text="@string/sp_uninstall_exit_message"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/btn_confirm_uninstall"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_cancel"
+            android:gravity="center"
+            android:text="@string/sp_uninstall_leave"
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_keep_using"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/cam_btn_primary"
+            android:gravity="center"
+            android:text="@string/sp_uninstall_continue"
+            android:textColor="@color/white"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

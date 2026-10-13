@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="boot_logo_size">120dp</dimen>
+    <dimen name="boot_title_size">28sp</dimen>
+    <dimen name="splash_progress_margin_horizontal">72dp</dimen>
+    <dimen name="boot_progress_margin_bottom">96dp</dimen>
+    <dimen name="splash_progress_thickness">6dp</dimen>
+
+    <dimen name="home_page_padding">16dp</dimen>
+    <dimen name="home_card_radius">16dp</dimen>
+    <dimen name="home_search_height">48dp</dimen>
+    <dimen name="home_logo_size">96dp</dimen>
+    <dimen name="header_settings_to_title">28dp</dimen>
+    <dimen name="header_content_overlap">-32dp</dimen>
+    <dimen name="home_type_icon">40dp</dimen>
+    <dimen name="home_list_icon">44dp</dimen>
+    <dimen name="home_empty_illustration">160dp</dimen>
+    <dimen name="home_permission_illustration">140dp</dimen>
+    <dimen name="tab_icon_size">24dp</dimen>
+    <dimen name="bottom_nav_height">64dp</dimen>
+</resources>

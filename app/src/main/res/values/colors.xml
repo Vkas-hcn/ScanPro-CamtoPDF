@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="cam_accent">#FFFF3B30</color>
+    <color name="cam_accent_light">#FFFFE0D6</color>
+    <color name="cam_accent_soft">#FFFFF0EB</color>
+    <color name="cam_chip_selected">#FFFF3B30</color>
+    <color name="boot_bg">#FFFFF8F5</color>
+    <color name="boot_blob">#33FF9A7A</color>
+    <color name="home_bg">#FFF7F7F8</color>
+    <color name="home_header_start">#FFFFE8DE</color>
+    <color name="home_header_end">#00FFE8DE</color>
+    <color name="text_primary">#FF1A1A1A</color>
+    <color name="text_secondary">#FF9A9A9A</color>
+    <color name="text_hint">#FFB0B0B0</color>
+    <color name="tab_unselected">#FFBDBDBD</color>
+    <color name="divider">#FFF0F0F0</color>
+    <color name="sp_shelf_divider">#AEB8CC</color>
+    <color name="card_stroke">#FFF2F2F2</color>
+
+    <!-- 通知（Apollo `text_color_notify` / 按钮橙） -->
+    <color name="sp_notify_text">#FF333333</color>
+    <color name="sp_notify_btn">#FFFF9800</color>
+</resources>

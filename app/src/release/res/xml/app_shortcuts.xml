@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  桌面静态快捷方式（release）。
+  `delete_action` 是卸载挽留的入口：点它 → SpLeaveEntryActivity（中转一帧）→ SpBootActivity
+  → 主界面 → SpUnInstall01Activity → SpUnInstall02Activity。判据见 `SpLeaveEntry.isLeaveLaunch`。
+
+  这里必须指向 `SpLeaveEntryActivity` 而不是开屏：快捷方式的 intent 带不了 flag，
+  而开屏要求自己是 task root（否则直接 finish），App 在后台时点快捷方式会没反应。
+  中转页负责补 `NEW_TASK | CLEAR_TASK`，等价 Apollo 的 `DeleteActivity`。
+
+  开关有两处，必须同时改：
+  1. 本文件（`src/debug/res/xml` 与 `src/release/res/xml` 各一份，debug 的 targetPackage 是 com.test.lwapp）；
+  2. `SpLeaveEntry.ENABLED`。
+
+  `android:targetClass` 用完整类名：静态快捷方式的 intent 由系统直接构造，不走 manifest 的包名解析。
+  源码里那个 `sp_from_type=delete_app` 决定这次开屏按 `ac_launch_uninstall` 场景上报。
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="delete_action"
+        android:enabled="true"
+        android:icon="@drawable/cam_app_mark"
+        android:shortcutShortLabel="@string/shortcut_leave"
+        android:shortcutLongLabel="@string/shortcut_leave">
+        <intent
+            android:targetPackage="com.scanpro.cam.pdf"
+            android:targetClass="com.scanpro.cam.pdf.leave.SpLeaveEntryActivity"
+            android:action="com.scanpro.cam.pdf.delete">
+            <extra
+                android:name="sp_from_type"
+                android:value="delete_app" />
+        </intent>
+    </shortcut>
+</shortcuts>

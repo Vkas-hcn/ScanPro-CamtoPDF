@@ -1,0 +1,50 @@
+# Built application files
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# Generated files
+bin/
+gen/
+out/
+# Signed APK export folders (do not ignore app/src/release source set)
+/release/
+/app/release/
+
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local configuration (SDK path, etc.)
+local.properties
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.navigation/
+
+# Kotlin
+.kotlin/
+
+# NDK / CMake
+.externalNativeBuild/
+.cxx/
+
+# Captures / profiling
+captures/
+*.hprof
+
+# Keystore — never commit secrets
+*.keystore
+
+# Log & OS files
+*.log
+.DS_Store
+Thumbs.db
+
+# Misc
+*.bak
+*.swp
+*~

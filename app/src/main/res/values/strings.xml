@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ScanPro - Cam to PDF</string>
+    <string name="boot_title_lead" translatable="false">ScanPro</string>
+    <string name="boot_title_trail"> - Cam to PDF</string>
+    <string name="ad_loading_hint">ad loading...</string>
+    <string name="ad_wait_hint">Please wait patiently,Ad is loading...</string>
+
+    <string name="home_title" translatable="false">PDF</string>
+    <string name="home_subtitle">Easy to handle, efficient office work</string>
+    <string name="home_search_hint">Search files</string>
+    <string name="home_type_txt">TXT File</string>
+    <string name="home_type_pdf">PDF File</string>
+    <string name="home_type_ppt">PPT File</string>
+    <string name="home_type_xls">Excel File</string>
+    <string name="home_type_doc">DOC File</string>
+    <string name="home_no_file">No File Found</string>
+    <string name="home_permission_title">Permission Required</string>
+    <string name="home_permission_desc">To Get Started, Please Allow File Access.\nTap Here To Grant Permission.</string>
+    <string name="home_permission_action">Get it</string>
+    <string name="home_file_meta">%1$s · %2$s</string>
+
+    <string name="tab_home">Home</string>
+    <string name="tab_scan">Scan</string>
+    <string name="tab_recent">Recent</string>
+    <string name="tab_made">Creation</string>
+
+    <string name="placeholder_scan">Scan</string>
+    <string name="placeholder_recent">Recent</string>
+    <string name="placeholder_made">Creation</string>
+
+    <string name="made_title">Creation</string>
+    <string name="made_subtitle">All files created by you</string>
+
+    <string name="recent_title">Recent</string>
+    <string name="recent_subtitle">Quick access to your recently opened files</string>
+
+    <string name="file_action_rename">Rename</string>
+    <string name="file_action_share">Share</string>
+    <string name="file_action_delete">Delete</string>
+    <string name="file_action_favorite">Add to Favorite</string>
+    <string name="file_action_unfavorite">Remove Favorite</string>
+    <string name="file_rename_title">Please enter new name</string>
+    <string name="file_rename_hint">Please enter new name</string>
+    <string name="file_rename_empty">Name cannot be empty</string>
+    <string name="file_rename_exists">A file with this name already exists</string>
+    <string name="file_rename_failed">Rename failed</string>
+    <string name="file_delete_title">Are You Sure ?</string>
+    <string name="file_delete_message">This file will be deleted permanently</string>
+    <string name="file_delete_failed">Delete failed</string>
+    <string name="file_share_failed">Share failed</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_ok">OK</string>
+    <string name="action_save">Save</string>
+
+    <string name="settings">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_favorite">Favorite</string>
+    <string name="settings_share">Share</string>
+    <string name="settings_rate">Rate US</string>
+    <string name="settings_privacy">Privacy Policy</string>
+    <string name="settings_terms">Terms Of Use</string>
+    <string name="settings_share_text">Check out ScanPro - Cam to PDF: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="settings_privacy_url" translatable="false">https://sites.google.com/view/scanpro-camtopdf/privacy-policy</string>
+    <string name="settings_terms_url" translatable="false">https://sites.google.com/view/scanpro-cam-to-pdf/terms-of-use</string>
+    <string name="settings_rate_failed">Unable to open store</string>
+
+    <string name="language_hindi" translatable="false">Hindi</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_french" translatable="false">French</string>
+    <string name="language_german" translatable="false">Germany</string>
+    <string name="language_portuguese" translatable="false">Portuguese</string>
+    <string name="language_spanish" translatable="false">Spanish</string>
+    <string name="language_indonesia" translatable="false">Indonesia</string>
+    <string name="language_russian" translatable="false">Russian</string>
+
+    <string name="favorite_title">Favorite</string>
+    <string name="favorite_subtitle">Files you marked as favorite</string>
+
+    <string name="more">More</string>
+    <string name="back">Back</string>
+
+    <string name="viewer_open_failed">Unable to open this file</string>
+    <string name="viewer_page_indicator">%1$d / %2$d</string>
+
+    <string name="scan_next">Preview</string>
+    <string name="scan_preview">Preview</string>
+    <string name="scan_save">Generate PDF</string>
+    <string name="scan_generate_pdf">Generate PDF</string>
+    <string name="scan_flash_auto">Flash Auto</string>
+    <string name="scan_flash_on">Flash On</string>
+    <string name="scan_flash_off">Flash Off</string>
+    <string name="scan_camera_permission">Camera permission is required</string>
+    <string name="scan_capture_failed">Capture failed</string>
+    <string name="scan_no_photos">Please take at least one photo</string>
+    <string name="scan_saving">Saving PDF…</string>
+    <string name="scan_saved">PDF saved</string>
+    <string name="scan_save_failed">Failed to save PDF</string>
+    <string name="scan_close">Close</string>
+    <string name="scan_flash">Flash</string>
+    <string name="scan_hd">Quality</string>
+    <string name="scan_grid">Grid</string>
+    <string name="scan_switch">Switch camera</string>
+    <string name="scan_shutter">Capture</string>
+    <string name="scan_thumbnail">Captured photos</string>
+    <string name="scan_add">Add</string>
+    <string name="scan_delete">Delete</string>
+
+    <string name="shortcut_leave">Uninstall</string>
+
+    <string name="onboard_continue">Get Start</string>
+    <string name="brand_title" translatable="false">ScanPro - Cam to PDF</string>
+    <string name="guide_agree_full">I Agree To %1$s And %2$s</string>
+    <string name="guide_terms_of_service">Terms Of Service</string>
+    <string name="guide_agree_required">Please agree to the privacy policy</string>
+    <string name="guide_skip">Skip</string>
+    <string name="guide_allow">Allow</string>
+    <string name="guide_overlay_headline">Don\'t Miss Important Notifications</string>
+    <string name="guide_overlay_subtitle">Floating Window Permissions</string>
+    <string name="guide_overlay_manage">Management permissions</string>
+    <string name="guide_notif_title">Enable Notifications</string>
+    <string name="guide_notif_message">Allow notifications so you never miss document reminders and updates.</string>
+    <string name="guide_notif_enable">Enable</string>
+    <string name="guide_notif_later">Not now</string>
+
+    <string name="rating_message_low">Could you give us some encouragement? We will work hard to do better.</string>
+    <string name="rating_message_high">Rate us on Google Play — we\'ll keep improving! Could you give us some encouragement?</string>
+    <string name="rating_action_low">Submit</string>
+    <string name="rating_action_high">Sure, rate now</string>
+    <string name="rating_best_hint">The best we can get</string>
+    <string name="rating_thanks_internal">Thank you for your rating. We have received your feedback and will keep improving.</string>
+
+    <!-- ===== 通知（照 ApolloPDF 的机制重写，文案是我们的，不是照抄竞品） ===== -->
+    <!-- 通知里那个按钮；Apollo 用 `check` -->
+    <string name="sp_notify_action">Check</string>
+    <string name="sp_notify_cover_desc">File preview</string>
+
+    <!-- 定时提醒（scheduled，8 条轮换） -->
+    <string name="nt_scheduled_1">Your Word document is ready to open</string>
+    <string name="nt_scheduled_2">Finished writing? Your DOC is here</string>
+    <string name="nt_scheduled_3">Your Excel sheet is ready</string>
+    <string name="nt_scheduled_4">A new XLS summary is waiting</string>
+    <string name="nt_scheduled_5">Your slides are ready to present</string>
+    <string name="nt_scheduled_6">Your PPT file needs a quick look</string>
+    <string name="nt_scheduled_7">Your PDF is ready to read</string>
+    <string name="nt_scheduled_8">A PDF is waiting in your files</string>
+
+    <!-- 解锁提醒（unlock，8 条轮换） -->
+    <string name="nt_unlock_1">Unlock to open your DOC</string>
+    <string name="nt_unlock_2">Your Word file is still unread</string>
+    <string name="nt_unlock_3">Your spreadsheet is one tap away</string>
+    <string name="nt_unlock_4">This XLS has been waiting all day</string>
+    <string name="nt_unlock_5">Your slides are ready to view</string>
+    <string name="nt_unlock_6">Your PPT file was not opened yet</string>
+    <string name="nt_unlock_7">Your PDF is still waiting</string>
+    <string name="nt_unlock_8">Tap to finish reading your PDF</string>
+
+    <!-- 闹钟提醒（alarm_clock，8 条轮换） -->
+    <string name="nt_alarm_1">Time to review your DOC</string>
+    <string name="nt_alarm_2">A Word file needs your attention</string>
+    <string name="nt_alarm_3">Spreadsheet reminder</string>
+    <string name="nt_alarm_4">Check today\u2019s XLS</string>
+    <string name="nt_alarm_5">Slides reminder</string>
+    <string name="nt_alarm_6">Your presentation is not reviewed yet</string>
+    <string name="nt_alarm_7">PDF reminder</string>
+    <string name="nt_alarm_8">Read your PDF today</string>
+
+    <!-- 常驻通知里三个快捷入口的标签；Apollo 直接写死 PDF / EXCEL / PPT -->
+    <string name="sp_notify_tag_pdf" translatable="false">PDF</string>
+    <string name="sp_notify_tag_excel" translatable="false">EXCEL</string>
+    <string name="sp_notify_tag_ppt" translatable="false">PPT</string>
+
+    <!-- ===== 两步卸载挽留（照 ApolloPDF `ui/delete/UnInstall01|02`） ===== -->
+    <string name="sp_uninstall_title">Feedback</string>
+    <string name="sp_uninstall_headline">Problems during use</string>
+    <string name="sp_uninstall_subtitle">Tell us and we will fix it</string>
+    <string name="sp_uninstall_issue_scan">PDF scan is not clear enough</string>
+    <string name="sp_uninstall_action_scan">Rescan</string>
+    <string name="sp_uninstall_issue_gen">PDF generation is too slow</string>
+    <string name="sp_uninstall_action_gen">Regenerate</string>
+    <string name="sp_uninstall_leave">Uninstall</string>
+    <string name="sp_uninstall_stay">Keep it</string>
+    <string name="sp_uninstall_exit_title">Leaving already?</string>
+    <string name="sp_uninstall_exit_message">Uninstalling removes the app. Your generated PDF files stay in your storage.</string>
+    <string name="sp_uninstall_continue">Continue using</string>
+
+    <!-- 第 2 步的三条原因 + 主文案；文案照 ApolloPDF（`what_makes` / `dissatisfied` / `the_app` / `complicated`），
+         只有句尾的应用名去掉，避免和 ApolloPDF 的包名混起来 -->
+    <string name="sp_uninstall_reason_title">What makes you decide to uninstall?</string>
+    <string name="sp_uninstall_reason_effects">Dissatisfied with PDF conversion effects</string>
+    <string name="sp_uninstall_reason_storage">The app occupies too much phone storage</string>
+    <string name="sp_uninstall_reason_complex">Complicated and inconvenient to use</string>
+    <string name="sp_uninstall_stay_confirm">Please reconsider before uninstall</string>
+</resources>

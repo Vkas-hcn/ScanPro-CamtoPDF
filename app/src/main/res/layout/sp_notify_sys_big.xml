@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  系统通知的「大图」版式。出处：ApolloPDF `layout/sys_notification_big_view.xml`。
+  RemoteViews 只认 id + 属性，所有填充都在 `SpNotifyCreator` 里做。
+  两个 id 由代码用 `setImageViewResource` / `setTextViewText` 填：
+  - `cover`  封面图（按 JumpType 换 PDF/PPT/Excel/Word）
+  - `anim_btn` + `btn`  按钮（29+ 用动画底，以下用 `sp_shape_notify_btn`）
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <ImageView
+        android:id="@+id/cover"
+        android:layout_width="90dp"
+        android:layout_height="90dp"
+        android:layout_marginTop="16dp"
+        android:contentDescription="@string/sp_notify_cover_desc"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_home_list_pdf" />
+
+    <TextView
+        android:id="@+id/messageText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="10dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:text="@string/nt_scheduled_1"
+        android:textColor="@color/sp_notify_text"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="26dp"
+        android:layout_marginTop="14dp">
+
+        <ImageView
+            android:id="@+id/anim_btn"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/sp_notify_action"
+            android:importantForAccessibility="yes" />
+
+        <TextView
+            android:id="@+id/btn"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center"
+            android:text="@string/sp_notify_action"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+</LinearLayout>

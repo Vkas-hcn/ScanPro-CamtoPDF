@@ -1,0 +1,122 @@
+# ============================================================
+# ProGuard / R8 rules (legacy file name)
+# Primary rules for AGP 9 also live in: src/main/keepRules/rules.keep
+# Keep both files in sync when editing.
+# ============================================================
+
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable
+-keepattributes Signature
+-keepattributes Exceptions
+-keepattributes InnerClasses
+-keepattributes EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations
+-keepattributes RuntimeInvisibleAnnotations
+-keepattributes RuntimeVisibleParameterAnnotations
+-keepattributes RuntimeInvisibleParameterAnnotations
+
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final ** CREATOR;
+}
+
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
+
+-keep class com.scanpro.cam.pdf.CamPdfApp { *; }
+-keep public class * extends android.app.Activity
+-keep public class * extends android.app.Application
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+-keep public class * extends androidx.fragment.app.Fragment
+
+-keep class com.scanpro.cam.pdf.databinding.** { *; }
+
+-dontwarn kotlin.**
+-dontwarn kotlinx.**
+-keep class kotlin.Metadata { *; }
+-keepclassmembers class **$WhenMappings {
+    <fields>;
+}
+
+-dontwarn javax.annotation.**
+-dontwarn org.codehaus.mojo.animal_sniffer.**
+
+
+-dontwarn androidx.camera.**
+-keep class androidx.camera.** { *; }
+
+-keep class com.seapeak.docviewer.** { *; }
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepclassmembers class * extends android.webkit.WebViewClient {
+    public void *(android.webkit.WebView, java.lang.String, android.graphics.Bitmap);
+    public boolean *(android.webkit.WebView, java.lang.String);
+    public void *(android.webkit.WebView, java.lang.String);
+}
+-keepclassmembers class * extends android.webkit.WebChromeClient {
+    public void *(android.webkit.WebView, java.lang.String);
+}
+
+-dontwarn com.google.android.material.**
+-keep class com.google.android.material.** { *; }
+
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+-keep class com.scanpro.cam.pdf.ads.SpAdInfo { *; }
+-keep class com.scanpro.cam.pdf.ads.SpAdConfig { *; }
+-keep class com.scanpro.cam.pdf.ads.SpNatConfig { *; }
+-keep class com.scanpro.cam.pdf.notice.SpNewConfig { *; }
+-keep class com.scanpro.cam.pdf.notice.SpAcPopConfig { *; }
+-keep class com.scanpro.cam.pdf.notice.SpPopRefresh { *; }
+-keep class com.scanpro.cam.pdf.notice.SpMediaConfig { *; }
+-keep class com.scanpro.cam.pdf.notice.SpWinPopConfig { *; }
+
+-keep class com.google.firebase.remoteconfig.** { *; }
+-dontwarn com.google.firebase.remoteconfig.**
+
+-keep class androidx.work.** { *; }
+-keep class androidx.work.impl.** { *; }
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.InputMerger
+-keep public class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context,androidx.work.WorkerParameters);
+}
+-keep class * extends androidx.room.RoomDatabase { *; }
+-dontwarn androidx.work.**
+-dontwarn androidx.room.paging.**
+
+
+-keep class com.google.android.gms.ads.** { *; }
+-dontwarn com.google.firebase.**
+
+-dontwarn com.google.android.ump.**
+-keep class com.google.android.ump.** { *; }
+
+-keep class com.google.android.gms.ads.identifier.** { *; }
+-dontwarn com.google.android.gms.**
+
+-keep class com.google.android.gms.common.ConnectionResult {
+    int SUCCESS;
+}
+-keep class com.google.android.gms.ads.identifier.AdvertisingIdClient {
+    com.google.android.gms.ads.identifier.AdvertisingIdClient$Info getAdvertisingIdInfo(android.content.Context);
+}
+-keep class com.google.android.gms.ads.identifier.AdvertisingIdClient$Info {
+    java.lang.String getId();
+    boolean isLimitAdTrackingEnabled();
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知按钮的静态底：一条橙色圆角条。
+  出处：ApolloPDF `drawable/but_1|but_2` 是外部图片，这里改成同形状的矢量，不搬竞品素材。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="48dp"
+    android:viewportWidth="100"
+    android:viewportHeight="48">
+    <path
+        android:name="spNotifyBtnShape"
+        android:fillColor="@color/sp_notify_btn"
+        android:pathData="M8,0 L92,0 A8,8 0 0 1 100,8 L100,40 A8,8 0 0 1 92,48 L8,48 A8,8 0 0 1 0,40 L0,8 A8,8 0 0 1 8,0 Z" />
+</vector>
