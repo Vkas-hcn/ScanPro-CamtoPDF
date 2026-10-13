@@ -60,6 +60,11 @@ object SpConfigWire {
     const val KEY_MEDIA_CONFIG = "media_config"
     const val KEY_WIN_POP_CONFIG = "win_pop_config"
 
+    /** 与广告配置同一层，不在 `ac_ad_config` 里面。 */
+    const val KEY_FACEBOOK_APP_ID = "facebook_app_id"
+    const val KEY_FACEBOOK_CLIENT_TOKEN = "client_token"
+    const val KEY_IS_ACQUIRED_USER = "isAcquiredUser"
+
     const val KEY_ADS_LIMIT = "ads_limit"
     const val KEY_AC_ADS_LIMIT = "ac_ads_limit"
     const val KEY_GLOBAL_BLOCK = "global_block"

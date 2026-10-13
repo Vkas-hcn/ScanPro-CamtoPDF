@@ -213,5 +213,8 @@ object SpTracker {
 
     /** 每次发起 `api/dispatch` 前上报（EfileScan `biconfig_request`）。 */
     const val BICONFIG_REQUEST = "biconfig_request"
+
+    /** 下发配置 `isAcquiredUser == true` 时上报一次。 */
+    const val ACTIVATED = "activated"
     // endregion
 }

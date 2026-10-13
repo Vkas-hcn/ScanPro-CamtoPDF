@@ -2,11 +2,14 @@ package com.scanpro.cam.pdf.ads
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpFullScreenAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
+import com.scanpro.cam.pdf.analytics.SpFacebookInit
 import com.scanpro.cam.pdf.analytics.SpSceneCode
+import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.config.SpConfigBootstrapper
 import com.scanpro.cam.pdf.config.SpConfigLoadResult
 import com.scanpro.cam.pdf.config.SpConfigRemoteSource
@@ -133,6 +136,7 @@ class SpAdsHub private constructor(
         mediaConfig = configStore.mediaConfig(payload)
         winPopConfig = configStore.winPopConfig(payload)
         applyBlocking(payload)
+        applyDispatchMeta(payload)
         Log.i(
             TAG,
             "config applied positions=${next.byPosition.keys} nat=${natConfig.switchOpen}/${natConfig.jumpPercent}",
@@ -146,6 +150,22 @@ class SpAdsHub private constructor(
         SpAdCache.clearAll()
         Log.w(TAG, "config unavailable ads off: $reason")
     }
+
+    private fun applyDispatchMeta(payload: JSONObject) {
+        val meta = configStore.dispatchMeta(payload)
+        runCatching { SpFacebookInit.start(app, meta.facebookAppId, meta.clientToken) }
+            .onFailure { Log.w(TAG, "facebook init skipped", it) }
+        if (!meta.isAcquiredUser || activatedReported(app)) return
+        SpTracker.log(app, SpTracker.ACTIVATED)
+        app.getSharedPreferences(PREFS_DISPATCH, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ACTIVATED, true)
+            .apply()
+    }
+
+    private fun activatedReported(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_DISPATCH, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ACTIVATED, false)
 
     private fun applyBlocking(payload: JSONObject) {
         val patch = configStore.blockingConfig(payload)
@@ -223,6 +243,8 @@ class SpAdsHub private constructor(
 
     companion object {
         private const val TAG = "SpAdsHub"
+        private const val PREFS_DISPATCH = "sp_dispatch_flags"
+        private const val KEY_ACTIVATED = "activated_reported"
 
         @Volatile
         private var instance: SpAdsHub? = null

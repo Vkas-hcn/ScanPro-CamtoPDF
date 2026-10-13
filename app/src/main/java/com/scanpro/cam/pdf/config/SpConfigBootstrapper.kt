@@ -24,7 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * 配置调度。对齐 EfileScan `AcquisitionConfigBootstrapper`：
  * 缓存优先、3 小时节流、attempt 时间、后台刷新、cloak。
- * 不接 Adjust / Facebook / 买量归因。
+ * Facebook 在配置到达后按 `facebook_app_id` / `client_token` 初始化。
  */
 class SpConfigBootstrapper(
     private val app: Application,

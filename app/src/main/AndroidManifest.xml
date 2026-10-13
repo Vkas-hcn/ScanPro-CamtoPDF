@@ -54,6 +54,18 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="${admobAppId}" />
 
+        <!-- Facebook 的 App Id / Client Token 来自下发配置，启动时不要自动初始化。 -->
+        <meta-data
+            android:name="com.facebook.sdk.AutoInitEnabled"
+            android:value="false" />
+        <meta-data
+            android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
+            android:value="false" />
+        <provider
+            android:name="com.facebook.internal.FacebookInitProvider"
+            android:authorities="${applicationId}.FacebookInitProvider"
+            tools:node="remove" />
+
         <!-- Disable WorkManager auto-init; CamPdfApp initializes manually. -->
         <provider
             android:name="androidx.startup.InitializationProvider"

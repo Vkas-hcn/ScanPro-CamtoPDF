@@ -170,6 +170,19 @@ class SpConfigStore {
         )
     }
 
+    /**
+     * `data` 最外层、与广告配置平级：`facebook_app_id` / `client_token` / `isAcquiredUser`。
+     * 缺字段按空串和 false，不抛。
+     */
+    fun dispatchMeta(payload: JSONObject?): DispatchMeta {
+        if (payload == null) return DispatchMeta()
+        return DispatchMeta(
+            facebookAppId = payload.optString(SpConfigWire.KEY_FACEBOOK_APP_ID).trim(),
+            clientToken = payload.optString(SpConfigWire.KEY_FACEBOOK_CLIENT_TOKEN).trim(),
+            isAcquiredUser = payload.optAcquired(),
+        )
+    }
+
     fun hasPosition(config: SpAdConfig, position: String): Boolean =
         config.adInfoList(position)?.isNotEmpty() == true
 
@@ -215,8 +228,26 @@ class SpConfigStore {
         return out
     }
 
+    data class DispatchMeta(
+        val facebookAppId: String = "",
+        val clientToken: String = "",
+        val isAcquiredUser: Boolean = false,
+    )
+
     companion object {
         private const val TAG = "SpConfig"
+    }
+}
+
+private fun JSONObject.optAcquired(): Boolean {
+    if (!has(SpConfigWire.KEY_IS_ACQUIRED_USER) || isNull(SpConfigWire.KEY_IS_ACQUIRED_USER)) {
+        return false
+    }
+    return when (val raw = opt(SpConfigWire.KEY_IS_ACQUIRED_USER)) {
+        is Boolean -> raw
+        is Number -> raw.toInt() != 0
+        is String -> raw.equals("true", ignoreCase = true) || raw == "1"
+        else -> false
     }
 }
 
