@@ -28,6 +28,7 @@ class CamPdfApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        camPdfApp = this
         SpLocale.resetCompatLocalesIfNeeded(this)
         ensureWorkManager()
         initSDK(this)
@@ -115,5 +116,9 @@ class CamPdfApp : Application() {
 
     companion object {
         private const val TAG = "CamPdfApp"
+        @Volatile
+        private var camPdfApp: CamPdfApp? = null
+        fun get(): CamPdfApp =
+            camPdfApp ?: error("Application not initialized")
     }
 }

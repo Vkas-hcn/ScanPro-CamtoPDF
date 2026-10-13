@@ -234,7 +234,13 @@ class SpNativeAdManager internal constructor(
         shownSessionId = cached.sessionId
         currentNativeAd = cached.ad
         cached.ad.setOnPaidEventListener { value ->
-            SpAdIncomeReport.sendAdIncome(appContext, value, cached.ad.responseInfo)
+            SpAdIncomeReport.sendAdIncome(
+                appContext,
+                value,
+                cached.ad.responseInfo,
+                AdTrackingHelper.AdType.NATIVE,
+                position,
+            )
         }
         bindAndShow(cached.ad, style)
     }

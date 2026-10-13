@@ -1,8 +1,25 @@
 package com.scanpro.cam.pdf.analytics
 
+import android.content.Context
+import android.content.SharedPreferences
+import android.os.Bundle
+import androidx.core.content.edit
+import com.adjust.sdk.Adjust
+import com.adjust.sdk.AdjustAdRevenue
+import com.adjust.sdk.AdjustEvent
+import com.facebook.FacebookSdk
+import com.facebook.appevents.AppEventsConstants
+import com.facebook.appevents.AppEventsLogger
 import com.flux.tracksdk.core.TrackSDK
+import com.flux.tracksdk.model.TrackPolicy
+import com.flux.tracksdk.utils.UsdFromAdMicros
+import com.google.android.gms.ads.AdValue
 import com.google.android.gms.ads.ResponseInfo
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.scanpro.cam.pdf.BuildConfig
+import com.scanpro.cam.pdf.CamPdfApp
 import com.scanpro.cam.pdf.util.AppLog
+import java.util.Locale.getDefault
 import java.util.UUID
 
 /**
@@ -17,7 +34,9 @@ object AdTrackingHelper {
         const val OPEN = "open"
         const val REWARDED = "rewarded"
     }
-
+    private val revenueLock = Any()
+    private const val PREF_NAME = "ad_tracking_prefs"
+    private const val KEY_TOTAL_ADS_REVENUE = "total_ads_revenue_001_accumulated"
     const val SDK_ADMOB = "AdMob"
     const val SOURCE_ADMOB = "admob"
 
@@ -203,6 +222,225 @@ object AdTrackingHelper {
     private fun report(name: String, block: () -> Unit) {
         runCatching(block).onFailure { AppLog.tracking.w("埋点提交失败 平台=tracksdk 事件=$name", it) }
     }
+
+    fun trackAdRevenueAdjust(
+        usd: Double
+    ) {
+        runCatching {
+            val adRevenue = AdjustAdRevenue("admob_sdk")
+            if (usd < 0) return
+            adRevenue.setRevenue(usd, "USD")
+            adRevenue.setAdRevenueNetwork("Admob")
+            Adjust.trackAdRevenue(adRevenue)
+            AppLog.tracking.d("trackAdRevenueAdjust usd=$usd")
+        }.onFailure {
+            AppLog.tracking.e( "trackAdRevenueAdjust failed ", it)
+        }
+    }
+
+    /**
+     * 上报广告收益（AdMob OnPaidEvent，使用 micros）
+     */
+    fun trackAdImpressionRevenueMicros(
+        context: Context,
+        revenue: Double,
+        adType: String,
+        posId: String,
+    ) {
+        if (revenue < 0) return
+        val currencyCode = "USD"
+        trackRevenueEvent(
+            event = SpTracker.AD_IMPRESSION_REVENUE,
+            revenue = revenue,
+            currencyCode = currencyCode,
+            adType = adType,
+            posId = posId
+        )
+        trackTotalAdsRevenueIfNeeded(context, revenue)
+        AppLog.tracking.e( "BI Firebase Facebook usd=$revenue adType=$adType")
+    }
+
+
+    /**
+     * 各平台互相独立上报：任一平台抛出异常不得影响其余平台，否则排在后面的平台会被整条丢弃。
+     */
+    fun trackRevenueEvent(
+        event: String,
+        revenue: Double,
+        currencyCode: String = "USD",
+        adType: String,
+        posId: String
+    ) {
+        //Firebase
+        runCatching {
+            putFirebaseAdRevenue(
+                CamPdfApp.get(),
+                event,
+                revenue,
+                currencyCode,
+            )
+        }.onFailure {
+            AppLog.tracking.e( "trackRevenueEvent Firebase failed: $event", it)
+        }
+        //Adjust
+        runCatching {
+            adjustPoint(event, revenue, currencyCode)
+        }.onFailure {
+            AppLog.tracking.e( "trackRevenueEvent Adjust failed: $event", it)
+        }
+        //BI
+        runCatching {
+            TrackSDK.trackAdRevenue(revenue)
+            AppLog.tracking.e( "trackRevenueEvent BI: $event revenue=$revenue currency=$currencyCode posId=$posId")
+        }.onFailure {
+            AppLog.tracking.e( "trackRevenueEvent BI failed: $event", it)
+        }
+        //Facebook：金额已是 USD，不再传原始币种二次换算
+        runCatching {
+            trackAdRevenueFacebook(adType, posId, revenue)
+        }.onFailure {
+            AppLog.tracking.e( "trackRevenueEvent Facebook failed: $event", it)
+        }
+
+    }
+
+
+    private fun trackTotalAdsRevenueIfNeeded(
+        context: Context,
+        revenue: Double,
+    ) {
+        synchronized(revenueLock) {
+            val prefs = context.applicationContext.trackingPrefs()
+            val totalRevenue = prefs.getDouble(KEY_TOTAL_ADS_REVENUE, 0.0) + revenue
+            if (totalRevenue >= 0.01) {
+                trackValueEvent(
+                    context = context,
+                    event = "total_ads_revenue_001",
+                    revenue = totalRevenue,
+                    currencyCode = "USD"
+                )
+                prefs.putDouble(KEY_TOTAL_ADS_REVENUE, 0.0)
+            } else {
+                prefs.putDouble(KEY_TOTAL_ADS_REVENUE, totalRevenue)
+            }
+        }
+    }
+
+
+
+
+
+    private fun Context.trackingPrefs(): SharedPreferences {
+        return applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    }
+
+    private fun SharedPreferences.putDouble(key: String, value: Double) {
+        edit { putLong(key, value.toBits()) }
+    }
+
+    private fun SharedPreferences.getDouble(key: String, defaultValue: Double): Double {
+        if (!contains(key)) return defaultValue
+        return Double.fromBits(getLong(key, defaultValue.toBits()))
+    }
+
+    private fun trackValueEvent(
+        context: Context,
+        event: String,
+        revenue: Double,
+        currencyCode: String = "USD"
+    ) {
+        putFirebaseAdRevenue(context, event, revenue, currencyCode)
+        adjustPoint(event, revenue, currencyCode)
+        runCatching {
+            TrackSDK.track(event, null, TrackPolicy.IMMEDIATE)
+            AppLog.tracking.d("trackValueEvent: $event revenue=$revenue currency=$currencyCode")
+        }.onFailure {
+            AppLog.tracking.e( "trackValueEvent failed: $event", it)
+        }
+    }
+
+
+    fun adjustPoint(
+        key: String,
+        revenue: Double? = null,
+        currencyCode: String? = null,
+    ) {
+        val token = adjustTokenFor(key)
+        runCatching {
+            val adjustEvent = AdjustEvent(token)
+            Adjust.trackEvent(adjustEvent)
+            adjustEvent.addCallbackParameter("revenue", revenue.toString()) // Fixed parameter order
+            adjustEvent.addCallbackParameter("currency", currencyCode) // Fixed parameter order
+        }.onFailure {
+            AppLog.tracking.e( "adjustPoint failed: $key", it)
+        }
+    }
+
+    private fun adjustTokenFor(key: String): String? {
+        return when (key) {
+            "ad_impression_revenue" -> "4rfcdo"
+            "total_ads_revenue_001" -> "g06m0y"
+            else -> null
+        }
+    }
+
+    /**
+     * 上报 Facebook 广告价值。入参已是美元，币种固定 USD，不在此处二次换算。
+     */
+    fun trackAdRevenueFacebook(
+        adType: String,
+        posId: String,
+        revenueUsd: Double,
+        adSourceName: String? = null
+    ) {
+        val context = TrackSDK.getContext() ?: return
+        if (!FacebookSdk.isInitialized()) return
+        try {
+            val fbParams = Bundle().apply {
+                putString(AppEventsConstants.EVENT_PARAM_AD_TYPE, mapAdTypeForFacebook(adType))
+                putString(AppEventsConstants.EVENT_PARAM_CURRENCY, "USD")
+                putString(AppEventsConstants.EVENT_PARAM_CONTENT_ID, posId)
+                adSourceName?.takeIf { it.isNotBlank() }?.let { putString("_ad_source", it) }
+            }
+            AppEventsLogger.newLogger(context).logEvent(
+                AppEventsConstants.EVENT_NAME_AD_IMPRESSION,
+                revenueUsd,
+                fbParams
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun mapAdTypeForFacebook(adType: String): String {
+        return when (adType) {
+            AdType.BANNER -> "banner"
+            AdType.NATIVE -> "native"
+            AdType.INTERSTITIAL -> "interstitial"
+            AdType.REWARDED -> "rewarded_video"
+            AdType.OPEN -> "interstitial" // 开屏全屏，文档无单独类型时用 interstitial
+            else -> adType.lowercase()
+        }
+    }
+
+    fun putFirebaseAdRevenue(
+        context: Context,
+        event: String,
+        revenue: Double,
+        currencyCode: String = "USD",
+    ) {
+        runCatching {
+            val bundle = Bundle().apply {
+                putDouble(FirebaseAnalytics.Param.VALUE, revenue)
+                putString(FirebaseAnalytics.Param.CURRENCY, currencyCode)
+            }
+            FirebaseAnalytics.getInstance(context).logEvent(event, bundle)
+        }.onFailure {
+            AppLog.tracking.e( "trackRevenueEvent failed: $event", it)
+        }
+    }
+
+
 }
 
 /** 单次广告请求的关联上下文，`adId` 贯穿请求到关闭。 */

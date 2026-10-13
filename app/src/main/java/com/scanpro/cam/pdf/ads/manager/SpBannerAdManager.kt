@@ -10,6 +10,7 @@ import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import com.scanpro.cam.pdf.ads.SpAdConfig
+import com.scanpro.cam.pdf.ads.SpAdIncomeReport
 import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
@@ -97,6 +98,15 @@ class SpBannerAdManager(
         closeShown(bannerLife)
         val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.BANNER, position)
         bannerLife = life
+        banner.setOnPaidEventListener { value ->
+            SpAdIncomeReport.sendAdIncome(
+                appContext,
+                value,
+                banner.responseInfo,
+                AdTrackingHelper.AdType.BANNER,
+                position,
+            )
+        }
         banner.adListener = object : AdListener() {
             override fun onAdLoaded() {
                 AppLog.ads.i("广告加载成功 类型=banner 位置=$position 单元=${adInfo.adUnitId}")

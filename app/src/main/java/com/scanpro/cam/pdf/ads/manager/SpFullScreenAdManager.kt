@@ -369,7 +369,13 @@ class SpFullScreenAdManager(
                     onResult = onResult,
                 )
                 ad.setOnPaidEventListener { value ->
-                    SpAdIncomeReport.sendAdIncome(appContext, value, ad.responseInfo)
+                    SpAdIncomeReport.sendAdIncome(
+                        appContext,
+                        value,
+                        ad.responseInfo,
+                        AdTrackingHelper.AdType.INTERSTITIAL,
+                        reloadPosition,
+                    )
                 }
                 SpFullScreenMask.show(host) {
                     if (host.isFinishing || host.isDestroyed) {
@@ -390,7 +396,13 @@ class SpFullScreenAdManager(
                     onResult = onResult,
                 )
                 ad.setOnPaidEventListener { value ->
-                    SpAdIncomeReport.sendAdIncome(appContext, value, ad.responseInfo)
+                    SpAdIncomeReport.sendAdIncome(
+                        appContext,
+                        value,
+                        ad.responseInfo,
+                        AdTrackingHelper.AdType.OPEN,
+                        reloadPosition,
+                    )
                 }
                 SpFullScreenMask.show(host) {
                     if (host.isFinishing || host.isDestroyed) {

@@ -1,10 +1,13 @@
 package com.scanpro.cam.pdf.ads
 
 import android.content.Context
-import android.os.Bundle
+import com.flux.tracksdk.utils.UsdFromAdMicros
 import com.google.android.gms.ads.AdValue
 import com.google.android.gms.ads.ResponseInfo
-import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.BuildConfig
+import com.scanpro.cam.pdf.analytics.AdTrackingHelper
+import com.scanpro.cam.pdf.util.AppLog
+import java.util.Locale.getDefault
 
 /**
  * 广告展示收入上报。照抄 ApolloPDF `ad/AdIncomeReport.java` 的三路上报，
@@ -23,39 +26,33 @@ import com.scanpro.cam.pdf.analytics.SpTracker
  */
 object SpAdIncomeReport {
 
-    /** Apollo `sendAdIncome(adValue, responseInfo)`。 */
-    fun sendAdIncome(context: Context, adValue: AdValue, responseInfo: ResponseInfo?) {
-        val amount = adValue.valueMicros / 1_000_000.0
-        val network = mediationNetwork(responseInfo)
+    /**
+     * @param posId 广告位，17 个 [SpAdPosition] 之一。开屏用 `ac_launch`，不用进入场景码。
+     */
+    fun sendAdIncome(
+        context: Context,
+        adValue: AdValue,
+        responseInfo: ResponseInfo?,
+        adType: String,
+        posId: String,
+    ) {
         try {
-            val params = Bundle().apply {
-                putDouble(AdIncomeKeys.VALUE, amount)
-                putString(AdIncomeKeys.CURRENCY, "USD")
-                putString(AdIncomeKeys.NETWORK, network)
+            val valueM = if (BuildConfig.DEBUG) {
+                6000L
+            } else {
+                adValue.valueMicros
             }
-            SpTracker.log(context, SpTracker.AD_IMPRESSION_REVENUE, params)
+            val usd: Double = UsdFromAdMicros.toUsd(
+                valueM,
+                adValue.currencyCode.uppercase(getDefault()),
+                null
+            )
+            val source = responseInfo?.adapterResponses?.firstOrNull()?.adSourceName
+            AppLog.tracking.d("广告收入 类型=$adType 位置=$posId 来源=$source")
+            AdTrackingHelper.trackAdRevenueAdjust(usd)
+            AdTrackingHelper.trackAdImpressionRevenueMicros(context, usd, adType, posId)
         } catch (t: Throwable) {
-            // 上报失败不影响主流程
+            AppLog.tracking.e("上报收入失败 类型=$adType 位置=$posId", t)
         }
     }
-
-    /** 等价 Apollo `responseInfo.c().h()`：拿中介网络名，缺省 "Admob"。 */
-    private fun mediationNetwork(responseInfo: ResponseInfo?): String {
-        // 不用 getMediationAdapterClassName()：play-services-ads 25 已把它移除。
-        val name = responseInfo?.adapterResponses?.firstOrNull()?.adSourceName?.trim().orEmpty()
-        return name.ifEmpty { DEFAULT_NETWORK }
-    }
-
-    private const val DEFAULT_NETWORK = "Admob"
-
-    private object AdIncomeKeys {
-        const val VALUE = "value"
-        const val CURRENCY = "currency"
-        const val NETWORK = "network"
-    }
-    // ponytail: Adjust `AdjustAdRevenue` 与 Facebook `AppEventsLogger` 两路没接，
-    // 因为工程没有这两个依赖（gradle/libs.versions.toml 只有 firebase-analytics）。
-    // 补依赖后：Adjust.trackAdRevenue(AdjustAdRevenue("admob_sdk").apply {
-    //     setRevenue(amount, adValue.currencyCode); setAdRevenueNetwork(network) })
-    // 与 AppEventsLogger.logPurchase(...)。升级路径就这两行，别的不动。
 }
