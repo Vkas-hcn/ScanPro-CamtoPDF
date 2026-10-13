@@ -50,6 +50,8 @@ user-messaging-platform = { group = "com.google.android.ump", name = "user-messa
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-config = { group = "com.google.firebase", name = "firebase-config" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 install-referrer = { group = "com.android.installreferrer", name = "installreferrer", version.ref = "installReferrer" }
 google-services-plugin = { group = "com.google.gms", name = "google-services", version.ref = "googleServices" }
 

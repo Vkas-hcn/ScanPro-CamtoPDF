@@ -14,6 +14,7 @@ import com.flux.tracksdk.model.TrackPolicy
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
+import com.scanpro.cam.pdf.notice.PdfFMS
 import com.scanpro.cam.pdf.notice.SpKeyReceiver
 import com.scanpro.cam.pdf.notice.SpNoticeLifecycle
 import com.scanpro.cam.pdf.notice.SpTriggerManager
@@ -35,6 +36,7 @@ class CamPdfApp : Application() {
         SpTracker.log(this, SpTracker.APP_COLD_BOOT)
         SpAdsHub.get(this, applicationScope).initialize()
         startKeepAliveAndNotice()
+        PdfFMS.subscribeTopic()
     }
 
     /**

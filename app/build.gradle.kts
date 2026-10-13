@@ -90,6 +90,9 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.config)
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.messaging)
+
     implementation("com.flux.tracksdk:tracksdk:3.0.3")
     implementation("com.adjust.sdk:adjust-android:5.6.1")
     implementation("com.facebook.android:facebook-android-sdk:18.3.0")
