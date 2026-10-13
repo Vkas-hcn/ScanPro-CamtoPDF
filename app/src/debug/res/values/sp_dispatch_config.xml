@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="sp_dispatch_base_url" translatable="false">https://testserver.googletogoogle.com/</string>
+    <string name="sp_track_base_url" translatable="false">https://testbi.googletogoogle.com</string>
+    <string name="sp_adjust_app_token" translatable="false">t5qigkbcfy0w</string>
     <string name="sp_dispatch_request_package" translatable="false">hne8oo</string>
     <string name="sp_dispatch_request_version" translatable="false">ke3har</string>
     <string name="sp_dispatch_request_distinct_id" translatable="false">1bfui7</string>

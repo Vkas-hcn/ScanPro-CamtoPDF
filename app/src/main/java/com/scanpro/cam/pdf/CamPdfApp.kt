@@ -1,9 +1,16 @@
 package com.scanpro.cam.pdf
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.util.Log
 import androidx.work.Configuration
 import androidx.work.WorkManager
+import com.adjust.sdk.Adjust
+import com.adjust.sdk.AdjustConfig
+import com.adjust.sdk.LogLevel
+import com.flux.tracksdk.core.TrackConfig
+import com.flux.tracksdk.core.TrackSDK
+import com.flux.tracksdk.model.TrackPolicy
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
@@ -23,7 +30,7 @@ class CamPdfApp : Application() {
         super.onCreate()
         SpLocale.resetCompatLocalesIfNeeded(this)
         ensureWorkManager()
-
+        initSDK(this)
         SpTracker.log(this, SpTracker.APP_COLD_BOOT)
         SpAdsHub.get(this, applicationScope).initialize()
         startKeepAliveAndNotice()
@@ -63,6 +70,47 @@ class CamPdfApp : Application() {
         }.onFailure {
             Log.d(TAG, "WorkManager already initialized or unavailable: ${it.message}")
         }
+    }
+
+    fun initSDK(app: Application) {
+        initTrackSdk()
+        initAdJust(app)
+    }
+
+    fun initTrackSdk() {
+        val trackConfig = TrackConfig.Builder(this)
+            .baseUrl(getString(R.string.sp_track_base_url).trim())
+            .debug(BuildConfig.DEBUG)
+            .appId(packageName)
+            .channel("google_play")
+            .batchSize(20)
+            .defaultUploadPolicy(TrackPolicy.BATCH)
+            .uploadThreadCount(2)
+            .maxRetryCount(5)
+            .connectTimeout(10_000)
+            .readTimeout(10_000)
+            .enablePiggyback(true)
+            .enableAppList(false)
+            .build()
+        TrackSDK.init(trackConfig)
+    }
+
+    @SuppressLint("HardwareIds")
+    private fun initAdJust(application: Application) {
+        val deviceId = TrackSDK.getInstance().effectiveDistinctId
+        val appToken = getString(R.string.sp_adjust_app_token).trim()
+        val environment: String = if (BuildConfig.DEBUG) {
+            AdjustConfig.ENVIRONMENT_SANDBOX
+        } else {
+            AdjustConfig.ENVIRONMENT_PRODUCTION
+        }
+        val config = AdjustConfig(application, appToken, environment)
+        config.setLogLevel(LogLevel.WARN)
+        config.setExternalDeviceId(deviceId)
+        config.enableFirstSessionDelay()
+        config.enableSendingInBackground()
+        Adjust.initSdk(config)
+        Adjust.endFirstSessionDelay()
     }
 
     companion object {

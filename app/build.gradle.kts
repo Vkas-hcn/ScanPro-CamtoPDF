@@ -90,6 +90,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.config)
+    implementation("com.flux.tracksdk:tracksdk:3.0.3")
+    implementation("com.adjust.sdk:adjust-android:5.6.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
