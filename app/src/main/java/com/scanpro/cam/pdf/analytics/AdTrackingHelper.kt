@@ -378,8 +378,8 @@ object AdTrackingHelper {
 
     private fun adjustTokenFor(key: String): String? {
         return when (key) {
-            "ad_impression_revenue" -> "4rfcdo"
-            "total_ads_revenue_001" -> "g06m0y"
+            "ad_impression_revenue" -> "82ahw3"
+            "total_ads_revenue_001" -> "hbsfq9"
             else -> null
         }
     }
