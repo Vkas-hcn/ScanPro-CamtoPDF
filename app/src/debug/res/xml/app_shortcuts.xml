@@ -23,7 +23,7 @@
         android:shortcutShortLabel="@string/shortcut_leave"
         android:shortcutLongLabel="@string/shortcut_leave">
         <intent
-            android:targetPackage="com.test.lwapp"
+            android:targetPackage="com.npro.mac.fdp.debug"
             android:targetClass="com.scanpro.cam.pdf.leave.SpLeaveEntryActivity"
             android:action="com.scanpro.cam.pdf.delete">
             <extra
