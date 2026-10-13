@@ -2,6 +2,7 @@ package com.scanpro.cam.pdf.notice
 
 import android.content.Context
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
+import com.scanpro.cam.pdf.util.AppLog
 import java.time.LocalTime
 
 /**
@@ -54,18 +55,21 @@ internal object SpNotifyFilter {
 
     /** Apollo `canSendSysNotification(context, scene)`：有通知权限 + 总闸放行。**不含频控**。 */
     fun canSendSysNotification(context: Context, scene: SpNotifyScene): Boolean {
-        val allowed = SpNotifyPermit.isHaveNotifyPermission(context) &&
-            SpBlockingLogic.get(context).canSendSystemNotification()
-        SpNotifyUtils.log("canSendSysNotification scene=$scene result=$allowed")
-        return allowed
+        if (!SpNotifyPermit.isHaveNotifyPermission(context)) {
+            block(scene, "无通知权限")
+            return false
+        }
+        if (!SpBlockingLogic.get(context).canSendSystemNotification()) {
+            block(scene, "总闸拦截")
+            return false
+        }
+        return true
     }
 
     /** Apollo `canSendMediaNotification(scene)`：总闸放行 **且** 频控通过。 */
     fun canSendMediaNotification(context: Context, scene: SpNotifyScene): Boolean {
-        val allowed = SpBlockingLogic.get(context).canSendMediaNotification() &&
-            sendNotificationFilter(context, scene)
-        SpNotifyUtils.log("canSendMediaNotification scene=$scene result=$allowed")
-        return allowed
+        if (!SpBlockingLogic.get(context).canSendMediaNotification()) return false
+        return sendNotificationFilter(context, scene)
     }
 
     /** Apollo `updateSendCountAndLastTime(scene)`：发成功才 +1 并记时间。 */
@@ -81,9 +85,9 @@ internal object SpNotifyFilter {
 
     /** Apollo `newNotifySceneFilter`。 */
     private fun newSceneFilter(context: Context, scene: SpNotifyScene): Boolean {
-        if (!SpNotifyEnv.hasRemoteConfig) return false
+        if (!SpNotifyEnv.hasRemoteConfig) return block(scene, "远端配置未就绪")
         val config = SpNotifyEnv.newConfig
-        if (config.acOn == 0) return false
+        if (config.acOn == 0) return block(scene, "场景开关关闭")
 
         val prefs = prefs(context)
         val quota = when (scene) {
@@ -115,13 +119,16 @@ internal object SpNotifyFilter {
                 lastKey = KEY_AD_LAST,
             )
 
-            else -> return false
+            else -> return block(scene, "场景不支持")
         }
 
         val last = prefs.getLong(quota.lastKey, 0L)
-        if (System.currentTimeMillis() <= last + quota.cooldownMinutes * MINUTE_MS) return false
+        if (System.currentTimeMillis() <= last + quota.cooldownMinutes * MINUTE_MS) {
+            return block(scene, "冷却中")
+        }
         if (!SpNotifyUtils.isToday(last)) resetNewCounters(prefs)
-        return quota.limit > prefs.getInt(quota.countKey, 0)
+        if (quota.limit <= prefs.getInt(quota.countKey, 0)) return block(scene, "达到当日上限")
+        return true
     }
 
     /** Apollo `oldNotifySceneFilter`。 */
@@ -132,8 +139,9 @@ internal object SpNotifyFilter {
         val from = minOf(config.noPopStart, config.noPopEnd)
         val to = maxOf(config.noPopStart, config.noPopEnd)
         // 只在 [from, to) 里发；范围外（默认 24/6 → 凌晨 0~6 点）静音
-        if (hour < from || hour >= to) return false
-        if (config.acOn == 0 || SpNotifyEnv.isForeground()) return false
+        if (hour < from || hour >= to) return block(scene, "免打扰时段")
+        if (config.acOn == 0) return block(scene, "场景开关关闭")
+        if (SpNotifyEnv.isForeground()) return block(scene, "应用在前台")
 
         val prefs = prefs(context)
         val quota = when (scene) {
@@ -158,11 +166,13 @@ internal object SpNotifyFilter {
                 lastKey = KEY_CLOCK_LAST,
             )
 
-            else -> return false
+            else -> return block(scene, "场景不支持")
         }
 
         val last = prefs.getLong(quota.lastKey, 0L)
-        if (System.currentTimeMillis() <= last + quota.cooldownMinutes * MINUTE_MS) return false
+        if (System.currentTimeMillis() <= last + quota.cooldownMinutes * MINUTE_MS) {
+            return block(scene, "冷却中")
+        }
         if (!SpNotifyUtils.isToday(last)) {
             prefs.edit()
                 .putInt(KEY_SCHEDULED_COUNT, 0)
@@ -170,7 +180,13 @@ internal object SpNotifyFilter {
                 .putInt(KEY_CLOCK_COUNT, 0)
                 .apply()
         }
-        return quota.limit > prefs.getInt(quota.countKey, 0)
+        if (quota.limit <= prefs.getInt(quota.countKey, 0)) return block(scene, "达到当日上限")
+        return true
+    }
+
+    private fun block(scene: SpNotifyScene, reason: String): Boolean {
+        AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 原因=$reason")
+        return false
     }
 
     /** Apollo：跨天时把四个 `new_config` 计数一起清零。 */

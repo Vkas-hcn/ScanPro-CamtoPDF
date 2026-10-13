@@ -1,10 +1,10 @@
 package com.scanpro.cam.pdf.ads
 
 import android.content.Context
-import android.util.Log
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,16 +37,14 @@ class SpAdMobInit private constructor(private val appContext: Context) {
                 )
                 MobileAds.initialize(appContext) {
                     initialized = true
-                    Log.i(TAG, "MobileAds initialized")
+                    AppLog.ads.i("广告SDK初始化完成")
                     SpTracker.log(appContext, SpTracker.AD_SDK_READY)
                 }
-            }.onFailure { Log.w(TAG, "MobileAds initialize failed safely", it) }
+            }.onFailure { AppLog.ads.w("广告SDK初始化失败", it) }
         }
     }
 
     companion object {
-        private const val TAG = "SpAdMobInit"
-
         /** 官方文档给的通用测试机 ID。仅在 [SpAdDevFlags] 打开时下发。 */
         private val TEST_DEVICE_IDS = listOf("B3EEABB8EE11C2BE770B684D95219ECB")
 

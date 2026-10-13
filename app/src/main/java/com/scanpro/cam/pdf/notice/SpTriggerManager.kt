@@ -4,8 +4,8 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
+import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,8 +52,6 @@ import kotlinx.coroutines.sync.withLock
  * 延迟之后、真正发之前再查一次「是不是回到前台了」——用户已经回到 App 里就不要打扰他。
  */
 internal object SpTriggerManager {
-
-    private const val TAG = "SpTriggerManager"
 
     /** Apollo `ALARM_REQUEST_CODE`。 */
     private const val ALARM_REQUEST_CODE = 41385
@@ -150,7 +148,7 @@ internal object SpTriggerManager {
             delay(SCHEDULE_WARMUP_MS)
             while (true) {
                 runCatching { sendScheduleNotification(appContext) }
-                    .onFailure { Log.w(TAG, "startWhileTask schedule failed", it) }
+                    .onFailure { AppLog.notification.w("定时通知触发失败", it) }
                 delay(SCHEDULE_INTERVAL_MS)
             }
         }
@@ -168,7 +166,7 @@ internal object SpTriggerManager {
         scope.launch {
             delay(ALARM_WARMUP_MS)
             runCatching { sendClockNotification(appContext) }
-                .onFailure { Log.w(TAG, "startAlarmTask clock failed", it) }
+                .onFailure { AppLog.notification.w("闹钟通知触发失败", it) }
             setAlarm(appContext, force = false)
         }
     }
@@ -190,12 +188,12 @@ internal object SpTriggerManager {
                     if (!force) {
                         val existing = prefs(appContext).getLong(KEY_NEXT_ALARM_TIME, 0L)
                         if (existing > System.currentTimeMillis()) {
-                            Log.i(TAG, "setAlarm: already scheduled at $existing, skip")
+                            AppLog.notification.d("闹钟已排期，跳过 触发时间=$existing")
                             return@runCatching
                         }
                     }
                     val config = waitAcPopConfig() ?: run {
-                        Log.w(TAG, "setAlarm: acpop_config not ready, give up")
+                        AppLog.notification.w("通知被拦截 场景=${SpNotifyScene.ALARM_CLOCK.sceneType} 原因=闹钟配置未就绪")
                         return@runCatching
                     }
                     val triggerAt = System.currentTimeMillis() + config.acA * 60_000L
@@ -211,8 +209,8 @@ internal object SpTriggerManager {
                     // type 0 = RTC_WAKEUP（Apollo 传的也是 0）
                     alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
                     prefs(appContext).edit().putLong(KEY_NEXT_ALARM_TIME, triggerAt).apply()
-                    Log.i(TAG, "setAlarm: triggerAt=$triggerAt acA=${config.acA}")
-                }.onFailure { Log.w(TAG, "setAlarm failed", it) }
+                    AppLog.notification.i("闹钟已设置 触发时间=$triggerAt 间隔分钟=${config.acA}")
+                }.onFailure { AppLog.notification.w("闹钟设置失败", it) }
             }
         }
     }
@@ -232,7 +230,7 @@ internal object SpTriggerManager {
             delay(CONFIG_POLL_MS)
             waited += CONFIG_POLL_MS
         }
-        Log.w(TAG, "waitAcPopConfig: timeout")
+        AppLog.notification.w("通知被拦截 场景=${SpNotifyScene.ALARM_CLOCK.sceneType} 原因=等待配置超时")
         return null
     }
 
@@ -246,6 +244,7 @@ internal object SpTriggerManager {
         item: () -> SpNotificationItem,
     ) {
         val appContext = context.applicationContext
+        AppLog.notification.i("通知触发 场景=${scene.sceneType}")
         val notificationItem = item()
         if (media2) {
             SpSendManager.sendMedia2Notification(appContext, notificationItem, scene)
@@ -271,8 +270,12 @@ internal object SpTriggerManager {
         item: () -> SpNotificationItem,
     ) {
         val appContext = context.applicationContext
+        AppLog.notification.i("通知触发 场景=${scene.sceneType} 延迟=${delaySeconds}秒")
         // 远端配置没回来之前不发（Apollo 这段是 `if (remoteConfig.newConfig != null)`）
-        if (!SpNotifyEnv.hasRemoteConfig) return
+        if (!SpNotifyEnv.hasRemoteConfig) {
+            AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 原因=远端配置未就绪")
+            return
+        }
         val notificationItem = item()
         if (media2) {
             SpSendManager.sendMedia2Notification(appContext, notificationItem, scene)
@@ -293,7 +296,10 @@ internal object SpTriggerManager {
 
     /** 普通提醒 + 媒体式提醒各一条，然后把计数 +1。 */
     private suspend fun sendBoth(context: Context, item: SpNotificationItem, scene: SpNotifyScene) {
-        if (SpNotifyEnv.isForeground()) return
+        if (SpNotifyEnv.isForeground()) {
+            AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 原因=应用在前台")
+            return
+        }
         SpSendManager.sendSysNotification(context, item, scene)
         SpSendManager.sendMediaNotification(context, item, scene)
         SpNotifyFilter.updateSendCountAndLastTime(context, scene)
@@ -301,7 +307,10 @@ internal object SpTriggerManager {
 
     /** 只发媒体式提醒，然后把计数 +1。 */
     private suspend fun sendMediaOnly(context: Context, item: SpNotificationItem, scene: SpNotifyScene) {
-        if (SpNotifyEnv.isForeground()) return
+        if (SpNotifyEnv.isForeground()) {
+            AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 原因=应用在前台")
+            return
+        }
         SpSendManager.sendMediaNotification(context, item, scene)
         SpNotifyFilter.updateSendCountAndLastTime(context, scene)
     }

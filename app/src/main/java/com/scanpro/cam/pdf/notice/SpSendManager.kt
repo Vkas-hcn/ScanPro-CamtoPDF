@@ -2,10 +2,10 @@ package com.scanpro.cam.pdf.notice
 
 import android.app.Notification
 import android.content.Context
-import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,8 +35,6 @@ import kotlinx.coroutines.launch
  * [SpNotifyUtils.wakeScreen]；Samsung 机型跳过 media2 那支属于设备维度，按要求不迁。
  */
 internal object SpSendManager {
-
-    private const val TAG = "SpSendManager"
 
     /** Apollo `MEDIA_NOTIFY_ID`。 */
     const val MEDIA_NOTIFY_ID = 945458
@@ -69,7 +67,14 @@ internal object SpSendManager {
             mediaNotifyJob?.cancel()
             mediaNotifyJob = null
 
-            if (!blocking.canSendSystemNotification() || SpNotifyEnv.isForeground()) return
+            if (!blocking.canSendSystemNotification()) {
+                AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 类型=普通 原因=总闸拦截")
+                return
+            }
+            if (SpNotifyEnv.isForeground()) {
+                AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 类型=普通 原因=应用在前台")
+                return
+            }
 
             val screenOn = SpNotifyUtils.isInteractive(appContext)
             if (SpNotifyEnv.popRefresh.popRefreshSwitch == 1 && screenOn) {
@@ -93,8 +98,9 @@ internal object SpSendManager {
             if (!SpNotifyUtils.isInteractive(appContext)) {
                 SpNotifyUtils.wakeScreen(appContext)
             }
+            AppLog.notification.i("通知已发出 场景=${scene.sceneType} 类型=普通 id=$notificationId")
         } catch (t: Throwable) {
-            Log.w(TAG, "sendSysNotification failed scene=$scene", t)
+            AppLog.notification.w("通知发送失败 场景=${scene.sceneType} 类型=普通", t)
         }
     }
     // endregion
@@ -121,8 +127,9 @@ internal object SpSendManager {
             if (!SpNotifyUtils.isInteractive(appContext)) {
                 SpNotifyUtils.wakeScreen(appContext)
             }
+            AppLog.notification.i("通知已发出 场景=${scene.sceneType} 类型=媒体 id=$MEDIA_NOTIFY_ID")
         } catch (t: Throwable) {
-            Log.w(TAG, "sendMediaNotification failed scene=$scene", t)
+            AppLog.notification.w("通知发送失败 场景=${scene.sceneType} 类型=媒体", t)
         }
     }
 
@@ -136,15 +143,26 @@ internal object SpSendManager {
         val appContext = context.applicationContext
         try {
             val config = SpNotifyEnv.mediaConfig
-            if (config.switch != 1) return
+            if (config.switch != 1) {
+                AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 类型=媒体2 原因=开关关闭")
+                return
+            }
 
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val last = prefs.getLong(KEY_MEDIA2_LAST_TIME, 0L)
             val intervalMs = config.intervalTime * 60_000L
-            if (last != 0L && System.currentTimeMillis() - last < intervalMs) return
+            if (last != 0L && System.currentTimeMillis() - last < intervalMs) {
+                AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 类型=媒体2 原因=未到发送间隔")
+                return
+            }
 
             val notification = SpNotifyCreator.createMedia2Notification(appContext, item, scene)
-            if (!SpBlockingLogic.get(appContext).canSendMediaNotification() || SpNotifyEnv.isForeground()) {
+            if (!SpBlockingLogic.get(appContext).canSendMediaNotification()) {
+                AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 类型=媒体2 原因=总闸拦截")
+                return
+            }
+            if (SpNotifyEnv.isForeground()) {
+                AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 类型=媒体2 原因=应用在前台")
                 return
             }
             notify(appContext, MEDIA_2_NOTIFY_ID, notification)
@@ -152,8 +170,9 @@ internal object SpSendManager {
             if (!SpNotifyUtils.isInteractive(appContext)) {
                 SpNotifyUtils.wakeScreen(appContext)
             }
+            AppLog.notification.i("通知已发出 场景=${scene.sceneType} 类型=媒体2 id=$MEDIA_2_NOTIFY_ID")
         } catch (t: Throwable) {
-            Log.w(TAG, "sendMedia2Notification failed scene=$scene", t)
+            AppLog.notification.w("通知发送失败 场景=${scene.sceneType} 类型=媒体2", t)
         }
     }
     // endregion
@@ -182,6 +201,7 @@ internal object SpSendManager {
             notify(context, notificationId, if (index == 0) loud else silent)
             delay(config.interval * 1000L)
             if (!SpNotifyUtils.isInteractive(context) || SpNotifyEnv.isForeground()) {
+                AppLog.notification.i("通知重发停止 原因=${if (SpNotifyEnv.isForeground()) "应用在前台" else "屏幕已关闭"}")
                 stopNotifyUpdate()
                 return@launch
             }
@@ -192,7 +212,7 @@ internal object SpSendManager {
     private fun notify(context: Context, id: Int, notification: Notification) {
         runCatching {
             NotificationManagerCompat.from(context).notify(id, notification)
-        }.onFailure { Log.w(TAG, "notify failed id=$id", it) }
+        }.onFailure { AppLog.notification.w("通知发送失败 id=$id", it) }
     }
 
     private fun sceneTypeBundle(scene: SpNotifyScene): android.os.Bundle =

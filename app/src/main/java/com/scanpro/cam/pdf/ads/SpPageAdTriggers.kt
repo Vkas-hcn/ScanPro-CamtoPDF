@@ -7,6 +7,7 @@ import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.util.AppLog
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -30,17 +31,35 @@ object SpPageAdTriggers {
     private var lastShowAdTime = 0L
 
     fun checkLoadAdByTab(activity: Activity, position: String) {
-        if (activity.isFinishing || activity.isDestroyed) return
-        if (System.currentTimeMillis() - lastShowAdTime <= TAB_THROTTLE_MS) return
-        val blocking = SpBlockingLogic.get(activity)
-        if (blocking.isShowPartialAdsOnly(position) ||
-            !blocking.canShowAdByShowCountLimit() ||
-            blocking.isVPNBlock() ||
-            !blocking.canShowAllAd()
-        ) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=页面已销毁")
             return
         }
-        val hub = SpAdsHub.getOrNull() ?: return
+        if (System.currentTimeMillis() - lastShowAdTime <= TAB_THROTTLE_MS) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=距上次展示不足60秒")
+            return
+        }
+        val blocking = SpBlockingLogic.get(activity)
+        if (blocking.isShowPartialAdsOnly(position)) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=只展示部分广告")
+            return
+        }
+        if (!blocking.canShowAdByShowCountLimit()) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=达到当日展示上限")
+            return
+        }
+        if (blocking.isVPNBlock()) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=VPN拦截")
+            return
+        }
+        if (!blocking.canShowAllAd()) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=总闸拦截")
+            return
+        }
+        val hub = SpAdsHub.getOrNull() ?: run {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告模块未就绪")
+            return
+        }
         SpTracker.log(
             activity,
             SpTracker.SHARK_AD_CHANCE,
@@ -49,6 +68,7 @@ object SpPageAdTriggers {
         val cached = SpAdCache.getInterstitialAd(position, hub.config(), blocking)
         val manager = hub.fullScreen(activity)
         if (cached == null) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告尚未就绪")
             manager.checkAndLoadAd(position, position)
             return
         }
@@ -70,25 +90,41 @@ object SpPageAdTriggers {
      */
     fun showFileIntThen(activity: Activity, then: () -> Unit) {
         if (activity.isFinishing || activity.isDestroyed) {
+            AppLog.ads.i("跳过广告展示 位置=${SpAdPosition.AC_FILE_INT} 原因=页面已销毁")
             then()
             return
         }
         if (System.currentTimeMillis() - lastShowAdTime <= TAB_THROTTLE_MS) {
+            AppLog.ads.i("跳过广告展示 位置=${SpAdPosition.AC_FILE_INT} 原因=距上次展示不足60秒")
             then()
             return
         }
         val blocking = SpBlockingLogic.get(activity)
-        if (blocking.isShowPartialAdsOnly(SpAdPosition.AC_FILE_INT) ||
-            !blocking.canShowAdByShowCountLimit() ||
-            blocking.isVPNBlock() ||
-            !blocking.canShowAllAd()
-        ) {
+        val position = SpAdPosition.AC_FILE_INT
+        if (blocking.isShowPartialAdsOnly(position)) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=只展示部分广告")
+            then()
+            return
+        }
+        if (!blocking.canShowAdByShowCountLimit()) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=达到当日展示上限")
+            then()
+            return
+        }
+        if (blocking.isVPNBlock()) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=VPN拦截")
+            then()
+            return
+        }
+        if (!blocking.canShowAllAd()) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=总闸拦截")
             then()
             return
         }
         val hub = SpAdsHub.getOrNull()
         val manager = hub?.fullScreen(activity)
         if (hub == null || manager == null) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告模块未就绪")
             then()
             return
         }
@@ -99,6 +135,7 @@ object SpPageAdTriggers {
         )
         val cached = SpAdCache.getInterstitialAd(SpAdPosition.AC_FILE_INT, hub.config(), blocking)
         if (cached == null) {
+            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告尚未就绪")
             manager.checkAndLoadAd(SpAdPosition.AC_FILE_INT, SpAdPosition.AC_FILE_INT)
             then()
             return

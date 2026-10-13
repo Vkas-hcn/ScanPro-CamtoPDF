@@ -2,37 +2,75 @@ package com.scanpro.cam.pdf.analytics
 
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
+import com.flux.tracksdk.core.TrackSDK
+import com.flux.tracksdk.model.TrackPolicy
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.scanpro.cam.pdf.util.AppLog
 
 /**
- * Firebase-only product analytics. Most events are name-only; the ad-income event
- * carries `value` / `currency` / `network` params (ApolloPDF `AdIncomeReport` 的口径).
+ * 产品埋点。Firebase 仍是原入口；同一事件、同一参数再同步一份到 TrackSDK。
+ * 广告收入事件带 `value` / `currency` / `network`（ApolloPDF `AdIncomeReport` 的口径）。
  */
 object SpTracker {
-
-    private const val TAG = "SpTracker"
 
     fun log(context: Context, event: String) {
         if (event.isBlank()) return
         runCatching {
             FirebaseAnalytics.getInstance(context.applicationContext)
                 .logEvent(event, null)
-            Log.i(TAG, "event=$event")
+            AppLog.tracking.i("埋点已提交 平台=firebase 事件=$event 参数=无")
         }.onFailure {
-            Log.w(TAG, "log failed event=$event", it)
+            AppLog.tracking.w("埋点提交失败 平台=firebase 事件=$event", it)
+        }
+        mirrorToTrackSdk(event, null)
+    }
+
+    /** 带参数上报。Firebase 参数原样再交给 TrackSDK。 */
+    fun log(context: Context, event: String, params: Bundle?) {
+        if (event.isBlank()) return
+        val text = params.toLogText()
+        runCatching {
+            FirebaseAnalytics.getInstance(context.applicationContext).logEvent(event, params)
+            AppLog.tracking.i("埋点已提交 平台=firebase 事件=$event 参数=$text")
+        }.onFailure {
+            AppLog.tracking.w("埋点提交失败 平台=firebase 事件=$event 参数=$text", it)
+        }
+        mirrorToTrackSdk(event, params)
+    }
+
+    /**
+     * 与 Firebase 同一事件名、同一 Bundle。
+     * ponytail: TrackSDK.track 只收 Map<String, String>（与 EfileScan BiTracker 相同），
+     * 数值用 toString() 原样写入，不改键名。
+     */
+    internal fun mirrorToTrackSdk(event: String, params: Bundle?) {
+        if (event.isBlank()) return
+        val text = params.toLogText()
+        runCatching {
+            TrackSDK.track(event, params.toTrackParams(), TrackPolicy.BATCH)
+            AppLog.tracking.i("埋点已提交 平台=tracksdk 事件=$event 参数=$text")
+        }.onFailure {
+            AppLog.tracking.w("埋点提交失败 平台=tracksdk 事件=$event 参数=$text", it)
         }
     }
 
-    /** 带参数上报。目前只有广告收入事件用。 */
-    fun log(context: Context, event: String, params: Bundle?) {
-        if (event.isBlank()) return
-        runCatching {
-            FirebaseAnalytics.getInstance(context.applicationContext).logEvent(event, params)
-            Log.i(TAG, "event=$event params=${params?.keySet()?.joinToString()}")
-        }.onFailure {
-            Log.w(TAG, "log failed event=$event", it)
+    private fun Bundle?.toLogText(): String {
+        val map = toTrackParams()
+        if (map.isEmpty()) return "无"
+        return map.entries.joinToString(", ") { "${it.key}=${it.value}" }
+    }
+
+    private fun Bundle?.toTrackParams(): Map<String, String> {
+        if (this == null || isEmpty) return emptyMap()
+        val map = LinkedHashMap<String, String>(size())
+        for (key in keySet()) {
+            when (val value = get(key)) {
+                null -> Unit
+                is String -> map[key] = value
+                else -> map[key] = value.toString()
+            }
         }
+        return map
     }
 
     // region Notification permission (enable / disable)

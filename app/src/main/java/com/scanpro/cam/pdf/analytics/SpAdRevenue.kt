@@ -2,9 +2,9 @@ package com.scanpro.cam.pdf.analytics
 
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import com.google.android.gms.ads.AdValue
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.scanpro.cam.pdf.util.AppLog
 
 /**
  * Firebase Taichi / ARO ad revenue events.
@@ -12,8 +12,6 @@ import com.google.firebase.analytics.FirebaseAnalytics
  * Event names must match Firebase conversion setup exactly.
  */
 object SpAdRevenue {
-
-    private const val TAG = "SpAdRevenue"
 
     /** Per-impression revenue for Taichi. */
     const val EVENT_AD_IMPRESSION_REVENUE = "Ad_Impression_Revenue"
@@ -26,32 +24,35 @@ object SpAdRevenue {
         usd: Double,
         precisionType: Int? = null,
     ) {
+        val params = Bundle().apply {
+            putDouble(FirebaseAnalytics.Param.VALUE, usd)
+            putString(FirebaseAnalytics.Param.CURRENCY, "USD")
+            precisionType?.let { putString("precisionType", precisionLabel(it)) }
+        }
         runCatching {
             val analytics = FirebaseAnalytics.getInstance(context.applicationContext)
-            val params = Bundle().apply {
-                putDouble(FirebaseAnalytics.Param.VALUE, usd)
-                putString(FirebaseAnalytics.Param.CURRENCY, "USD")
-                precisionType?.let { putString("precisionType", precisionLabel(it)) }
-            }
             analytics.logEvent(EVENT_AD_IMPRESSION_REVENUE, params)
-            Log.i(TAG, "$EVENT_AD_IMPRESSION_REVENUE usd=$usd")
+            val precision = precisionType?.let { ", precisionType=${precisionLabel(it)}" }.orEmpty()
+            AppLog.tracking.i("埋点已提交 平台=firebase 事件=$EVENT_AD_IMPRESSION_REVENUE 参数=value=$usd, currency=USD$precision")
         }.onFailure {
-            Log.w(TAG, "log $EVENT_AD_IMPRESSION_REVENUE failed", it)
+            AppLog.tracking.w("埋点提交失败 平台=firebase 事件=$EVENT_AD_IMPRESSION_REVENUE", it)
         }
+        SpTracker.mirrorToTrackSdk(EVENT_AD_IMPRESSION_REVENUE, params)
     }
 
     fun trackTotalEarn(context: Context, usd: Double) {
+        val params = Bundle().apply {
+            putDouble(FirebaseAnalytics.Param.VALUE, usd)
+            putString(FirebaseAnalytics.Param.CURRENCY, "USD")
+        }
         runCatching {
             val analytics = FirebaseAnalytics.getInstance(context.applicationContext)
-            val params = Bundle().apply {
-                putDouble(FirebaseAnalytics.Param.VALUE, usd)
-                putString(FirebaseAnalytics.Param.CURRENCY, "USD")
-            }
             analytics.logEvent(EVENT_TOTAL_ADS_REVENUE_001, params)
-            Log.i(TAG, "$EVENT_TOTAL_ADS_REVENUE_001 usd=$usd")
+            AppLog.tracking.i("埋点已提交 平台=firebase 事件=$EVENT_TOTAL_ADS_REVENUE_001 参数=value=$usd, currency=USD")
         }.onFailure {
-            Log.w(TAG, "log $EVENT_TOTAL_ADS_REVENUE_001 failed", it)
+            AppLog.tracking.w("埋点提交失败 平台=firebase 事件=$EVENT_TOTAL_ADS_REVENUE_001", it)
         }
+        SpTracker.mirrorToTrackSdk(EVENT_TOTAL_ADS_REVENUE_001, params)
     }
 
     private fun precisionLabel(precisionType: Int): String = when (precisionType) {
