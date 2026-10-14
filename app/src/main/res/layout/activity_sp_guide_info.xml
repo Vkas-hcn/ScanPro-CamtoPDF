@@ -41,21 +41,21 @@
             android:layout_height="match_parent"
             android:contentDescription="@string/guide_page_1"
             android:scaleType="fitCenter"
-            android:src="@drawable/cam_app_mark" />
+            android:src="@drawable/pic_1" />
 
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:contentDescription="@string/guide_page_2"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_scanning" />
+            android:src="@drawable/pic_2" />
 
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:contentDescription="@string/guide_page_3"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_cleanup" />
+            android:src="@drawable/pic_3" />
     </ViewFlipper>
 
     <TextView
