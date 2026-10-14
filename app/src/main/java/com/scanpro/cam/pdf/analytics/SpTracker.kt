@@ -167,9 +167,9 @@ object SpTracker {
     /** 展示级收入，唯一入口，带 value / currency / network 参数（Apollo `AdIncomeReport`）。 */
     const val AD_IMPRESSION_REVENUE = "ad_impression_revenue"
 
-    // Apollo `report/InsertEvent.java` 的事件名，原样照抄
-    const val SHARK_AD_CHANCE = "Shark_ad_chance"
-    const val SHARK_AD_IMPRESSION_ERROR = "Shark_ad_impression_error"
+    // Apollo `report/InsertEvent.java` 的事件名；按规范 §3 硬约束改为小写 snake_case
+    const val SHARK_AD_CHANCE = "shark_ad_chance"
+    const val SHARK_AD_IMPRESSION_ERROR = "shark_ad_impression_error"
     // 注：`ad_show_splash` / `ad_show_interstitial` / `ad_show_banner` 属规范 §7 作废名（`ad_show`），
     // 已删除，不再保留死常量。
     // endregion

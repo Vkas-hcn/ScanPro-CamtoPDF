@@ -158,7 +158,7 @@ class SpFullScreenAdManager(
 
     /** 同一 [sessionId] 的一次开屏请求。重试走这里，避免重新发 session、把计数清零。 */
     private fun requestOpenAd(position: String, adInfo: SpAdInfo, scene: String, sessionId: String) {
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.OPEN, position)
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.OPEN, position, adInfo.adUnitId, "preload")
         AppOpenAd.load(
             appContext,
             adInfo.adUnitId,
@@ -195,7 +195,7 @@ class SpFullScreenAdManager(
         scene: String,
         sessionId: String,
     ) {
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.INTERSTITIAL, position)
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.INTERSTITIAL, position, adInfo.adUnitId, "preload")
         InterstitialAd.load(
             appContext,
             adInfo.adUnitId,
@@ -340,6 +340,11 @@ class SpFullScreenAdManager(
     ) {
         val host = activity
         if (isAdTryShowing) {
+            SpTrackEvents.adBlocked(
+                if (ad is AppOpenAd) AdTrackingHelper.AdType.OPEN else AdTrackingHelper.AdType.INTERSTITIAL,
+                reloadPosition,
+                "another_fullscreen",
+            )
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=已有广告正在展示")
             return
         }
@@ -366,6 +371,7 @@ class SpFullScreenAdManager(
                         ad.responseInfo,
                         AdTrackingHelper.AdType.INTERSTITIAL,
                         reloadPosition,
+                        AdTrackingHelper.recall(sessionId),
                     )
                 }
                 SpFullScreenMask.show(host) {
@@ -393,6 +399,7 @@ class SpFullScreenAdManager(
                         ad.responseInfo,
                         AdTrackingHelper.AdType.OPEN,
                         reloadPosition,
+                        AdTrackingHelper.recall(sessionId),
                     )
                 }
                 SpFullScreenMask.show(host) {

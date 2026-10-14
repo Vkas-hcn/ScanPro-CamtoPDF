@@ -158,6 +158,7 @@ internal object SpSendManager {
             val intervalMs = config.intervalTime * 60_000L
             if (last != 0L && System.currentTimeMillis() - last < intervalMs) {
                 AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 类型=媒体2 原因=未到发送间隔")
+                SpTrackEvents.notificationFrequencyLimited(scene.sceneType, "未到发送间隔")
                 return
             }
 

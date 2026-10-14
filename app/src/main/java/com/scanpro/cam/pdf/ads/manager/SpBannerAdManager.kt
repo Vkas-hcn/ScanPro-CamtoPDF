@@ -95,7 +95,7 @@ class SpBannerAdManager(
 
 
         closeShown(bannerLife)
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.BANNER, position)
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.BANNER, position, adInfo.adUnitId)
         bannerLife = life
         banner.setOnPaidEventListener { value ->
             SpAdIncomeReport.sendAdIncome(
@@ -104,6 +104,7 @@ class SpBannerAdManager(
                 banner.responseInfo,
                 AdTrackingHelper.AdType.BANNER,
                 position,
+                life,
             )
         }
         banner.adListener = object : AdListener() {

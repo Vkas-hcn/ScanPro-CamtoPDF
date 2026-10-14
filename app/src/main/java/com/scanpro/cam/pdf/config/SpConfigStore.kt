@@ -50,8 +50,6 @@ class SpConfigStore {
         val base = SpNatConfig()
         return base.copy(
             switchOpen = json.optIntOrNull(SpConfigWire.KEY_NAT_SWITCH_OPEN) ?: base.switchOpen,
-            jumpPercent = json.optIntOrNull(SpConfigWire.KEY_NAT_JUMP_PERCENT)
-                ?.coerceIn(0, 100) ?: base.jumpPercent,
         )
     }
 

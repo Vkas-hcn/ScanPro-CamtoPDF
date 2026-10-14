@@ -16,11 +16,10 @@ import com.google.android.gms.ads.ResponseInfo
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.scanpro.cam.pdf.CamPdfApp
 import com.scanpro.cam.pdf.util.AppLog
-import java.util.UUID
 
 /**
  * 广告全生命周期埋点，对接 TrackSDK 专用广告接口。
- * 能力对齐 EfileScan `AdTrackingHelper`：`adId` 在请求时生成，填充/失败/曝光/点击/关闭回传同一个值。
+ * `adId` 使用广告单元 ID（规范 §2.3，形如 ca-app-pub-…/…），填充/失败/点击/关闭各环回传同一个值。
  */
 object AdTrackingHelper {
     object AdType {
@@ -39,8 +38,6 @@ object AdTrackingHelper {
 
     private val lives = HashMap<String, AdTrackLife>()
 
-    fun newAdId(): String = UUID.randomUUID().toString()
-
     fun adSourceOf(networkName: String?): String =
         networkName?.takeIf { it.isNotBlank() } ?: SOURCE_ADMOB
 
@@ -51,11 +48,11 @@ object AdTrackingHelper {
         return ((nowMs - showStartMs).coerceAtLeast(0L)) / 1000L
     }
 
-    /** 一次 GMA 请求。返回的 [AdTrackLife.adId] 贯穿后续回调。 */
-    fun begin(adType: String, posId: String): AdTrackLife {
+    /** 一次 GMA 请求。`adUnitId` 为广告单元 ID（规范 §2.3 的 ad_id，形如 ca-app-pub-…/…），贯穿后续回调。 */
+    fun begin(adType: String, posId: String, adUnitId: String, scene: String = ""): AdTrackLife {
         val started = System.currentTimeMillis()
-        val adId = trackAdRequestGMA(adType, posId)
-        return AdTrackLife(adId, adType, posId, started)
+        trackAdRequestGMA(adType, posId, adUnitId, scene)
+        return AdTrackLife(adUnitId, adType, posId, started)
     }
 
     fun remember(sessionId: String, life: AdTrackLife) {
@@ -85,15 +82,9 @@ object AdTrackingHelper {
     }
 
     fun impression(life: AdTrackLife, scene: String = "") {
+        // 规范 §7：展示不另立事件（ad_show / ad_impression 已作废），展示与展示级收入统一走 ad_impression_revenue。
+        // 这里只记录展示起始时间，供 ad_close 的 stay_duration 计算，不再发 SDK 展示事件。
         if (life.showStartMs == 0L) life.showStartMs = System.currentTimeMillis()
-        trackAdImpressionWithSource(
-            adType = life.adType,
-            posId = life.posId,
-            adId = life.adId,
-            sdkName = SDK_ADMOB,
-            adSource = life.adSource,
-            scene = scene,
-        )
     }
 
     fun click(life: AdTrackLife) {
@@ -116,14 +107,15 @@ object AdTrackingHelper {
         flush()
     }
 
-    fun trackAdRequestGMA(adType: String, posId: String): String {
-        val adId = newAdId()
+    fun trackAdRequestGMA(adType: String, posId: String, adUnitId: String, scene: String = "") {
         report("trackAdRequestGMA") {
-            TrackSDK.trackAdRequest(adType, posId, SDK_ADMOB, adId)
+            TrackSDK.trackAdRequest(adType, posId, SDK_ADMOB, adUnitId)
         }
-        mirrorFirebase(SpTracker.AD_REQUEST, adBaseBundle(adType, posId, SDK_ADMOB, adId))
-        AppLog.tracking.d("埋点已提交 平台=tracksdk 事件=trackAdRequest 参数=adType=$adType, posId=$posId, sdk=$SDK_ADMOB, adId=$adId")
-        return adId
+        mirrorFirebase(SpTracker.AD_REQUEST, adBaseBundle(adType, posId, SDK_ADMOB, adUnitId).apply {
+            // 规范 §4 E05：预加载用 scene=preload 标；现拉/边拉边展示不带 scene
+            if (scene.isNotBlank()) putString("scene", scene)
+        })
+        AppLog.tracking.d("埋点已提交 平台=tracksdk 事件=trackAdRequest 参数=adType=$adType, posId=$posId, sdk=$SDK_ADMOB, adId=$adUnitId, scene=$scene")
     }
 
     fun trackAdFilledWithSource(
@@ -163,31 +155,6 @@ object AdTrackingHelper {
         })
         AppLog.tracking.d(
             "埋点已提交 平台=tracksdk 事件=trackAdFailed 参数=adType=$adType, posId=$posId, sdk=$SDK_ADMOB, adId=$adId, errCode=$errCodeInt, errMsg=$errMsg",
-        )
-    }
-
-    fun trackAdImpressionWithSource(
-        adType: String,
-        posId: String,
-        adId: String,
-        sdkName: String,
-        adSource: String,
-        isVisiblePct: Int = 100,
-        scene: String = "",
-    ) {
-        report("trackAdImpressionWithSource") {
-            TrackSDK.trackAdImpression(
-                adType,
-                posId,
-                sdkName,
-                adId,
-                adSource,
-                isVisiblePct.toFloat(),
-                scene,
-            )
-        }
-        AppLog.tracking.d(
-            "埋点已提交 平台=tracksdk 事件=trackAdImpression 参数=adType=$adType, posId=$posId, sdk=$sdkName, adId=$adId, adSource=$adSource, visible=$isVisiblePct, scene=$scene",
         )
     }
 
@@ -281,6 +248,8 @@ object AdTrackingHelper {
         revenue: Double,
         adType: String,
         posId: String,
+        adId: String,
+        adSource: String,
     ) {
         if (revenue < 0) return
         val currencyCode = "USD"
@@ -289,7 +258,9 @@ object AdTrackingHelper {
             revenue = revenue,
             currencyCode = currencyCode,
             adType = adType,
-            posId = posId
+            posId = posId,
+            adId = adId,
+            adSource = adSource,
         )
         trackTotalAdsRevenueIfNeeded(context, revenue)
         AppLog.tracking.e("BI Firebase Facebook usd=$revenue adType=$adType")
@@ -304,16 +275,23 @@ object AdTrackingHelper {
         revenue: Double,
         currencyCode: String = "USD",
         adType: String,
-        posId: String
+        posId: String,
+        adId: String,
+        adSource: String,
     ) {
-        //Firebase
+        val sdkName = SDK_ADMOB
+        //Firebase：ad_impression_revenue 全参数（AD-SOURCE + value + currency）
         runCatching {
-            putFirebaseAdRevenue(
-                CamPdfApp.get(),
-                event,
-                revenue,
-                currencyCode,
-            )
+            val bundle = Bundle().apply {
+                putString(SpTracker.PARAM_AD_TYPE, adType)
+                putString(SpTracker.PARAM_POS_ID, posId)
+                putString(SpTracker.PARAM_SDK_NAME, sdkName)
+                putString(SpTracker.PARAM_AD_ID, adId)
+                putString(SpTracker.PARAM_AD_SOURCE, adSource)
+                putDouble(FirebaseAnalytics.Param.VALUE, revenue)
+                putString(FirebaseAnalytics.Param.CURRENCY, currencyCode)
+            }
+            FirebaseAnalytics.getInstance(CamPdfApp.get()).logEvent(event, bundle)
         }.onFailure {
             AppLog.tracking.e("trackRevenueEvent Firebase failed: $event", it)
         }
@@ -323,13 +301,18 @@ object AdTrackingHelper {
         }.onFailure {
             AppLog.tracking.e("trackRevenueEvent Adjust failed: $event", it)
         }
-        //BI
+        //BI：ad_impression_revenue 全参数，金额字段用 value
         runCatching {
             val properties: MutableMap<String?, Any?> = java.util.HashMap<String?, Any?>()
-            properties["revenue"] = revenue
-            properties["currency"] = "USD"
+            properties[SpTracker.PARAM_AD_TYPE] = adType
+            properties[SpTracker.PARAM_POS_ID] = posId
+            properties[SpTracker.PARAM_SDK_NAME] = sdkName
+            properties[SpTracker.PARAM_AD_ID] = adId
+            properties[SpTracker.PARAM_AD_SOURCE] = adSource
+            properties["value"] = revenue
+            properties["currency"] = currencyCode
             TrackSDK.track(event, properties, TrackPolicy.IMMEDIATE)
-            AppLog.tracking.e("trackRevenueEvent BI: $event revenue=$revenue currency=$currencyCode posId=$posId")
+            AppLog.tracking.e("trackRevenueEvent BI: $event value=$revenue currency=$currencyCode posId=$posId adId=$adId")
         }.onFailure {
             AppLog.tracking.e("trackRevenueEvent BI failed: $event", it)
         }
@@ -465,27 +448,10 @@ object AdTrackingHelper {
         }
     }
 
-    fun putFirebaseAdRevenue(
-        context: Context,
-        event: String,
-        revenue: Double,
-        currencyCode: String = "USD",
-    ) {
-        runCatching {
-            val bundle = Bundle().apply {
-                putDouble(FirebaseAnalytics.Param.VALUE, revenue)
-                putString(FirebaseAnalytics.Param.CURRENCY, currencyCode)
-            }
-            FirebaseAnalytics.getInstance(context).logEvent(event, bundle)
-        }.onFailure {
-            AppLog.tracking.e("trackRevenueEvent failed: $event", it)
-        }
-    }
-
 
 }
 
-/** 单次广告请求的关联上下文，`adId` 贯穿请求到关闭。 */
+/** 单次广告请求的关联上下文，`adId`（广告单元 ID）贯穿请求到关闭。 */
 class AdTrackLife(
     val adId: String,
     val adType: String,
@@ -493,4 +459,6 @@ class AdTrackLife(
     val requestStartMs: Long,
     var adSource: String = AdTrackingHelper.SOURCE_ADMOB,
     var showStartMs: Long = 0L,
+    /** 规范 §4 E10：一次展示被多次回调收入时只报一次。 */
+    var revenueReported: Boolean = false,
 )

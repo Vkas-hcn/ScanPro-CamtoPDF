@@ -60,8 +60,9 @@ data class SpNotificationItem(
  */
 /**
  * 规范 §2.3 trigger_source（通知）取值：timer 定时 / unlock 解锁 / power 充电 / fcm 推送 / resident 常驻。
- * 应用现有 7 个场景按语义就近映射：定时轮询与闹钟归 timer、解锁归 unlock；
- * home/recent/exit/adclick 属应用内行为触发、无独立枚举值，就近归 resident（常驻/应用内触发）。
+ * 应用现有 7 个场景按语义就近映射：定时轮询与闹钟归 timer、解锁归 unlock。
+ * 注意：home/recent/exit/adclick 属应用内行为触发，规范闭集内无对应值，暂归 resident；
+ * 但 resident=常驻，会与常驻位（pos_id=persistent + trigger_source=resident）混算，【待产品确认映射】。
  */
 fun notificationTriggerSource(sceneType: String?): String = when (sceneType) {
     "unlock" -> "unlock"

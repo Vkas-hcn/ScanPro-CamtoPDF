@@ -5,6 +5,7 @@ import com.flux.tracksdk.utils.UsdFromAdMicros
 import com.google.android.gms.ads.AdValue
 import com.google.android.gms.ads.ResponseInfo
 import com.scanpro.cam.pdf.BuildConfig
+import com.scanpro.cam.pdf.analytics.AdTrackLife
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.util.AppLog
 import java.util.Locale.getDefault
@@ -35,8 +36,11 @@ object SpAdIncomeReport {
         responseInfo: ResponseInfo?,
         adType: String,
         posId: String,
+        life: AdTrackLife?,
     ) {
         try {
+            // 规范 §4 E10：一次展示被平台多次回调收入时只报一次
+            if (life != null && life.revenueReported) return
             val valueM = if (BuildConfig.DEBUG) {
                 6000L
             } else {
@@ -48,9 +52,12 @@ object SpAdIncomeReport {
                 null
             )
             val source = responseInfo?.adapterResponses?.firstOrNull()?.adSourceName
-            AppLog.tracking.d("广告收入 类型=$adType 位置=$posId 来源=$source")
+            val adSource = life?.adSource ?: AdTrackingHelper.adSourceOf(source)
+            val adId = life?.adId.orEmpty()
+            AppLog.tracking.d("广告收入 类型=$adType 位置=$posId 来源=$source adId=$adId")
             AdTrackingHelper.trackAdRevenueAdjust(usd)
-            AdTrackingHelper.trackAdImpressionRevenueMicros(context, usd, adType, posId)
+            AdTrackingHelper.trackAdImpressionRevenueMicros(context, usd, adType, posId, adId, adSource)
+            life?.revenueReported = true
         } catch (t: Throwable) {
             AppLog.tracking.e("上报收入失败 类型=$adType 位置=$posId", t)
         }

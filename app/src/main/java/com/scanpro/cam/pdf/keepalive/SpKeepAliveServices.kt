@@ -44,7 +44,7 @@ class SpApoForegroundService : Service() {
         super.onCreate()
         isRunning = true
         startedAtMs = System.currentTimeMillis()
-        SpTrackEvents.keepaliveServiceStart(SERVICE_NAME, SpForegroundServiceLauncher.lastTriggerSource)
+        SpTrackEvents.keepaliveServiceStart(SERVICE_NAME, SpForegroundServiceLauncher.consumeTriggerSource())
         startForegroundInternal()
     }
 
@@ -99,6 +99,8 @@ class SpApoForegroundService : Service() {
                 SpNotifyPermit.isHaveNotifyPermission(this)
             ) {
                 SpTracker.log(this, SpTracker.ALWAYS_NOTIFICATION_TRIGGER)
+                SpTrackEvents.notificationTrigger(this, SpPersistentNotifyManager.POS_ID_PERSISTENT, "resident")
+                SpTrackEvents.notificationShow(this, SpPersistentNotifyManager.POS_ID_PERSISTENT, "resident")
             }
             startForegroundInternal()
         }.onFailure { Log.e(TAG, "updateNotice failed", it) }
@@ -129,6 +131,8 @@ class SpAssistanceLaunchJobService : JobService() {
 
     override fun onStartJob(params: JobParameters): Boolean {
         Log.i(TAG, "onStartJob")
+        // 规范 E21 keepalive_trigger：自拉起成功时上报，trigger_type 取最近一次触发来源（消费即清零）
+        SpForegroundServiceLauncher.consumeTriggerType()?.let { SpTrackEvents.keepaliveTrigger(it) }
         runCatching {
             SpForegroundServiceLauncher.launchForegroundService(applicationContext)
         }.onFailure { Log.w(TAG, "launchForegroundService failed", it) }

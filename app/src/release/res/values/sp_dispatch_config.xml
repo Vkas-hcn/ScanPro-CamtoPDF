@@ -4,12 +4,12 @@
     <string name="sp_dispatch_base_url" translatable="false">https://config.scanpro.uk/</string>
     <string name="sp_track_base_url" translatable="false">https://bi.googletogoogle.com</string>
     <string name="sp_adjust_app_token" translatable="false">5v49m4h5uhz4</string>
-    <string name="sp_dispatch_request_package" translatable="false">lmlgp8</string>
-    <string name="sp_dispatch_request_version" translatable="false">hziayj</string>
-    <string name="sp_dispatch_request_distinct_id" translatable="false">5670ts</string>
-    <string name="sp_dispatch_request_gaid" translatable="false">bvmjof</string>
-    <string name="sp_dispatch_request_device_model" translatable="false">ib3qf1</string>
-    <string name="sp_dispatch_request_referrer" translatable="false">fbnmg7</string>
-    <string name="sp_dispatch_request_language" translatable="false">b1flz9</string>
-    <string name="sp_dispatch_request_os_version" translatable="false">nbjpsn</string>
+    <string name="sp_dispatch_request_package" translatable="false">0348op</string>
+    <string name="sp_dispatch_request_version" translatable="false">4bq2wz</string>
+    <string name="sp_dispatch_request_distinct_id" translatable="false">yec72l</string>
+    <string name="sp_dispatch_request_gaid" translatable="false">i2zqnf</string>
+    <string name="sp_dispatch_request_device_model" translatable="false">kxuecn</string>
+    <string name="sp_dispatch_request_referrer" translatable="false">6qqrie</string>
+    <string name="sp_dispatch_request_language" translatable="false">2094ym</string>
+    <string name="sp_dispatch_request_os_version" translatable="false">e8netx</string>
 </resources>

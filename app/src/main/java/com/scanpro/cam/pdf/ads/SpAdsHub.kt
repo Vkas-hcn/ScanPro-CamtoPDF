@@ -139,7 +139,7 @@ class SpAdsHub private constructor(
         applyDispatchMeta(payload)
         Log.i(
             TAG,
-            "config applied positions=${next.byPosition.keys} nat=${natConfig.switchOpen}/${natConfig.jumpPercent}",
+            "config applied positions=${next.byPosition.keys} nat=${natConfig.switchOpen}",
         )
         SpAdCache.clearAll()
         preloadLaunchAd()
@@ -165,12 +165,12 @@ class SpAdsHub private constructor(
      */
     private fun reportAttributionOnce(acquired: Boolean) {
         val prefs = app.getSharedPreferences(PREFS_DISPATCH, Context.MODE_PRIVATE)
+        // E23 activated / E25 biorganic 互斥：任一已报过，另一个不再报（配置自然量↔买量来回切换也不重复）
+        if (prefs.getBoolean(KEY_ACTIVATED, false) || prefs.getBoolean(KEY_BIORGANIC, false)) return
         if (acquired) {
-            if (prefs.getBoolean(KEY_ACTIVATED, false)) return
             SpTrackEvents.activated()
             prefs.edit().putBoolean(KEY_ACTIVATED, true).apply()
         } else {
-            if (prefs.getBoolean(KEY_BIORGANIC, false)) return
             SpTrackEvents.biorganic()
             prefs.edit().putBoolean(KEY_BIORGANIC, true).apply()
         }

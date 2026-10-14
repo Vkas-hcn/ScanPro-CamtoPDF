@@ -44,6 +44,34 @@ object SpForegroundServiceLauncher {
     fun markTrigger(source: String) {
         lastTriggerSource = source
     }
+
+    /** 读取并复位为 launch（E20 消费即清零，避免粘值错报）。 */
+    fun consumeTriggerSource(): String {
+        val value = lastTriggerSource
+        lastTriggerSource = TRIGGER_LAUNCH
+        return value
+    }
+
+    /** 最近一次自拉起的触发类型，供 E21 `keepalive_trigger`（在 JobService 实际拉起成功后上报）取用。 */
+    @Volatile
+    var lastTriggerType: String? = null
+        private set
+
+    fun markTriggerType(type: String) {
+        lastTriggerType = type
+    }
+
+    /** 读取并复位为 null（E21 消费即清零，避免粘值错报）。 */
+    fun consumeTriggerType(): String? {
+        val value = lastTriggerType
+        lastTriggerType = null
+        return value
+    }
+
+    /** 无有效触发类型的拉起路径（Home/最近任务/亮灭屏）在排 Job 前清除，避免复用上一次类型。 */
+    fun clearTriggerType() {
+        lastTriggerType = null
+    }
     // endregion
 
     private const val TAG = "SpFgLauncher"

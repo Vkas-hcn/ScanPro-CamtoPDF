@@ -149,7 +149,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         // 规范 E17 notification_click + E19 reactivation_landing（通知拉活落地）
         val posId = when (fromType) {
             SpNotifyCreator.FROM_PERSISTENT -> SpPersistentNotifyManager.POS_ID_PERSISTENT
-            SpNotifyCreator.FROM_SYS, SpNotifyCreator.FROM_MEDIA -> entrySceneType
+            SpNotifyCreator.FROM_SYS, SpNotifyCreator.FROM_MEDIA, SpNotifyCreator.FROM_MEDIA_TWO -> entrySceneType
             else -> null
         }
         if (posId != null) {

@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.notice.SpTriggerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +33,7 @@ class SpPhoneBootReceiver : BroadcastReceiver() {
         val app = context.applicationContext
 
         SpForegroundServiceLauncher.markTrigger(SpForegroundServiceLauncher.TRIGGER_BOOT)
-        SpTrackEvents.keepaliveTrigger("boot")
+        SpForegroundServiceLauncher.markTriggerType("boot")
 
         scope.launch {
             runCatching {

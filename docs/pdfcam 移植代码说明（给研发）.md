@@ -43,7 +43,7 @@ ads/                      广告编排
   SpAdPosition.kt           17 个位置的 key（常量）
   SpAdInfo.kt               单条位置配置（ad_unit_id / ad_paltfrom / ad_type / ad_timelimit）
   SpAdConfig.kt             位置 → 单元列表
-  SpNatConfig.kt            原生关闭键行为（switch_open / jump_percent）
+  SpNatConfig.kt            原生关闭键行为（switch_open）
   SpAdBean.kt               缓存条目（ad 对象 + createTime + sessionId）
   SpAdCache.kt              三类缓存（各留 1 条 + TTL 校验）
   SpBlockingLogic.kt        广告/通知总闸 + 当日展示上限

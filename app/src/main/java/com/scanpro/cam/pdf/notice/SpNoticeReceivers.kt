@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,13 +45,17 @@ class SpPhoneLockReceiver : BroadcastReceiver() {
             scope.launch {
                 runCatching {
                     if (action == Intent.ACTION_USER_PRESENT || action == Intent.ACTION_USER_UNLOCKED) {
-                        SpTrackEvents.keepaliveTrigger("user_present")
+                        SpForegroundServiceLauncher.markTriggerType("user_present")
                         SpPhoneStateManager.onUserUnlocked(context, state)
                     }
                 }.onFailure { Log.w(TAG, "user-present handling failed", it) }
             }
             scope.launch {
                 delay(UNLOCK_KEEP_ALIVE_DELAY_MS)
+                // 非解锁动作（SCREEN_ON/OFF）无对应 trigger_type，清除避免复用上一次 boot/user_present/alarm
+                if (action != Intent.ACTION_USER_PRESENT && action != Intent.ACTION_USER_UNLOCKED) {
+                    SpForegroundServiceLauncher.clearTriggerType()
+                }
                 SpForegroundServiceLauncher.startLaunchService(context.applicationContext)
             }
         }.onFailure { Log.w(TAG, "onReceive failed action=$action", it) }
@@ -96,7 +99,10 @@ class SpKeyReceiver : BroadcastReceiver() {
                 runCatching { SpTriggerManager.sendHomeClickNotification(context) }
                     .onFailure { Log.w(TAG, "home trigger failed", it) }
             }
-            scope.launch { SpForegroundServiceLauncher.startLaunchService(context.applicationContext) }
+            scope.launch {
+                SpForegroundServiceLauncher.clearTriggerType()
+                SpForegroundServiceLauncher.startLaunchService(context.applicationContext)
+            }
         }
         if (reason.contains(RECENT) && now - lastRecentTime > DEBOUNCE_MS) {
             lastRecentTime = now
@@ -105,7 +111,10 @@ class SpKeyReceiver : BroadcastReceiver() {
                 runCatching { SpTriggerManager.sendRecentClickNotification(context) }
                     .onFailure { Log.w(TAG, "recent trigger failed", it) }
             }
-            scope.launch { SpForegroundServiceLauncher.startLaunchService(context.applicationContext) }
+            scope.launch {
+                SpForegroundServiceLauncher.clearTriggerType()
+                SpForegroundServiceLauncher.startLaunchService(context.applicationContext)
+            }
         }
     }
 
@@ -161,7 +170,7 @@ class SpAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         val app = context?.applicationContext
         if (app == null) return
-        SpTrackEvents.keepaliveTrigger("alarm")
+        SpForegroundServiceLauncher.markTriggerType("alarm")
         scope.launch {
             runCatching { SpTriggerManager.sendClockNotification(app) }
                 .onFailure { Log.w(TAG, "clock trigger failed", it) }
