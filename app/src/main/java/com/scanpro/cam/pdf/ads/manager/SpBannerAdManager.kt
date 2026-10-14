@@ -18,6 +18,7 @@ import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.analytics.AdTrackLife
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 
 /**
@@ -65,10 +66,12 @@ class SpBannerAdManager(
         }
         if (!blocking.canShowAdByShowCountLimit()) {
             AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=达到当日展示上限")
+            SpTrackEvents.adBlocked(AdTrackingHelper.AdType.BANNER, position, "daily_cap")
             return
         }
         if (!blocking.canShowAllAd()) {
             AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=总闸拦截")
+            SpTrackEvents.adBlocked(AdTrackingHelper.AdType.BANNER, position, "disabled")
             return
         }
 
@@ -90,11 +93,7 @@ class SpBannerAdManager(
         }
         adView = banner
 
-        SpTracker.log(
-            appContext,
-            SpTracker.SHARK_AD_PLACEMENT_REQUEST,
-            Bundle().apply { putString("position", position); putString("unit", adInfo.adUnitId) },
-        )
+
         closeShown(bannerLife)
         val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.BANNER, position)
         bannerLife = life
@@ -110,39 +109,24 @@ class SpBannerAdManager(
         banner.adListener = object : AdListener() {
             override fun onAdLoaded() {
                 AppLog.ads.i("广告加载成功 类型=banner 位置=$position 单元=${adInfo.adUnitId}")
-                SpTracker.log(
-                    appContext,
-                    SpTracker.SHARK_AD_SOURCE_REQUEST,
-                    Bundle().apply { putString("position", position); putString("unit", adInfo.adUnitId) },
-                )
                 AdTrackingHelper.filled(life, banner.responseInfo)
             }
 
             override fun onAdFailedToLoad(error: LoadAdError) {
                 AppLog.ads.w("广告加载失败 类型=banner 位置=$position 单元=${adInfo.adUnitId} 错误码=${error.code} 错误信息=${error.message}")
-                SpTracker.log(
-                    appContext,
-                    SpTracker.SHARK_AD_SOURCE_ERROR,
-                    Bundle().apply {
-                        putString("position", position)
-                        putString("unit", adInfo.adUnitId)
-                        putString("message", error.message)
-                    },
-                )
+
                 AdTrackingHelper.failed(life, error.code, error.message)
             }
 
             override fun onAdImpression() {
                 blocking.updateAdShowCount()
                 AppLog.ads.i("广告已曝光 类型=banner 位置=$position")
-                SpTracker.log(appContext, SpTracker.SHARK_AD_IMPRESSION)
                 AdTrackingHelper.impression(life)
             }
 
             override fun onAdClicked() {
                 SpAdSession.markAdClicked()
                 AppLog.ads.i("广告已点击 类型=banner 位置=$position")
-                SpTracker.log(appContext, SpTracker.SHARK_AD_CLICK)
                 AdTrackingHelper.click(life)
             }
         }

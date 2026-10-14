@@ -12,6 +12,7 @@ import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.boot.SpBootActivity
 import com.scanpro.cam.pdf.notice.SpNotifyCatalog
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
@@ -41,6 +42,9 @@ internal object SpPersistentNotifyManager {
 
     /** Apollo `persistent_notification_id`。 */
     const val PERSISTENT_NOTIFICATION_ID = 234397
+
+    /** 规范 E16「常驻通知栏 pos_id 标常驻位」用。 */
+    const val POS_ID_PERSISTENT = "persistent"
 
     private const val TAG = "SpPersistentNotify"
 
@@ -107,6 +111,8 @@ internal object SpPersistentNotifyManager {
             val notification = createPersistentNotification(appContext)
             Log.i(TAG, "sendPersistentNotification: $PERSISTENT_NOTIFICATION_ID")
             SpTracker.log(appContext, SpTracker.ALWAYS_NOTIFICATION_TRIGGER)
+            SpTrackEvents.notificationTrigger(appContext, POS_ID_PERSISTENT, "resident")
+            SpTrackEvents.notificationShow(appContext, POS_ID_PERSISTENT, "resident")
             manager.notify(PERSISTENT_NOTIFICATION_ID, notification)
         }.onFailure { Log.w(TAG, "sendPersistentNotification failed", it) }
     }

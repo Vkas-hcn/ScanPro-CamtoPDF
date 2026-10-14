@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- prod 地址待后端分配。为空时配置模块整体跳过。 -->
-    <string name="sp_dispatch_base_url" translatable="false"></string>
+    <string name="sp_dispatch_base_url" translatable="false">https://config.scanpro.uk/</string>
     <string name="sp_track_base_url" translatable="false">https://bi.googletogoogle.com</string>
     <string name="sp_adjust_app_token" translatable="false">5v49m4h5uhz4</string>
-    <string name="sp_dispatch_request_package" translatable="false">hne8oo</string>
-    <string name="sp_dispatch_request_version" translatable="false">ke3har</string>
-    <string name="sp_dispatch_request_distinct_id" translatable="false">1bfui7</string>
-    <string name="sp_dispatch_request_gaid" translatable="false">pz9zqb</string>
-    <string name="sp_dispatch_request_device_model" translatable="false">b3dgej</string>
-    <string name="sp_dispatch_request_referrer" translatable="false">tsd589</string>
-    <string name="sp_dispatch_request_language" translatable="false">0ifdut</string>
-    <string name="sp_dispatch_request_os_version" translatable="false">y1ywr3</string>
+    <string name="sp_dispatch_request_package" translatable="false">lmlgp8</string>
+    <string name="sp_dispatch_request_version" translatable="false">hziayj</string>
+    <string name="sp_dispatch_request_distinct_id" translatable="false">5670ts</string>
+    <string name="sp_dispatch_request_gaid" translatable="false">bvmjof</string>
+    <string name="sp_dispatch_request_device_model" translatable="false">ib3qf1</string>
+    <string name="sp_dispatch_request_referrer" translatable="false">fbnmg7</string>
+    <string name="sp_dispatch_request_language" translatable="false">b1flz9</string>
+    <string name="sp_dispatch_request_os_version" translatable="false">nbjpsn</string>
 </resources>

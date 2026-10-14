@@ -3,6 +3,7 @@ package com.scanpro.cam.pdf.notice
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 
 /**
@@ -15,7 +16,9 @@ import com.scanpro.cam.pdf.util.AppLog
 class PdfFMS : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
-
+        // 规范 E15 notification_received：下发消息到达客户端（pos_id / msg_id 均可空）
+        val posId = message.data["pos_id"].orEmpty()
+        SpTrackEvents.notificationReceived(posId, message.messageId.orEmpty())
     }
 
     companion object {

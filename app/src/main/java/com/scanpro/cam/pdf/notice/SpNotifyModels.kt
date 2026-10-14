@@ -58,6 +58,19 @@ data class SpNotificationItem(
  * 通知点进来带的三个附加信息。出处：ApolloPDF `app/Constants.java`
  * （`JUMP_TYPE` / `FROM_TYPE` / `SCENE_TYPE`）。
  */
+/**
+ * 规范 §2.3 trigger_source（通知）取值：timer 定时 / unlock 解锁 / power 充电 / fcm 推送 / resident 常驻。
+ * 应用现有 7 个场景按语义就近映射：定时轮询与闹钟归 timer、解锁归 unlock；
+ * home/recent/exit/adclick 属应用内行为触发、无独立枚举值，就近归 resident（常驻/应用内触发）。
+ */
+fun notificationTriggerSource(sceneType: String?): String = when (sceneType) {
+    "unlock" -> "unlock"
+    "time", "alarm" -> "timer"
+    else -> "resident"
+}
+
+fun SpNotifyScene.toTriggerSource(): String = notificationTriggerSource(sceneType)
+
 object SpNotifyExtras {
 
     /** 落到哪个文件类型页，值是 [SpJumpType] 的名字。 */

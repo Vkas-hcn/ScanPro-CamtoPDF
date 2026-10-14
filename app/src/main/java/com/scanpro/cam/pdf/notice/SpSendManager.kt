@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -95,6 +96,8 @@ internal object SpSendManager {
                 SpTracker.SYSTEM_NOTIFICATION_TRIGGER,
                 sceneTypeBundle(scene),
             )
+            SpTrackEvents.notificationTrigger(appContext, scene.sceneType, scene.toTriggerSource())
+            SpTrackEvents.notificationShow(appContext, scene.sceneType, scene.toTriggerSource())
             if (!SpNotifyUtils.isInteractive(appContext)) {
                 SpNotifyUtils.wakeScreen(appContext)
             }
@@ -124,6 +127,8 @@ internal object SpSendManager {
                 SpTracker.MEDIA_NOTIFICATION_TRIGGER,
                 sceneTypeBundle(scene),
             )
+            SpTrackEvents.notificationTrigger(appContext, scene.sceneType, scene.toTriggerSource())
+            SpTrackEvents.notificationShow(appContext, scene.sceneType, scene.toTriggerSource())
             if (!SpNotifyUtils.isInteractive(appContext)) {
                 SpNotifyUtils.wakeScreen(appContext)
             }
@@ -167,6 +172,8 @@ internal object SpSendManager {
             }
             notify(appContext, MEDIA_2_NOTIFY_ID, notification)
             prefs.edit().putLong(KEY_MEDIA2_LAST_TIME, System.currentTimeMillis()).apply()
+            SpTrackEvents.notificationTrigger(appContext, scene.sceneType, scene.toTriggerSource())
+            SpTrackEvents.notificationShow(appContext, scene.sceneType, scene.toTriggerSource())
             if (!SpNotifyUtils.isInteractive(appContext)) {
                 SpNotifyUtils.wakeScreen(appContext)
             }

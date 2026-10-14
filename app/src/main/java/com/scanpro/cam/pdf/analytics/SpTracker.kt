@@ -54,6 +54,15 @@ object SpTracker {
         }
     }
 
+    /**
+     * 只出 BI（TrackSDK），不发 Firebase。用于规范 §3 中出口仅为 `bi` 的事件
+     * （如 `activated` / `biorganic` / 保活 / 频控等），保证「bi 出口必收、不被 Firebase 旁路」。
+     */
+    fun logBi(event: String, params: Bundle? = null) {
+        if (event.isBlank()) return
+        mirrorToTrackSdk(event, params)
+    }
+
     private fun Bundle?.toLogText(): String {
         val map = toTrackParams()
         if (map.isEmpty()) return "无"
@@ -160,22 +169,9 @@ object SpTracker {
 
     // Apollo `report/InsertEvent.java` 的事件名，原样照抄
     const val SHARK_AD_CHANCE = "Shark_ad_chance"
-    const val SHARK_AD_PLACEMENT_REQUEST = "Shark_ad_placement_request"
-    const val SHARK_AD_SOURCE_REQUEST = "Shark_ad_source_request"
-    const val SHARK_AD_SOURCE_ERROR = "Shark_ad_source_error"
-    const val SHARK_AD_IMPRESSION = "Shark_ad_impression"
     const val SHARK_AD_IMPRESSION_ERROR = "Shark_ad_impression_error"
-    const val SHARK_AD_CLICK = "Shark_ad_click"
-    const val SHARK_AD_CLOSE = "Shark_ad_close"
-
-    const val AD_SHOW_OPEN = "ad_show_splash"
-    const val AD_SHOW_INTERSTITIAL = "ad_show_interstitial"
-    const val AD_SHOW_BANNER = "ad_show_banner"
-    const val AD_SKIP_TUNNEL = "ad_skip_vpn"
-    const val AD_SKIP_CONSENT = "ad_skip_ump"
-    const val AD_SKIP_CAP = "ad_skip_freq"
-    const val CONSENT_FALLBACK = "ump_fallback"
-    const val HOT_START_SPLASH_SHOW = "hot_start_splash_show"
+    // 注：`ad_show_splash` / `ad_show_interstitial` / `ad_show_banner` 属规范 §7 作废名（`ad_show`），
+    // 已删除，不再保留死常量。
     // endregion
 
     // region Floating window (悬浮窗)
@@ -216,5 +212,47 @@ object SpTracker {
 
     /** 下发配置 `isAcquiredUser == true` 时上报一次。 */
     const val ACTIVATED = "activated"
+    // endregion
+
+    // region 通用埋点规范 §3 事件名（补齐 / 归并用）
+    const val AD_REQUEST = "ad_request"
+    const val AD_FILLED = "ad_filled"
+    const val AD_FAILED = "ad_failed"
+    const val AD_CLICK = "ad_click"
+    const val AD_CLOSE = "ad_close"
+    const val AD_BLOCKED = "ad_blocked"
+    const val AD_SHOW_TIMEOUT = "ad_show_timeout"
+    const val NOTIFICATION_TRIGGER = "notification_trigger"
+    const val NOTIFICATION_RECEIVED = "notification_received"
+    const val NOTIFICATION_SHOW = "notification_show"
+    const val NOTIFICATION_CLICK = "notification_click"
+    const val NOTIFICATION_FREQUENCY_LIMITED = "notification_frequency_limited"
+    const val REACTIVATION_LANDING = "reactivation_landing"
+    const val KEEPALIVE_SERVICE_START = "keepalive_service_start"
+    const val KEEPALIVE_TRIGGER = "keepalive_trigger"
+    const val KEEPALIVE_SERVICE_STOP = "keepalive_service_stop"
+    const val BIORGANIC = "biorganic"
+    const val RETENTION_D1 = "retention_d1"
+    const val RETENTION_D7 = "retention_d7"
+    const val RETENTION_D14 = "retention_d14"
+    const val RETENTION_D30 = "retention_d30"
+    // endregion
+
+    // region 规范 §2.3 参数名（AD-BASE / AD-SOURCE / NOTIFY-BASE / 保活 / 拉活）
+    const val PARAM_AD_TYPE = "ad_type"
+    const val PARAM_POS_ID = "pos_id"
+    const val PARAM_SDK_NAME = "sdk_name"
+    const val PARAM_AD_ID = "ad_id"
+    const val PARAM_AD_SOURCE = "ad_source"
+    const val PARAM_TRIGGER_SOURCE = "trigger_source"
+    const val PARAM_TRIGGER_TYPE = "trigger_type"
+    const val PARAM_SERVICE_NAME = "service_name"
+    const val PARAM_ALIVE_MS = "alive_ms"
+    const val PARAM_SOURCE = "source"
+    const val PARAM_LANDING_PAGE = "landing_page"
+    const val PARAM_LIMIT_REASON = "limit_reason"
+    const val PARAM_BLOCK_REASON = "block_reason"
+    const val PARAM_WAIT_MS = "wait_ms"
+    const val PARAM_MSG_ID = "msg_id"
     // endregion
 }

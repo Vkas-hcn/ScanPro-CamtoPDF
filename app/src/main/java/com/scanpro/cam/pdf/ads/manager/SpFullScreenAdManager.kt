@@ -21,6 +21,7 @@ import com.scanpro.cam.pdf.ads.SpCachedAd
 import com.scanpro.cam.pdf.ads.SpFullScreenMask
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 
 /**
@@ -143,7 +144,6 @@ class SpFullScreenAdManager(
         val sessionId = SpAdSession.newId()
         sessionIdTryCountMap[sessionId] = 0
         loadingAdStateMap[adInfo.adUnitId] = true
-        reportStartLoading(scene, adInfo.adUnitId, sessionId)
         AppLog.ads.i("开始加载广告 类型=open 位置=$position 单元=${adInfo.adUnitId}")
         requestOpenAd(position, adInfo, scene, sessionId)
     }
@@ -152,7 +152,6 @@ class SpFullScreenAdManager(
         val sessionId = SpAdSession.newId()
         sessionIdTryCountMap[sessionId] = 0
         loadingAdStateMap[adInfo.adUnitId] = true
-        reportStartLoading(scene, adInfo.adUnitId, sessionId)
         AppLog.ads.i("开始加载广告 类型=interstitial 位置=$position 单元=${adInfo.adUnitId}")
         requestInterstitialAd(position, adInfo, scene, sessionId)
     }
@@ -171,7 +170,6 @@ class SpFullScreenAdManager(
                     SpAdCache.putOpenAd(SpCachedAd(ad, System.currentTimeMillis(), sessionId))
                     AdTrackingHelper.filled(life, ad.responseInfo)
                     AdTrackingHelper.remember(sessionId, life)
-                    reportLoaded(scene, adInfo.adUnitId, sessionId)
                     AppLog.ads.i("广告加载成功 类型=open 位置=$position 单元=${adInfo.adUnitId}")
                 }
 
@@ -209,7 +207,6 @@ class SpFullScreenAdManager(
                     SpAdCache.putInterstitialAd(SpCachedAd(ad, System.currentTimeMillis(), sessionId))
                     AdTrackingHelper.filled(life, ad.responseInfo)
                     AdTrackingHelper.remember(sessionId, life)
-                    reportLoaded(scene, adInfo.adUnitId, sessionId)
                     AppLog.ads.i("广告加载成功 类型=interstitial 位置=$position 单元=${adInfo.adUnitId}")
                 }
 
@@ -241,15 +238,7 @@ class SpFullScreenAdManager(
         message: String,
     ) {
         AppLog.ads.d("广告加载重试 位置=$position 单元=${adInfo.adUnitId} 错误信息=$message")
-        SpTracker.log(
-            appContext,
-            SpTracker.SHARK_AD_SOURCE_ERROR,
-            android.os.Bundle().apply {
-                putString("position", position)
-                putString("unit", adInfo.adUnitId)
-                putString("message", message)
-            },
-        )
+
         val tried = (sessionIdTryCountMap[sessionId] ?: 0) + 1
         if (tried < tryCountLimit) {
             sessionIdTryCountMap[sessionId] = tried
@@ -296,6 +285,7 @@ class SpFullScreenAdManager(
         }
         if (!blocking.canShowAdByShowCountLimit()) {
             AppLog.ads.i("跳过广告展示 类型=interstitial 位置=$position 原因=达到当日展示上限")
+            SpTrackEvents.adBlocked(AdTrackingHelper.AdType.INTERSTITIAL, position, "daily_cap")
             onDone()
             return
         }
@@ -306,6 +296,7 @@ class SpFullScreenAdManager(
         }
         if (!blocking.canShowAllAd()) {
             AppLog.ads.i("跳过广告展示 类型=interstitial 位置=$position 原因=总闸拦截")
+            SpTrackEvents.adBlocked(AdTrackingHelper.AdType.INTERSTITIAL, position, "disabled")
             onDone()
             return
         }
@@ -431,13 +422,11 @@ class SpFullScreenAdManager(
         override fun onAdClicked() {
             SpAdSession.markAdClicked()
             AppLog.ads.i("广告已点击 位置=$scene")
-            SpTracker.log(appContext, SpTracker.SHARK_AD_CLICK)
             AdTrackingHelper.recall(sessionId)?.let { AdTrackingHelper.click(it) }
         }
 
         override fun onAdImpression() {
             AppLog.ads.i("广告已曝光 位置=$scene")
-            SpTracker.log(appContext, SpTracker.SHARK_AD_IMPRESSION)
             AdTrackingHelper.recall(sessionId)?.let { AdTrackingHelper.impression(it, scene) }
         }
 
@@ -451,7 +440,6 @@ class SpFullScreenAdManager(
 
         override fun onAdDismissedFullScreenContent() {
             AppLog.ads.i("广告已关闭 位置=$scene")
-            SpTracker.log(appContext, SpTracker.SHARK_AD_CLOSE)
             AdTrackingHelper.recall(sessionId)?.let { AdTrackingHelper.close(it) }
             AdTrackingHelper.forget(sessionId)
             onResult(false, true)
@@ -482,28 +470,8 @@ class SpFullScreenAdManager(
         isAdTryShowing = false
     }
 
-    private fun reportStartLoading(scene: String, unitId: String, sessionId: String) {
-        SpTracker.log(
-            appContext,
-            SpTracker.SHARK_AD_PLACEMENT_REQUEST,
-            android.os.Bundle().apply {
-                putString("scene", scene)
-                putString("unit", unitId)
-                putString("session", sessionId)
-            },
-        )
-    }
 
-    private fun reportLoaded(scene: String, unitId: String, sessionId: String) {
-        SpTracker.log(
-            appContext,
-            SpTracker.SHARK_AD_SOURCE_REQUEST,
-            android.os.Bundle().apply {
-                putString("scene", scene)
-                putString("unit", unitId)
-                putString("session", sessionId)
-            },
-        )
-    }
+
+
 
 }

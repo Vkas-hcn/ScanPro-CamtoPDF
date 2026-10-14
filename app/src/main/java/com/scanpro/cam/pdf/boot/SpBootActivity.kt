@@ -22,15 +22,18 @@ import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.analytics.SpSceneCode
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.guide.SpFirstLaunch
 import com.scanpro.cam.pdf.guide.SpGuideLanguageActivity
 import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
+import com.scanpro.cam.pdf.keepalive.SpPersistentNotifyManager
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
 import com.scanpro.cam.pdf.leave.SpUnInstall01Activity
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.scanpro.cam.pdf.notice.SpNotifyPermit
 import com.scanpro.cam.pdf.notice.SpSendManager
+import com.scanpro.cam.pdf.notice.notificationTriggerSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -142,6 +145,21 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
             SpNotifyCreator.FROM_PERSISTENT ->
                 SpTracker.log(this, SpTracker.ALWAYS_NOTIFICATION_CLICK)
+        }
+        // 规范 E17 notification_click + E19 reactivation_landing（通知拉活落地）
+        val posId = when (fromType) {
+            SpNotifyCreator.FROM_PERSISTENT -> SpPersistentNotifyManager.POS_ID_PERSISTENT
+            SpNotifyCreator.FROM_SYS, SpNotifyCreator.FROM_MEDIA -> entrySceneType
+            else -> null
+        }
+        if (posId != null) {
+            val triggerSource = if (fromType == SpNotifyCreator.FROM_PERSISTENT) {
+                "resident"
+            } else {
+                notificationTriggerSource(entrySceneType)
+            }
+            SpTrackEvents.notificationClick(this, posId, triggerSource)
+            SpTrackEvents.reactivationLanding("notification", entryJumpType ?: "home", posId)
         }
         SpSendManager.stopNotifyUpdate()
     }

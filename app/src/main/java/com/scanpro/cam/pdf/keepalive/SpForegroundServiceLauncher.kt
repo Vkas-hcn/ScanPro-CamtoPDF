@@ -32,6 +32,20 @@ object SpForegroundServiceLauncher {
     /** Apollo `ASSISTANCE_JOB_ID`。 */
     const val ASSISTANCE_JOB_ID = 46555
 
+    // region 保活触发来源（规范 E20 trigger_source：launch / boot / task_removed）
+    const val TRIGGER_LAUNCH = "launch"
+    const val TRIGGER_BOOT = "boot"
+
+    /** 最近一次拉起前台服务的来源，供 E20 `keepalive_service_start` 取用；默认随 App 启动为 launch。 */
+    @Volatile
+    var lastTriggerSource: String = TRIGGER_LAUNCH
+        private set
+
+    fun markTrigger(source: String) {
+        lastTriggerSource = source
+    }
+    // endregion
+
     private const val TAG = "SpFgLauncher"
 
     /**

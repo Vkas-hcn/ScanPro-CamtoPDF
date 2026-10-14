@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.notice.SpNotifyPermit
 
 /**
@@ -37,9 +38,13 @@ class SpApoForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private var startedAtMs = 0L
+
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        startedAtMs = System.currentTimeMillis()
+        SpTrackEvents.keepaliveServiceStart(SERVICE_NAME, SpForegroundServiceLauncher.lastTriggerSource)
         startForegroundInternal()
     }
 
@@ -51,6 +56,9 @@ class SpApoForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        val aliveMs = if (startedAtMs > 0L) System.currentTimeMillis() - startedAtMs else 0L
+        SpTrackEvents.keepaliveServiceStop(SERVICE_NAME, aliveMs)
+        startedAtMs = 0L
         isRunning = false
     }
 
@@ -98,6 +106,9 @@ class SpApoForegroundService : Service() {
 
     companion object {
         private const val TAG = "SpApoForegroundService"
+
+        /** 规范 E20/E22 的 service_name，固定取前台服务名。 */
+        private const val SERVICE_NAME = "SpApoForegroundService"
 
         /** Apollo `ApoForegroundService.isRunning`。 */
         @Volatile

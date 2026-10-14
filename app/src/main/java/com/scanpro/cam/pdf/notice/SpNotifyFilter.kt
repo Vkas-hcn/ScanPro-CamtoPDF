@@ -2,6 +2,7 @@ package com.scanpro.cam.pdf.notice
 
 import android.content.Context
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 import java.time.LocalTime
 
@@ -186,8 +187,15 @@ internal object SpNotifyFilter {
 
     private fun block(scene: SpNotifyScene, reason: String): Boolean {
         AppLog.notification.i("通知被拦截 场景=${scene.sceneType} 原因=$reason")
+        if (reason in FREQUENCY_LIMIT_REASONS) {
+            // 规范 E18 notification_frequency_limited：仅频控类拦截上报，pos_id + limit_reason
+            SpTrackEvents.notificationFrequencyLimited(scene.sceneType, reason)
+        }
         return false
     }
+
+    /** 频控类拦截原因（冷却 / 当日上限 / 免打扰时段），与总闸、无权限、前台等非频控拦截区分。 */
+    private val FREQUENCY_LIMIT_REASONS = setOf("冷却中", "达到当日上限", "免打扰时段")
 
     /** Apollo：跨天时把四个 `new_config` 计数一起清零。 */
     private fun resetNewCounters(prefs: android.content.SharedPreferences) {

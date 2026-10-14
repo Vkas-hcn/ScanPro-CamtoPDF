@@ -9,7 +9,7 @@ import com.scanpro.cam.pdf.ads.manager.SpFullScreenAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.analytics.SpFacebookInit
 import com.scanpro.cam.pdf.analytics.SpSceneCode
-import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.config.SpConfigBootstrapper
 import com.scanpro.cam.pdf.config.SpConfigLoadResult
 import com.scanpro.cam.pdf.config.SpConfigRemoteSource
@@ -155,17 +155,26 @@ class SpAdsHub private constructor(
         val meta = configStore.dispatchMeta(payload)
         runCatching { SpFacebookInit.start(app, meta.facebookAppId, meta.clientToken) }
             .onFailure { Log.w(TAG, "facebook init skipped", it) }
-        if (!meta.isAcquiredUser || activatedReported(app)) return
-        SpTracker.log(app, SpTracker.ACTIVATED)
-        app.getSharedPreferences(PREFS_DISPATCH, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_ACTIVATED, true)
-            .apply()
+        reportAttributionOnce(meta.isAcquiredUser)
     }
 
-    private fun activatedReported(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_DISPATCH, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ACTIVATED, false)
+    /**
+     * 买量 / 自然量一次性标记，对应规范 E23 `activated` / E25 `biorganic`：两者互斥、
+     * 每台设备只报一次、且**只出 bi**（不经 Firebase / Adjust / Facebook）。
+     * E25 的「三方归因状态已是已归因则不报」需等归因回传接入后补充（当前配置仅含 isAcquiredUser）。
+     */
+    private fun reportAttributionOnce(acquired: Boolean) {
+        val prefs = app.getSharedPreferences(PREFS_DISPATCH, Context.MODE_PRIVATE)
+        if (acquired) {
+            if (prefs.getBoolean(KEY_ACTIVATED, false)) return
+            SpTrackEvents.activated()
+            prefs.edit().putBoolean(KEY_ACTIVATED, true).apply()
+        } else {
+            if (prefs.getBoolean(KEY_BIORGANIC, false)) return
+            SpTrackEvents.biorganic()
+            prefs.edit().putBoolean(KEY_BIORGANIC, true).apply()
+        }
+    }
 
     private fun applyBlocking(payload: JSONObject) {
         val patch = configStore.blockingConfig(payload)
@@ -245,6 +254,7 @@ class SpAdsHub private constructor(
         private const val TAG = "SpAdsHub"
         private const val PREFS_DISPATCH = "sp_dispatch_flags"
         private const val KEY_ACTIVATED = "activated_reported"
+        private const val KEY_BIORGANIC = "biorganic_reported"
 
         @Volatile
         private var instance: SpAdsHub? = null

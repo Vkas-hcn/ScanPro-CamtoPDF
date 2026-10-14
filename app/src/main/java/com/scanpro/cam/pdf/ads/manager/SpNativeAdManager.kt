@@ -27,6 +27,7 @@ import com.scanpro.cam.pdf.ads.SpNatConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,10 +134,12 @@ class SpNativeAdManager internal constructor(
         }
         if (!blocking.canShowAdByShowCountLimit()) {
             AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=达到当日展示上限")
+            if (action == "展示") SpTrackEvents.adBlocked(AdTrackingHelper.AdType.NATIVE, position, "daily_cap")
             return false
         }
         if (!blocking.canShowAllAd()) {
             AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=总闸拦截")
+            if (action == "展示") SpTrackEvents.adBlocked(AdTrackingHelper.AdType.NATIVE, position, "disabled")
             return false
         }
         return true
@@ -167,21 +170,12 @@ class SpNativeAdManager internal constructor(
             return
         }
         val sessionId = SpAdSession.newId()
-        SpTracker.log(
-            appContext,
-            SpTracker.SHARK_AD_PLACEMENT_REQUEST,
-            Bundle().apply { putString("position", position); putString("unit", adInfo.adUnitId) },
-        )
+
         val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.NATIVE, position)
         AppLog.ads.i("开始加载广告 类型=native 位置=$position 单元=${adInfo.adUnitId}")
         AdLoader.Builder(appContext, adInfo.adUnitId)
             .forNativeAd { nativeAd ->
                 isLoading = false
-                SpTracker.log(
-                    appContext,
-                    SpTracker.SHARK_AD_SOURCE_REQUEST,
-                    Bundle().apply { putString("position", position); putString("unit", adInfo.adUnitId) },
-                )
                 AdTrackingHelper.filled(life, nativeAd.responseInfo)
                 AdTrackingHelper.remember(sessionId, life)
                 SpAdCache.putNativeAd(SpCachedAd(nativeAd, System.currentTimeMillis(), sessionId))
@@ -189,15 +183,6 @@ class SpNativeAdManager internal constructor(
             }
             .withAdListener(object : com.google.android.gms.ads.AdListener() {
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    SpTracker.log(
-                        appContext,
-                        SpTracker.SHARK_AD_SOURCE_ERROR,
-                        Bundle().apply {
-                            putString("position", position)
-                            putString("unit", adInfo.adUnitId)
-                            putString("message", error.message)
-                        },
-                    )
                     AppLog.ads.w("广告加载失败 类型=native 位置=$position 单元=${adInfo.adUnitId} 错误码=${error.code} 错误信息=${error.message}")
                     AdTrackingHelper.failed(life, error.code, error.message)
                     val current = loadIndexOfAdPositionMap[position] ?: 0
@@ -206,14 +191,12 @@ class SpNativeAdManager internal constructor(
 
                 override fun onAdImpression() {
                     AppLog.ads.i("广告已曝光 类型=native 位置=$position")
-                    SpTracker.log(appContext, SpTracker.SHARK_AD_IMPRESSION)
                     AdTrackingHelper.impression(life)
                 }
 
                 override fun onAdClicked() {
                     SpAdSession.markAdClicked()
                     AppLog.ads.i("广告已点击 类型=native 位置=$position")
-                    SpTracker.log(appContext, SpTracker.SHARK_AD_CLICK)
                     AdTrackingHelper.click(life)
                 }
             })

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,7 @@ class SpPhoneLockReceiver : BroadcastReceiver() {
             scope.launch {
                 runCatching {
                     if (action == Intent.ACTION_USER_PRESENT || action == Intent.ACTION_USER_UNLOCKED) {
+                        SpTrackEvents.keepaliveTrigger("user_present")
                         SpPhoneStateManager.onUserUnlocked(context, state)
                     }
                 }.onFailure { Log.w(TAG, "user-present handling failed", it) }
@@ -159,6 +161,7 @@ class SpAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         val app = context?.applicationContext
         if (app == null) return
+        SpTrackEvents.keepaliveTrigger("alarm")
         scope.launch {
             runCatching { SpTriggerManager.sendClockNotification(app) }
                 .onFailure { Log.w(TAG, "clock trigger failed", it) }
