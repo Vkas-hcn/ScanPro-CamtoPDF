@@ -161,14 +161,29 @@ object SpAdCache {
         peekWithoutGate(nativeAds, config, position) != null
     // endregion
 
-    /** 清空全部（[SpAdsHub] 在广告位/单元配置变化时调用）。 */
-    fun clearAll() {
-        synchronized(openAds) { openAds.clear() }
-        synchronized(interstitialAds) { interstitialAds.clear() }
-        synchronized(nativeAds) {
-            nativeAds.forEach { it.releaseNative() }
-            nativeAds.clear()
+    /**
+     * 配置变化时只清理“按入库 TTL 已过期”的广告，未过期的一律保留。
+     *
+     * 旧实现是 `clearAll()`：每次远端配置下发都会把刚填充、还没展示的广告扔掉。
+     * 这里按条目自带的 [SpCachedAd.ttlSeconds] 判定，配置里的 TTL 变化不影响已加载广告；
+     * 真正的取用仍由 [peekOpenAd] / [getOpenAd] 等按当前配置再做一次校验。
+     */
+    fun clearExpired() {
+        synchronized(openAds) {
+            openAds.removeAll { !it.isFreshNow() }
         }
+        synchronized(interstitialAds) {
+            interstitialAds.removeAll { !it.isFreshNow() }
+        }
+        val expiredNative = ArrayList<SpCachedNativeAd>()
+        synchronized(nativeAds) {
+            nativeAds.removeAll { ad ->
+                val expired = !ad.isFreshNow()
+                if (expired) expiredNative += ad
+                expired
+            }
+        }
+        expiredNative.forEach { it.releaseNative() }
     }
 
     private fun <T> isFresh(ad: SpCachedAd<T>, config: SpAdConfig, position: String): Boolean {

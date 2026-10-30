@@ -127,12 +127,25 @@ boot/                     SpBootActivity.kt（冷启动，等价 Apollo `SplashA
 
 等价 Apollo `SplashActivity`，顺序是：
 
-1. **`!isTaskRoot` 直接 `finish()`** —— 这是原逻辑，也是「后台点桌面快捷方式没反应」的根因，所以才有 `leave/SpLeaveEntryActivity` 中转层（§8）。
-2. 通知入口处理（`handleNotificationEntry`）：按 `from_type` 报点击埋点、撤掉媒体式提醒、停掉重发循环，并把 `from_type` 映射成开屏场景码。
-3. 报一次 `Shark_ad_chance`（带 `scene` / `type`）。
+1. **不是 task root 时的处理**：带上 `isHotStart` 的话按热启动继续（见 §3.2）；没带而且栈顶已经是启动页/挽留/引导流程，就直接 `finish()`，不再叠层。其余情况（桌面图标在「任务还在后台」时把启动页压进现有任务栈）就地转成热启动，**不再像 Apollo 那样直接退出**——直接退出等于点图标什么都没发生，还白闪一帧。
+2. 通知入口处理（`handleNotificationEntry`）：按 `from_type` 报点击埋点、撤掉媒体式提醒、停掉重发循环，并把 `from_type` 映射成开屏场景码。热启动跳过「停重发循环」那一步。
+3. 报一次 `Shark_ad_chance`（带 `scene` / `type`）。热启动不报 `APP_COLD_BOOT`。
 4. `checkNotifyPermission()` —— **这一步的真正作用是「开屏计时什么时候开始」**，不是进主界面前补授权。
-5. 授权框答完（或无需询问）→ 计时开始 → 等 `minDelay` 后取 `ac_launch` 缓存展示；没缓存或超时走 `nextPage`。
-6. `nextPage`（Apollo 同序）：卸载入口 → `SpUnInstall01Activity`；首次打开 → `SpGuideLanguageActivity`；否则把 `jump_type` 转交给 `CamShellActivity`。
+5. 授权框答完（或无需询问）→ 计时开始 → 等 `launch_min_ms` 后取 `ac_launch` 缓存展示；没缓存或超时走 `nextPage`。
+6. `nextPage`（Apollo 同序）：热启动 → 直接 `finish()` 回原页面；否则卸载入口 → `SpUnInstall01Activity`；首次打开 → `SpGuideLanguageActivity`；再否则把 `jump_type` 转交给 `CamShellActivity`。
+
+### 3.2 热启动 `SpHotStartGate`
+
+**需求**：只要 App 从后台回到前台，就重走一遍启动页看开屏。
+
+- **触发**：`SpAdSession` 的进程级回调里，前台计数 `0 → 1` 时调 `SpHotStartGate.onAppForegrounded()`；阈值 `MIN_BACKGROUND_MS = 0`（每次回前台都算）。
+- **拉起**：从当前 Activity `startActivity(SpBootActivity) + EXTRA_HOT_START=true`，**不带 `FLAG_ACTIVITY_NEW_TASK`**，启动页叠在当前页面之上；广告结束/超时后 `finish()`，用户回到原来的页面。
+  > 这里踩过一次坑：用 Application context 只能带 `NEW_TASK`，而 `SpBootActivity` 恰好是本任务的根 Activity，系统会把这次启动当成「把任务切到前台」（`START_TASK_TO_FRONT`），启动页根本压不上来。必须用 Activity context。
+- **两条快捷路径**：桌面图标在任务还在后台时，系统会自己把 `SpBootActivity` 压进现有任务栈，`isTaskRoot` 为 false —— 这条就地按热启动跑，不再额外拉一次。
+- **三道防叠闸**：`splashCount`（启动页存活计数）、`COOLDOWN_MS=2s`（启动页关掉后冷却）、`pending`（已排队未拉起）。少了任何一道，`finish()` 后原页面 `onStart` 会让前台计数再次 `0→1`，直接无限叠层。
+- **热启动专属参数**：等广告上限 `HOT_START_MAX_WAIT_MS = 3s`（不能按冷启的十几秒等）；不 arm 补展示（这一路不会创建 `CamShellActivity`）。
+- **抑制**（阈值 0 秒必须配）：`suppressNext()` 在主动跳外部 UI 前调用 —— 分享 chooser、应用商店、隐私政策外链、系统应用详情页；另外点过广告后 60 秒内不弹（GMA 政策）。
+- **不打断**：栈顶是 `SpBootActivity` / `SpLeaveEntryActivity` / `SpUnInstall*` / `SpGuide*` 时不触发。
 
 `from_type` → 场景码映射（Apollo `SplashActivity.fromTypeToSceneCode`）：
 
@@ -508,7 +521,7 @@ Apollo 三路，我们只接了一路：
 - **Activity 集合空了** → 发 `no_page_exist`（用户把页面都退了 = 退到桌面）。
 - **前台计数减到 ≤ 0 且这期间点过广告** → 发 `ad_click`。点击标记是**一次性的**（`SpAdSession.consumeAdClick()` 取走即清零），不会重复发。
 
-Apollo 还有两件事这里不做（与通知无关）：`toReStartApp` 触发的重新拉起 Splash、全部页面销毁时置 `isColdStart`。
+Apollo 的 `toReStartApp` 触发的「重新拉起 Splash」由 [`SpHotStartGate`](<app/src/main/java/com/scanpro/cam/pdf/ads/SpHotStartGate.kt>) 接上了（见 §3.2）：**所有后台回前台**都重走启动页，阈值 0 秒。Apollo 的「全部页面销毁时置 `isColdStart`」仍然没有移植。
 
 ---
 

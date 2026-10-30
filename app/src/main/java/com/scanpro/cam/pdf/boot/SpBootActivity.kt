@@ -23,6 +23,7 @@ import com.scanpro.cam.pdf.ads.SpAdPosition
 import com.scanpro.cam.pdf.ads.SpAdShowConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
+import com.scanpro.cam.pdf.ads.SpHotStartGate
 import com.scanpro.cam.pdf.ads.SpLaunchAdCatchup
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpSceneCode
@@ -54,6 +55,17 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     private var adsFlowStarted = false
     private var maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
 
+    /**
+     * 这次是不是「热启动」：从后台回前台时叠在当前页面上的那层启动页。
+     *
+     * 两个来源：1）[SpHotStartGate] 主动拉起（带 [EXTRA_HOT_START]）；
+     * 2）桌面图标在「任务还在后台」时把启动页压进现有任务栈——见 [initView] 里的就地判定。
+     *
+     * 热启动和冷启走同一套开屏时序，差别只有四处：task root 门槛、冷启埋点、通知循环、
+     * 以及**下一页**（热启动直接 `finish()` 回原页面，不跳首页）。
+     */
+    private var isHotStart = false
+
     /** 通知带进来的目标（Apollo `jumpType`），开屏结束后转交主界面。 */
     private var entryJumpType: String? = null
 
@@ -70,12 +82,22 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     }
 
     override fun initView(savedInstanceState: Bundle?) {
+        SpHotStartGate.onSplashCreated()
+        isHotStart = intent?.getBooleanExtra(EXTRA_HOT_START, false) == true
         // Apollo `SplashActivity.onCreate`：通知进来时带的 flags 是 NEW_TASK|CLEAR_TASK，
-        // 所以真正的冷启一定是 task root；不是就别再叠一个开屏。
-        if (!isTaskRoot) {
-            Log.i(TAG, "not task root, finish")
-            finish()
-            return
+        // 所以真正的冷启一定是 task root。
+        // 不是 root 只剩一种情况：桌面图标在「任务还在后台」时被系统压进现有任务栈——
+        // 这本来就是热启动要做的事，就地按热启动继续走，而不是像 Apollo 那样直接 finish
+        //（直接 finish 等于点图标什么都没发生，还白闪一帧）。
+        if (!isTaskRoot && !isHotStart) {
+            // 底下本来就是一层启动页/挽留/引导流程（比如冷启的开屏还没走完），别叠第二层
+            if (SpHotStartGate.isProtectedSurface()) {
+                Log.i(TAG, "not task root and already in a protected flow, finish")
+                finish()
+                return
+            }
+            isHotStart = true
+            Log.i(TAG, "not task root, treat as hot start")
         }
         val baseBottomMargin =
             resources.getDimensionPixelSize(R.dimen.boot_progress_margin_bottom)
@@ -88,15 +110,16 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         }
         ViewCompat.requestApplyInsets(binding.bootRoot)
 
-        SpTracker.log(this, SpTracker.APP_COLD_BOOT)
+        // 热启动不是冷启，别把 APP_COLD_BOOT 的基数冲掉
+        if (!isHotStart) SpTracker.log(this, SpTracker.APP_COLD_BOOT)
         maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
         binding.bootProgress.max = maxTimeoutMs.toInt().coerceAtLeast(1)
         binding.bootProgress.progress = 0
 
         handleNotificationEntry()
 
-        // 预加载立刻发，不再等 UMP：开屏的展示窗口本来就短，等 consent 会白白吃掉 1~2.5 秒。
-        SpAdsHub.getOrNull()?.preloadLaunchAd("boot")
+        // 开屏广告的唯一加载入口：启动页。配置晚到时由 preloadLaunchAdForBoot 在页面存活期间补一次。
+        preloadLaunchAdForBoot()
         SpTracker.log(
             this,
             SpTracker.SHARK_AD_CHANCE,
@@ -106,8 +129,36 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             },
         )
         lifecycleScope.launch {
-            SpAdsHub.getOrNull()?.requestStartupConsent(this@SpBootActivity)
+            val hub = SpAdsHub.getOrNull()
+            hub?.requestStartupConsent(this@SpBootActivity)
+            // consent 结束后由启动页补一次；页面已经销毁时不再发请求。
+            if (!isFinishing && !isDestroyed) {
+                hub?.preloadLaunchAd("boot-consent")
+            }
             checkNotifyPermission()
+        }
+    }
+
+    /**
+     * 启动页触发开屏预加载。
+     *
+     * 配置通常在启动页之后才到：首次调用可能因为还没有 `ac_launch` 配置而直接返回，
+     * 所以页面存活期间每次配置下发都检查一次。页面销毁后 `lifecycleScope` 取消，
+     * 后台进程（没有启动页）不会走到这里。
+     */
+    private fun preloadLaunchAdForBoot() {
+        val hub = SpAdsHub.getOrNull() ?: return
+        hub.preloadLaunchAd("boot")
+        lifecycleScope.launch {
+            // 配置可能在启动页之后才到，也可能先在缓存里没有 ac_launch、远端才补上；
+            // 每次配置下发都检查一次，只有页面还活着且真的有开屏位时才补加载。
+            hub.configGeneration.collect {
+                if (!isFinishing && !isDestroyed &&
+                    hub.config().adInfoList(SpAdPosition.AC_LAUNCH) != null
+                ) {
+                    hub.preloadLaunchAd("boot-config")
+                }
+            }
         }
     }
 
@@ -162,7 +213,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             SpTrackEvents.notificationClick(this, posId, triggerSource)
             SpTrackEvents.reactivationLanding("notification", entryJumpType ?: "home", posId)
         }
-        SpSendManager.stopNotifyUpdate()
+        // 热启动只是「盖一层开屏」，不是用户点了通知进来的，别把提醒重发循环掐掉
+        if (!isHotStart) SpSendManager.stopNotifyUpdate()
     }
 
     /** Apollo `SplashActivity.fromTypeToSceneCode`：认不出来的 `from_type` 一律按自然打开算。 */
@@ -211,10 +263,16 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         val hub = SpAdsHub.getOrNull()
         val showConfig = hub?.showConfig() ?: SpAdShowConfig()
-        maxTimeoutMs = maxOf(
-            SpBootViewModel.DEFAULT_BOOT_MS,
-            showConfig.launchMinMs + showConfig.launchWaitMs + BOOT_SLACK_MS,
-        )
+        // 热启动是「每次回前台」都会走一遍的路径，不能按冷启的十几秒去等，
+        // 否则用户每次切回来都要盯着进度条。
+        maxTimeoutMs = if (isHotStart) {
+            showConfig.launchMinMs + HOT_START_MAX_WAIT_MS + BOOT_SLACK_MS
+        } else {
+            maxOf(
+                SpBootViewModel.DEFAULT_BOOT_MS,
+                showConfig.launchMinMs + showConfig.launchWaitMs + BOOT_SLACK_MS,
+            )
+        }
         binding.bootProgress.max = maxTimeoutMs.toInt().coerceAtLeast(1)
         viewModel.runBootProgress(maxTimeoutMs)
 
@@ -228,7 +286,12 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
             val elapsed = SystemClock.elapsedRealtime() - startedAt
             val remaining = (maxTimeoutMs - elapsed).coerceAtLeast(0L)
-            val waitMs = minOf(showConfig.launchWaitMs, remaining)
+            val waitLimit = if (isHotStart) {
+                minOf(showConfig.launchWaitMs, HOT_START_MAX_WAIT_MS)
+            } else {
+                showConfig.launchWaitMs
+            }
+            val waitMs = minOf(waitLimit, remaining)
             val ready = hub.awaitOpenAd(waitMs)
 
             if (ready) {
@@ -241,7 +304,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 SpAdPosition.AC_LAUNCH,
                 SystemClock.elapsedRealtime() - startedAt,
             )
-            if (showConfig.catchupEnabled) {
+            // 热启动不 arm 补展示：这一路不会创建 CamShellActivity，arm 了也没人展示
+            if (showConfig.catchupEnabled && !isHotStart) {
                 SpLaunchAdCatchup.arm(showConfig.catchupMs)
             }
             continueToShell()
@@ -332,6 +396,12 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     private fun continueToShell() {
         if (finished || isFinishing) return
         finished = true
+        // 热启动：启动页只是叠在原页面上的一层，广告结束（或超时）直接退出，用户回到原来那一页
+        if (isHotStart) {
+            Log.i(TAG, "hot start finish, back to previous page")
+            finish()
+            return
+        }
         val next = when {
             SpLeaveEntry.isLeaveLaunch(intent) ->
                 Intent(this, SpUnInstall01Activity::class.java)
@@ -349,8 +419,20 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         finish()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        // 启动页离场：通知 SpHotStartGate 放行冷却，否则原页面 onStart 时会再叠一层
+        SpHotStartGate.onSplashDestroyed()
+    }
+
     companion object {
         private const val TAG = "SpBootGate"
+
+        /** 热启动标记：由 [SpHotStartGate] 拉起时带上，表示这次是叠在当前页面上的开屏。 */
+        const val EXTRA_HOT_START = "sp_hot_start"
+
+        /** 热启动等开屏广告的上限。每次回前台都要走一遍，不能按冷启的等待时长来。 */
+        private const val HOT_START_MAX_WAIT_MS = 3_000L
 
         /** 开屏兜底总时长在「最短停留 + 等待」之外的余量。 */
         private const val BOOT_SLACK_MS = 1_000L

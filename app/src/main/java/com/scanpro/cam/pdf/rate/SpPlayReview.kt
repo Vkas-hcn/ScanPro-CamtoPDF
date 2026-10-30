@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import com.google.android.play.core.review.ReviewManagerFactory
+import com.scanpro.cam.pdf.ads.SpHotStartGate
 
 object SpPlayReview {
 
@@ -33,6 +34,8 @@ object SpPlayReview {
         val pkg = activity.packageName
         val market = Uri.parse("market://details?id=$pkg")
         val web = Uri.parse("https://play.google.com/store/apps/details?id=$pkg")
+        // 跳商店再回来不该弹开屏
+        SpHotStartGate.suppressNext()
         try {
             activity.startActivity(Intent(Intent.ACTION_VIEW, market))
         } catch (_: ActivityNotFoundException) {

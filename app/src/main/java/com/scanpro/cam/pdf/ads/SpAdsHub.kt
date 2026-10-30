@@ -22,10 +22,12 @@ import com.scanpro.cam.pdf.notice.SpNewConfig
 import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.scanpro.cam.pdf.notice.SpWinPopConfig
 import com.scanpro.cam.pdf.util.AppLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -81,7 +83,7 @@ class SpAdsHub private constructor(
     @Volatile
     private var remotePayloadReady = false
 
-    /** SDK 未就绪 / consent 未就绪时被跳过的开屏预加载，等条件满足后补一次。 */
+    /** 启动页发起、但 SDK/consent 未就绪被推迟的开屏预加载；条件满足后补一次。 */
     @Volatile
     private var pendingLaunchPreload = false
 
@@ -98,16 +100,30 @@ class SpAdsHub private constructor(
         }
     }
 
-    /** 冷启动页调用。2.5 秒兜底在 [SpUmpGate] 内部。 */
+    /**
+     * 冷启动页调用。2.5 秒兜底在 [SpUmpGate] 内部。
+     *
+     * 只负责 consent；预加载由启动页在返回后自己触发，避免这里被其它调用方复用时
+     * 在没有页面的情况下发广告请求。
+     */
     suspend fun requestStartupConsent(activity: Activity) {
         if (umpGate.isCompleted) return
-        runCatching { SpUmpGate(app).requestUmpConsent(activity) }
-        if (!umpGate.isCompleted) umpGate.complete(Unit)
-        // consent 结束后立刻补一次预加载：非 EEA 用户这时候才被允许请求。
-        preloadLaunchAd("consent")
+        try {
+            SpUmpGate(app).requestUmpConsent(activity)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Log.w(TAG, "requestStartupConsent failed", error)
+        } finally {
+            if (!umpGate.isCompleted) umpGate.complete(Unit)
+        }
     }
 
     val configApplied: StateFlow<Boolean> get() = bootstrapper.configApplied
+
+    /** 每次配置下发（含不可用）递增；启动页用它在配置晚到、或广告位后补时再预加载。 */
+    private val _configGeneration = MutableStateFlow(0)
+    val configGeneration: StateFlow<Int> get() = _configGeneration
 
     // region 配置
 
@@ -140,7 +156,7 @@ class SpAdsHub private constructor(
         // 远端配置没回来之前不发通知。这里用同一语义的开关表达。
         remotePayloadReady = true
         val next = configStore.adConfig(payload)
-        // 每次配置下发都 clearAll 会把刚填充好、还没展示的广告白扔掉；只有广告位/单元变了才清。
+        // 配置变化不再清空缓存；`unitsChanged` 只用于日志排查，过期由 clearExpired() 按入库 TTL 判断。
         val unitsChanged = adUnitSignature(next) != adUnitSignature(adConfig)
         adConfig = next
         adShowConfig = configStore.adShowConfig(payload)
@@ -156,12 +172,10 @@ class SpAdsHub private constructor(
             "配置已应用 位置=${next.byPosition.keys} 原生开关=${natConfig.switchOpen} " +
                 "单元变更=$unitsChanged",
         )
-        if (unitsChanged) {
-            SpAdCache.clearAll()
-            preloadLaunchAd("config-changed")
-        } else if (!SpAdCache.isHaveOpenAd(next)) {
-            preloadLaunchAd("config")
-        }
+        // 配置变化只清理已过期广告，未过期的保留；开屏预加载也不再由配置触发，
+        // 避免后台进程（保活/闹钟/开机/FCM）拉起时没有页面却发广告请求。
+        SpAdCache.clearExpired()
+        _configGeneration.value += 1
     }
 
     private fun adUnitSignature(config: SpAdConfig): Map<String, List<String>> =
@@ -169,8 +183,10 @@ class SpAdsHub private constructor(
 
     private fun applyUnavailable(reason: String) {
         adConfig = SpAdConfig()
-        SpAdCache.clearAll()
-        AppLog.network.w("配置不可用，广告已关闭 原因=$reason")
+        // 配置不可用只停止新的加载；已填充广告保留到各自 TTL 到期。
+        SpAdCache.clearExpired()
+        AppLog.network.w("配置不可用，停止新广告请求；已加载广告保留到过期 原因=$reason")
+        _configGeneration.value += 1
     }
 
     private fun applyDispatchMeta(payload: JSONObject) {
@@ -207,7 +223,13 @@ class SpAdsHub private constructor(
         patch.virtualBlockSwitch?.let { blocking.virtualBlockSwitch = it }
     }
 
-    /** 用 `ac_launch` 预加载开屏广告。Apollo 在 Application 初始化后就会预热。 */
+    /**
+     * 用 `ac_launch` 预加载开屏广告。
+     *
+     * 只允许启动页、退后台（已有用户会话）及其 SDK/consent 回调触发；
+     * 配置下发、Application 启动阶段不自动调用。这样进程被保活服务、闹钟、
+     * 开机广播、FCM 拉起时，没有页面就不会发开屏请求。
+     */
     fun preloadLaunchAd(reason: String = "auto") {
         scope.launch(Dispatchers.Main) {
             if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
@@ -238,10 +260,17 @@ class SpAdsHub private constructor(
     private fun isConsentReady(): Boolean =
         runCatching { SpUmpGate(app).adsEligible() }.getOrDefault(true)
 
-    /** SDK 初始化完成后由 [SpAdMobInit] 回调。 */
+    /**
+     * SDK 初始化完成后由 [SpAdMobInit] 回调。
+     *
+     * 只补启动页已经发起、但因 SDK 未就绪被推迟的那一次；后台进程没有启动页，
+     * `pendingLaunchPreload` 保持 false，这里不会发出请求。
+     */
     internal fun onAdSdkReady() {
         Log.i(TAG, "ad sdk ready, pendingPreload=$pendingLaunchPreload")
-        preloadLaunchAd("sdk-ready")
+        if (pendingLaunchPreload && SpAdSession.isForeground) {
+            preloadLaunchAd("sdk-ready")
+        }
     }
 
     /** 是否有已经就绪、可以立刻展示的开屏广告。 */

@@ -21,8 +21,9 @@ import com.scanpro.cam.pdf.ads.SpAdSession
  *   发一次 `ad_click`（Apollo 用 `ApoApplication.isClickAd` 这个一次性布尔；我们用
  *   [SpAdSession.consumeAdClick] 的一次性语义，看完就清零，不会重复发）。
  *
- * Apollo 还有两件事这里**不做**（与通知无关，属于它自己的启动判据）：`toReStartApp` 触发的
- * 「重新拉起 SplashActivity」、以及全部页面销毁时置 `isColdStart`。
+ * Apollo 还有两件事：`toReStartApp` 触发的「重新拉起 SplashActivity」由
+ * [com.scanpro.cam.pdf.ads.SpHotStartGate] 接手（热启动开屏）；「全部页面销毁时置
+ * `isColdStart`」仍未移植。
  */
 internal object SpNoticeLifecycle {
 

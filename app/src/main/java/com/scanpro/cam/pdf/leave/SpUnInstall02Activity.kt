@@ -21,6 +21,7 @@ import com.scanpro.cam.pdf.CamShellActivity
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.ads.SpAdPosition
 import com.scanpro.cam.pdf.ads.SpAdsHub
+import com.scanpro.cam.pdf.ads.SpHotStartGate
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
 import com.scanpro.cam.pdf.base.SpActivity
@@ -149,6 +150,8 @@ class SpUnInstall02Activity : SpActivity<ActivitySpUninstall02Binding>() {
     /** Apollo `toSettingPage()`：跳系统「应用详情」，用户在那里点卸载。 */
     private fun toSettingPage() {
         if (isFinishing || isDestroyed) return
+        // 去系统设置再回来不该弹开屏，否则会挡住卸载挽留流程
+        SpHotStartGate.suppressNext()
         runCatching {
             startActivity(
                 Intent(

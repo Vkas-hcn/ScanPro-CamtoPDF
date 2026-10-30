@@ -8,6 +8,7 @@ import android.net.Uri
 import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
+import com.scanpro.cam.pdf.ads.SpHotStartGate
 import com.scanpro.cam.pdf.home.FileType
 import java.io.File
 
@@ -90,6 +91,8 @@ object CamFileOps {
             }
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+        // 分享面板会把自己送到后台；用户回来时不该弹开屏（阈值 0 秒时必须显式排除）
+        SpHotStartGate.suppressNext()
         context.startActivity(chooser)
     }
 

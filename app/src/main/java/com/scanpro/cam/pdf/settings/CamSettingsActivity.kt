@@ -11,6 +11,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.scanpro.cam.pdf.R
+import com.scanpro.cam.pdf.ads.SpHotStartGate
 import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.base.SpActivity
@@ -111,11 +112,15 @@ class CamSettingsActivity : SpActivity<ActivityCamSettingsBinding>() {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
         }
+        // 分享面板会把自己送到后台；用户回来时不该弹开屏（阈值 0 秒时必须显式排除）
+        SpHotStartGate.suppressNext()
         startActivity(Intent.createChooser(intent, ctx.getString(R.string.settings_share)))
     }
 
     private fun openUrl(urlRes: Int) {
         val url = SpLocale.wrap(this).getString(urlRes)
+        // 跳浏览器（隐私政策等）再回来不该弹开屏
+        SpHotStartGate.suppressNext()
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 

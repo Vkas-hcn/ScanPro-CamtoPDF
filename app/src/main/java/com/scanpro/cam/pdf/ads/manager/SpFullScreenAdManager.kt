@@ -35,7 +35,7 @@ import com.scanpro.cam.pdf.util.AppLog
  * 保留的行为：
  * - 每个位置一条按优先级排的单元列表，加载失败**换下一个单元**（不是换位置）
  * - 同一个 sessionId 最多重试 [tryCountLimit] 次
- * - `loadingAdStateMap` 按 adUnitId 串行化，避免并发重复加载
+ * - 进程级 `loadingPositions` 按 position 串行化，避免预加载/展示 manager 跨实例重复加载
  * - 展示前先走 [SpFullScreenMask]（500ms 假加载）
  * - 展示成功 → `updateAdShowCount()` 并立刻为下一次做预加载
  * - 展示失败 → 记 `Shark_ad_impression_error`，再补一次预加载
@@ -60,9 +60,6 @@ class SpFullScreenAdManager(
 
     /** sessionId → 已重试次数。 */
     private val sessionIdTryCountMap = LinkedHashMap<String, Int>()
-
-    /** adUnitId → 是否正在加载。 */
-    private val loadingAdStateMap = LinkedHashMap<String, Boolean>()
 
     /** position → 当前加载到列表第几个。 */
     private val loadIndexOfAdPositionMap = LinkedHashMap<String, Int>()
@@ -99,6 +96,11 @@ class SpFullScreenAdManager(
             AppLog.ads.i("跳过广告加载 位置=$position 原因=总闸拦截")
             return
         }
+        // 进程级互斥：preloadManager 和页面 manager 是不同实例，必须在这里统一挡住重复请求。
+        if (position in loadingPositions) {
+            AppLog.ads.d("跳过广告加载 位置=$position 原因=已有请求正在执行")
+            return
+        }
 
         val list = config.adInfoList(position) ?: run {
             AppLog.ads.i("跳过广告加载 位置=$position 原因=没有广告位配置")
@@ -116,20 +118,12 @@ class SpFullScreenAdManager(
                 AppLog.ads.d("复用已有广告缓存 类型=open 位置=$position")
                 return
             }
-            if (loadingAdStateMap[adInfo.adUnitId] == true) {
-                AppLog.ads.d("跳过广告加载 类型=open 位置=$position 原因=已有请求正在执行")
-                return
-            }
             loadOpenAd(position, adInfo, scene)
             return
         }
         if (adInfo.isInterstitial) {
             if (SpAdCache.isHaveEnableInterstitialAd(position, config)) {
                 AppLog.ads.d("复用已有广告缓存 类型=interstitial 位置=$position")
-                return
-            }
-            if (loadingAdStateMap[adInfo.adUnitId] == true) {
-                AppLog.ads.d("跳过广告加载 类型=interstitial 位置=$position 原因=已有请求正在执行")
                 return
             }
             loadInterstitialAd(position, adInfo, scene)
@@ -139,17 +133,24 @@ class SpFullScreenAdManager(
     }
 
     private fun loadOpenAd(position: String, adInfo: SpAdInfo, scene: String) {
+        // add 本身是原子的：即使两个线程同时越过上面的 contains 检查，也只有一个能真正发起请求。
+        if (!loadingPositions.add(position)) {
+            AppLog.ads.d("跳过广告加载 类型=open 位置=$position 原因=已有请求正在执行")
+            return
+        }
         val sessionId = SpAdSession.newId()
         sessionIdTryCountMap[sessionId] = 0
-        loadingAdStateMap[adInfo.adUnitId] = true
         AppLog.ads.i("开始加载广告 类型=open 位置=$position 单元=${adInfo.adUnitId}")
         requestOpenAd(position, adInfo, scene, sessionId)
     }
 
     private fun loadInterstitialAd(position: String, adInfo: SpAdInfo, scene: String) {
+        if (!loadingPositions.add(position)) {
+            AppLog.ads.d("跳过广告加载 类型=interstitial 位置=$position 原因=已有请求正在执行")
+            return
+        }
         val sessionId = SpAdSession.newId()
         sessionIdTryCountMap[sessionId] = 0
-        loadingAdStateMap[adInfo.adUnitId] = true
         AppLog.ads.i("开始加载广告 类型=interstitial 位置=$position 单元=${adInfo.adUnitId}")
         requestInterstitialAd(position, adInfo, scene, sessionId)
     }
@@ -163,7 +164,7 @@ class SpFullScreenAdManager(
             AdRequest.Builder().build(),
             object : AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: AppOpenAd) {
-                    loadingAdStateMap[adInfo.adUnitId] = false
+                    loadingPositions.remove(position)
                     sessionIdTryCountMap.remove(sessionId)
                     SpAdCache.putOpenAd(
                         SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit),
@@ -202,7 +203,7 @@ class SpFullScreenAdManager(
             AdRequest.Builder().build(),
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
-                    loadingAdStateMap[adInfo.adUnitId] = false
+                    loadingPositions.remove(position)
                     sessionIdTryCountMap.remove(sessionId)
                     SpAdCache.putInterstitialAd(
                         SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit),
@@ -249,7 +250,7 @@ class SpFullScreenAdManager(
             requestInterstitialAd(position, adInfo, scene, sessionId)
             return
         }
-        loadingAdStateMap[adInfo.adUnitId] = false
+        loadingPositions.remove(position)
         sessionIdTryCountMap.remove(sessionId)
         val current = loadIndexOfAdPositionMap[position] ?: 0
         checkAndLoadAd(position, scene, current + 1)
@@ -496,5 +497,18 @@ class SpFullScreenAdManager(
     /** Apollo `release()`。只清本地重试计数，不强行释放正在展示的广告。 */
     fun release() {
         sessionIdTryCountMap.clear()
+    }
+
+    private companion object {
+        /**
+         * 进程级“正在加载”的广告位集合。
+         *
+         * `SpAdsHub` 的预加载 manager 和每个 Activity 的展示 manager 是不同实例，
+         * 原实例字段挡不住跨实例的重复请求；这里按 position 串行化，保证同一广告位
+         * 同一时间最多只有一个 load 在飞。
+         */
+        val loadingPositions: MutableSet<String> = java.util.Collections.newSetFromMap(
+            java.util.concurrent.ConcurrentHashMap<String, Boolean>(),
+        )
     }
 }

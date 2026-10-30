@@ -34,25 +34,41 @@ object SpAdSession {
     var isForeground: Boolean = false
         private set
 
+    /** 最近一次 resume 的页面类名，给 [SpHotStartGate] 判断「当前是不是不该打断的页面」。 */
+    @Volatile
+    var resumedActivityClass: String? = null
+        private set
+
     private val startedActivities = java.util.concurrent.atomic.AtomicInteger(0)
 
     /** 进程级生命周期注册，只调一次。 */
     fun attachLifecycle(app: Application) {
         app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) {
+                val wasForeground = isForeground
                 isForeground = startedActivities.incrementAndGet() > 0
+                // 后台 → 前台：热启动在这里起跳（是否真的要弹由 SpHotStartGate 判）
+                if (!wasForeground && isForeground) SpHotStartGate.onAppForegrounded(activity)
             }
 
             override fun onActivityStopped(activity: android.app.Activity) {
                 val wasForeground = isForeground
                 isForeground = startedActivities.decrementAndGet() > 0
-                // 退到后台时预加载下一次开屏：同进程再回来（通知/图标）时直接命中，
-                // 不用再赌「冷启 3 秒内能不能加载完」。
-                if (wasForeground && !isForeground) preloadNextLaunchAd()
+                if (wasForeground && !isForeground) {
+                    SpHotStartGate.onAppBackgrounded()
+                    // 退后台预加载下一次开屏：同进程再回来直接命中。
+                    // 这里已经有页面/用户会话，属于“有展示计划”的后台加载；
+                    // Application 启动阶段和配置下发阶段不会触发。
+                    preloadNextLaunchAd()
+                }
             }
 
             override fun onActivityCreated(a: android.app.Activity, b: Bundle?) = Unit
-            override fun onActivityResumed(a: android.app.Activity) = Unit
+
+            override fun onActivityResumed(a: android.app.Activity) {
+                resumedActivityClass = a.javaClass.name
+            }
+
             override fun onActivityPaused(a: android.app.Activity) = Unit
             override fun onActivitySaveInstanceState(a: android.app.Activity, b: Bundle) = Unit
             override fun onActivityDestroyed(a: android.app.Activity) = Unit

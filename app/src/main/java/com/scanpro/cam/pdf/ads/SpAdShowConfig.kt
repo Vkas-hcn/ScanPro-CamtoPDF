@@ -6,7 +6,7 @@ package com.scanpro.cam.pdf.ads
  * - [launchMinMs]：开屏页最短停留，命中广告也至少显示这么久。
  * - [launchWaitMs]：等待开屏广告就绪的上限，超时即放行进主页（并报 `ad_show_timeout`）。
  * - [catchupMs]：进主页后继续等广告的窗口，窗口内到货且仍在首页才补展示。
- * - [preloadOnBackground]：退到后台时预加载下一次开屏。
+ * - [preloadOnBackground]：退到后台、已有用户会话时预加载下一次开屏。
  * - [catchupEnabled]：补展示总开关，出问题可远端一键关掉。
  *
  * [launchWaitMs] 与 [catchupMs] **不设上限**，远端填多少就按多少执行（负数按 0 处理）。
