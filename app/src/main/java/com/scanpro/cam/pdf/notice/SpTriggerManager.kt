@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
+import com.scanpro.cam.pdf.keepalive.SpPersistentNotifyManager
 import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,7 +73,14 @@ internal object SpTriggerManager {
     /** Apollo `startAlarmTask`：等 5 秒（让远端配置先到）再对准闹钟。 */
     private const val ALARM_WARMUP_MS = 5000L
 
+    /** 最后一条提醒发完之后隔多久把常驻通知重排回最上面（要盖过同一波里的后续场景）。 */
+    private const val PERSISTENT_REFRESH_DELAY_MS = 8000L
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** 常驻通知重排的防抖任务，见 [schedulePersistentRefresh]。 */
+    @Volatile
+    private var persistentRefreshJob: Job? = null
 
     /** Apollo `alarmMutex`：同一时刻只允许一个协程改闹钟。 */
     private val alarmMutex = Mutex()
@@ -303,6 +311,7 @@ internal object SpTriggerManager {
         SpSendManager.sendSysNotification(context, item, scene)
         SpSendManager.sendMediaNotification(context, item, scene)
         SpNotifyFilter.updateSendCountAndLastTime(context, scene)
+        schedulePersistentRefresh(context)
     }
 
     /** 只发媒体式提醒，然后把计数 +1。 */
@@ -313,6 +322,23 @@ internal object SpTriggerManager {
         }
         SpSendManager.sendMediaNotification(context, item, scene)
         SpNotifyFilter.updateSendCountAndLastTime(context, scene)
+        schedulePersistentRefresh(context)
+    }
+
+    /**
+     * 提醒发完之后，隔 [PERSISTENT_REFRESH_DELAY_MS] 把常驻通知重排回最上面。
+     *
+     * 用防抖而不是直接调：一次退回桌面会连着触发好几个场景（`home_click` 马上一条、
+     * `no_page_exist` 五六秒后又一条），抢在最后一个之前重排等于白排。
+     * 每来一条新提醒就取消上一次、重新计时，只留最后那一次。
+     */
+    private fun schedulePersistentRefresh(context: Context) {
+        val appContext = context.applicationContext
+        persistentRefreshJob?.cancel()
+        persistentRefreshJob = scope.launch {
+            delay(PERSISTENT_REFRESH_DELAY_MS)
+            SpPersistentNotifyManager.refreshPersistentNotification(appContext)
+        }
     }
     // endregion
 

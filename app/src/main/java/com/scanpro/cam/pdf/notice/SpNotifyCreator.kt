@@ -110,6 +110,8 @@ internal object SpNotifyCreator {
     ): RemoteViews = RemoteViews(context.packageName, R.layout.sp_notify_sys_big).apply {
         setImageViewResource(R.id.cover, coverIconRes)
         setTextViewText(R.id.messageText, context.getString(item.textRes))
+        // 自定义版式不跟系统深浅色反色，正文色自己盖（见 SpNotifyTheme）。
+        setTextColor(R.id.messageText, SpNotifyTheme.textColor(context))
         setTextViewText(R.id.btn, context.getString(item.buttonRes))
         if (Build.VERSION.SDK_INT > 28) {
             setImageViewResource(R.id.anim_btn, R.drawable.sp_notify_btn_anim)
@@ -125,6 +127,7 @@ internal object SpNotifyCreator {
                 setViewPadding(R.id.root, 20, 20, 20, 20)
             }
             setTextViewText(R.id.messageText, context.getString(item.textRes))
+            setTextColor(R.id.messageText, SpNotifyTheme.textColor(context))
             setTextViewText(R.id.btnText, context.getString(item.buttonRes))
             if (Build.VERSION.SDK_INT > 28) {
                 setImageViewResource(R.id.anim_btn, R.drawable.sp_notify_btn_anim)

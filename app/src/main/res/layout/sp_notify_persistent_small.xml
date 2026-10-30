@@ -2,6 +2,7 @@
 <!--
   常驻通知的小图版式（12 以上的折叠态）。出处：ApolloPDF `layout/notify_persistent_small.xml`。
   只有图标，文字默认 `gone`（和 Apollo 一致，折叠时放不下）。
+  文字色由代码按系统深浅色用 `setTextColor` 盖（`SpNotifyTheme`）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
@@ -26,6 +27,7 @@
             android:src="@drawable/ic_home_list_pdf" />
 
         <TextView
+            android:id="@+id/tagPdf"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="5dp"
@@ -51,6 +53,7 @@
             android:src="@drawable/ic_home_list_xls" />
 
         <TextView
+            android:id="@+id/tagExcel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="5dp"
@@ -76,6 +79,7 @@
             android:src="@drawable/ic_home_list_ppt" />
 
         <TextView
+            android:id="@+id/tagPpt"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="5dp"

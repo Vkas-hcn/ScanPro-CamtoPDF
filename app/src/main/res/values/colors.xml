@@ -20,6 +20,10 @@
     <color name="card_stroke">#FFF2F2F2</color>
 
     <!-- 通知（Apollo `text_color_notify` / 按钮橙） -->
+    <!-- 通知正文色有两份：白天用深字，夜间用浅字。通知栏背景跟的是**系统**深色开关，
+         和 App 自己的主题无关；自定义版式（RemoteViews）不会自动反色，所以由
+         `SpNotifyTheme.textColor()` 按当前 uiMode 挑一份塞进 RemoteViews。 -->
     <color name="sp_notify_text">#FF333333</color>
+    <color name="sp_notify_text_night">#FFECECEC</color>
     <color name="sp_notify_btn">#FFFF9800</color>
 </resources>

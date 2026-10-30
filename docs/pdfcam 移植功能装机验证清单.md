@@ -93,6 +93,11 @@
 - [ ] Android 11 及以下：常驻通知挂出时前台服务同时起来（通知栏能看到服务类型）
 - [ ] 在最近任务里划掉 App：进程被回收后由 JobScheduler 零延迟任务（`ASSISTANCE_JOB_ID = 46555`）把前台服务拉回来
 - [ ] 把常驻通知划掉：服务下次回来时补报一次 `always_notification_trigger` 埋点，并重挂通知
+- [ ] 常驻通知是**独立一张卡片**，不会被折叠进「N 条通知」的 bundle 里（`setGroupSummary` 的作用）
+- [ ] 设置 → 通知里只有一条常驻渠道 `channel_sp_persistent_high`，不该再出现旧的 `channel_sp_persistent`
+- [ ] Android 12+ 起常驻通知应当**立刻**出现，而不是起服务后约 10 秒才冒出来（`FOREGROUND_SERVICE_IMMEDIATE`）
+- [ ] 提醒发完约 8 秒后，常驻通知会被重新顶到**比它更早的通知之上**（ID 轮换刷新）。注意它**压不过刚响过的提醒**——这是系统排序行为，不是 bug，别当缺陷报
+- [ ] **深浅色**：系统开深色模式后，普通提醒 / 媒体式 / 常驻三条通知的正文都要看得清（浅字压深底）；切回浅色模式是深字压浅底
 - [ ] 重启手机：`BOOT_COMPLETED` 拉服务 + 重排闹钟
 - [ ] 覆盖安装：`MY_PACKAGE_REPLACED` 同样重排
 - [ ] 在系统设置里「强行停止」App：**不会**自启（Android 限制，Apollo 也一样），这一条只是确认没有意外行为

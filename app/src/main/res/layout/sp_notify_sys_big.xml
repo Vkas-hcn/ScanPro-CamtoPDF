@@ -5,6 +5,9 @@
   两个 id 由代码用 `setImageViewResource` / `setTextViewText` 填：
   - `cover`  封面图（按 JumpType 换 PDF/PPT/Excel/Word）
   - `anim_btn` + `btn`  按钮（29+ 用动画底，以下用 `sp_shape_notify_btn`）
+
+  `messageText` 的 `textColor` 只是白天的兜底值，实际由 `SpNotifyCreator` 按系统
+  深浅色用 `setTextColor` 盖一遍（`SpNotifyTheme`）——RemoteViews 不会自己反色。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

@@ -2,6 +2,7 @@
 <!--
   系统通知的「小图」版式（横幅型）。出处：ApolloPDF `layout/sys_notification_small_view.xml`。
   `root` 是 29 以下补 padding 用的（代码里 `setViewPadding`）。
+  正文色同上，由 `SpNotifyCreator` 用 `setTextColor` 按系统深浅色盖。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"

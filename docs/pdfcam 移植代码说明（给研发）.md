@@ -438,9 +438,28 @@ Apollo 三路，我们只接了一路：
 | 普通提醒 | `channel_reader_normal` / `_silent` | `sp_notify_sys_big` / `sp_notify_sys_small` | 按场景，3 个 ID 里挑一个没被占用的 | `system_notification_trigger`（带 `type`） |
 | 媒体式提醒 | `channel_reader_media` / `_silent` | 大版式 | 固定 `945458` | `media_notification_trigger`（带 `type`） |
 | media2 | `channel_ado_pdf_media_two` | 大版式 | 固定 `698228` | 无 |
-| 常驻（前台服务） | `channel_sp_persistent` | `sp_notify_persistent_big` / `_small` | 固定 `234397` | `always_notification_trigger` |
+| 常驻（前台服务） | `channel_sp_persistent_high` | `sp_notify_persistent_big` / `_small` | 固定 `234397` | `always_notification_trigger` |
 
 渠道优先级统一 `IMPORTANCE_HIGH`；`silent` 变体不响不震不亮。
+
+> **常驻通知「置顶」能做到什么程度（Pixel 8 / Android 15 实测）**
+>
+> 渠道原名 `channel_sp_persistent`，重要度 `IMPORTANCE_DEFAULT`。渠道重要度建好后改不动，所以换 ID 重建成 `channel_sp_persistent_high`（`IMPORTANCE_HIGH`，但仍不响不震不亮），老渠道在 `ensureChannel` 里顺手删掉。
+>
+> 光提重要度**不够**，实测还做了三件事：
+> 1. `setGroup` + `setGroupSummary` 让它自成一个组——否则会被系统跟自家提醒打成一个 bundle，直接折叠进「N 条通知」里看不见；
+> 2. `FOREGROUND_SERVICE_IMMEDIATE`：12+ 前台服务通知默认延后 10 秒才上栏；
+> 3. **换 key 重发**（两个 ID 轮换）：系统按「首次上栏时间」排序，同一个 key 再 `notify`、甚至 `cancel` 后立刻用同一个 ID 重发，位置都不动；只有换 ID 才拿到新的排序时间。
+>
+> **仍然做不到「永远第一」**：系统会把常驻/静音这类卡片排在「刚响过的提醒」下面，哪怕常驻通知的时间戳更新。实测（同一波 home + exit 提醒之后立即刷新）常驻通知稳定停在自家提醒的下一张，只压得住比它更早的通知。
+>
+> 要做到真正置顶只有两条路，都不是纯排序能解决的：
+> - **MediaStyle + MediaSession**：媒体卡有独立的置顶区，但版式会变成播放器卡片，三个文件入口的画法用不上；
+> - **渠道配声音/震动**：变成「提醒」类，能排到提醒同层，但每次刷新都会响。
+>
+> 两个方案都影响观感，需要产品拍板，代码里没有默认走。
+
+**深浅色**：`sp_notify_*` 是自定义 RemoteViews，`android:textColor` 是一次性取值，**不会跟着系统深色模式反色**。原来的 `#333333` 在深色通知卡片（近黑）上对比度约 1.3:1，字基本看不见。现在由 `SpNotifyTheme.textColor()` 按当前 uiMode 在 `sp_notify_text`（白天 `#333333`）和 `sp_notify_text_night`（夜间 `#ECECEC`）之间二选一，造 RemoteViews 时用 `setTextColor` 显式盖一遍。判据取的是**系统**深浅色，因为通知栏跟系统走、而 App 自己是恒浅色主题（`Theme.Material3.Light` + `forceDarkAllowed=false`）。
 
 **通知 ID 轮换**（Apollo `getCheckNotificationID`）：每个场景 3 个 ID，**从后往前**挑第一个状态栏里没占用的；都占着就退回最后一个。
 
@@ -536,6 +555,9 @@ Apollo 还有两件事这里不做（与通知无关）：`toReStartApp` 触发�
 - **兜底版**：自定义版式炸了退化成一条普通通知（标题 App 名、正文取定时池下一条）。
 - 前台服务里先试自定义版式、失败再试兜底版、再失败 `stopSelf()`。
 - 发之前判重：已经在状态栏里、或没通知权限 → 直接返回。不去重会闪一下。
+- **置顶**（Apollo 没有，本工程要求）：渠道 `IMPORTANCE_HIGH` + `PRIORITY_MAX` + `setGroupSummary` + `FOREGROUND_SERVICE_IMMEDIATE`，再加 `refreshPersistentNotification()` 的 ID 轮换；能做到什么程度见 6.2 的实测结论。两个造法共用 `baseBuilder()`，加属性别只改一边。
+- **ID 轮换的代价**：常驻通知有两个槽位（`234397` / `234398`），前台服务 `startForeground` 必须用 `currentNotificationId(context)`，否则会同时挂两条。
+- **深浅色**：三个 `tagPdf/tagExcel/tagPpt` 的文字色由 `createView()` 用 `setTextColor` 按系统深浅色盖；版式里的 `textColor` 只是白天兜底。
 
 ---
 

@@ -4,6 +4,9 @@
   出处：ApolloPDF `layout/notify_persistent_big.xml`。
   三个 `*Layout` 各自挂一个 PendingIntent（代码 `SpPersistentNotifyManager`）。
   29 以下代码会给 `root` 补上下 20dp 的 padding。
+
+  注：`textColor` 只是白天的兜底值，实际颜色由代码按系统深浅色用 `setTextColor`
+  盖一遍（`SpNotifyTheme`）——RemoteViews 不会自己跟着深色模式反色。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
@@ -28,6 +31,7 @@
             android:src="@drawable/ic_home_list_pdf" />
 
         <TextView
+            android:id="@+id/tagPdf"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/sp_notify_tag_pdf"
@@ -52,6 +56,7 @@
             android:src="@drawable/ic_home_list_xls" />
 
         <TextView
+            android:id="@+id/tagExcel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/sp_notify_tag_excel"
@@ -76,6 +81,7 @@
             android:src="@drawable/ic_home_list_ppt" />
 
         <TextView
+            android:id="@+id/tagPpt"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/sp_notify_tag_ppt"

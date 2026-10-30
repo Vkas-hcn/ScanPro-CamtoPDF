@@ -81,27 +81,31 @@ class SpApoForegroundService : Service() {
 
     /** Apollo `startForegroundWithNotification`。29+ 带上类型 `mediaPlayback`。 */
     private fun startForegroundWithNotification(notification: Notification) {
+        // ID 跟着轮换位走：刷新会把常驻通知挪到另一个 ID 上，这里必须用同一个，否则会多一条
+        val id = SpPersistentNotifyManager.currentNotificationId(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
-                SpPersistentNotifyManager.PERSISTENT_NOTIFICATION_ID,
+                id,
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
             )
         } else {
-            startForeground(SpPersistentNotifyManager.PERSISTENT_NOTIFICATION_ID, notification)
+            startForeground(id, notification)
         }
     }
 
     /** Apollo `updateNotice`：通知被人划掉了就补报一次埋点，然后重挂。 */
     private fun updateNotice() {
         runCatching {
-            if (!SpNotifyPermit.isNotificationShowing(this, SpPersistentNotifyManager.PERSISTENT_NOTIFICATION_ID) &&
+            if (!SpPersistentNotifyManager.isPersistentShowing(this) &&
                 SpNotifyPermit.isHaveNotifyPermission(this)
             ) {
                 SpTracker.log(this, SpTracker.ALWAYS_NOTIFICATION_TRIGGER)
                 SpTrackEvents.notificationTrigger(this, SpPersistentNotifyManager.POS_ID_PERSISTENT, "resident")
                 SpTrackEvents.notificationShow(this, SpPersistentNotifyManager.POS_ID_PERSISTENT, "resident")
             }
+            // 先换 key 把常驻通知顶回最上面，再按它的当前 ID 挂回前台（顺序反了 ID 会对不上）
+            SpPersistentNotifyManager.refreshPersistentNotification(this)
             startForegroundInternal()
         }.onFailure { Log.e(TAG, "updateNotice failed", it) }
     }
