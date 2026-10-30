@@ -3,6 +3,7 @@ package com.scanpro.cam.pdf.boot
 import android.Manifest
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import android.view.LayoutInflater
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,8 +19,12 @@ import com.scanpro.cam.pdf.CamShellActivity
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivitySpBootBinding
+import com.scanpro.cam.pdf.ads.SpAdPosition
+import com.scanpro.cam.pdf.ads.SpAdShowConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
+import com.scanpro.cam.pdf.ads.SpLaunchAdCatchup
+import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpSceneCode
 import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
@@ -35,9 +40,7 @@ import com.scanpro.cam.pdf.notice.SpNotifyPermit
 import com.scanpro.cam.pdf.notice.SpSendManager
 import com.scanpro.cam.pdf.notice.notificationTriggerSource
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 冷启动。Apollo `SplashActivity` 的等价：预加载 `ac_launch` 开屏广告 →
@@ -50,7 +53,6 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     private var openAdStarted = false
     private var adsFlowStarted = false
     private var maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
-    private var minDelayMs = SpBootViewModel.DEFAULT_BOOT_MIN_MS
 
     /** 通知带进来的目标（Apollo `jumpType`），开屏结束后转交主界面。 */
     private var entryJumpType: String? = null
@@ -88,13 +90,13 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         SpTracker.log(this, SpTracker.APP_COLD_BOOT)
         maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
-        minDelayMs = SpBootViewModel.DEFAULT_BOOT_MIN_MS
         binding.bootProgress.max = maxTimeoutMs.toInt().coerceAtLeast(1)
         binding.bootProgress.progress = 0
 
         handleNotificationEntry()
 
-        // 先走 UMP（2.5 秒兜底），再预加载开屏。计时仍等通知权限框结束才开始。
+        // 预加载立刻发，不再等 UMP：开屏的展示窗口本来就短，等 consent 会白白吃掉 1~2.5 秒。
+        SpAdsHub.getOrNull()?.preloadLaunchAd("boot")
         SpTracker.log(
             this,
             SpTracker.SHARK_AD_CHANCE,
@@ -105,7 +107,6 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         )
         lifecycleScope.launch {
             SpAdsHub.getOrNull()?.requestStartupConsent(this@SpBootActivity)
-            SpAdsHub.getOrNull()?.preloadLaunchAd()
             checkNotifyPermission()
         }
     }
@@ -195,20 +196,55 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         }
     }
 
+    /**
+     * 开屏时序：最短停留 `launchMinMs` → 最多等 `launchWaitMs` 等广告就绪 → 命中即展示。
+     *
+     * 旧实现是固定 `delay(3000)` 后只看一眼缓存：而实测填充耗时 p50 约 3.7 秒，
+     * 大部分填充都晚于这个时间点，等于「加载成功了但永远不展示」。
+     *
+     * `launchWaitMs` 不设上限，所以这里的兜底总时长跟着配置放大——否则远端填 15 秒，
+     * 也会被本地的 10 秒进度条提前截断。
+     */
     private fun beginBootAdsFlow() {
         if (adsFlowStarted || finished || isFinishing) return
         adsFlowStarted = true
+
+        val hub = SpAdsHub.getOrNull()
+        val showConfig = hub?.showConfig() ?: SpAdShowConfig()
+        maxTimeoutMs = maxOf(
+            SpBootViewModel.DEFAULT_BOOT_MS,
+            showConfig.launchMinMs + showConfig.launchWaitMs + BOOT_SLACK_MS,
+        )
+        binding.bootProgress.max = maxTimeoutMs.toInt().coerceAtLeast(1)
         viewModel.runBootProgress(maxTimeoutMs)
 
         lifecycleScope.launch {
-            delay(minDelayMs.coerceAtLeast(0L))
-            val remaining = (maxTimeoutMs - minDelayMs).coerceAtLeast(0L)
-            runCatching {
-                withTimeoutOrNull(remaining) {
-                    SpAdsHub.getOrNull()?.configApplied?.first { it }
-                }
+            if (hub == null) {
+                continueToShell()
+                return@launch
             }
-            tryPresentOpenIfReady()
+            val startedAt = SystemClock.elapsedRealtime()
+            delay(showConfig.launchMinMs.coerceAtLeast(0L))
+
+            val elapsed = SystemClock.elapsedRealtime() - startedAt
+            val remaining = (maxTimeoutMs - elapsed).coerceAtLeast(0L)
+            val waitMs = minOf(showConfig.launchWaitMs, remaining)
+            val ready = hub.awaitOpenAd(waitMs)
+
+            if (ready) {
+                tryPresentOpenIfReady()
+                return@launch
+            }
+            // 规范 E13：到了展示点、等兜底广告超时后放行。这是「失去展示机会」唯一合规口径。
+            SpTrackEvents.adShowTimeout(
+                AdTrackingHelper.AdType.OPEN,
+                SpAdPosition.AC_LAUNCH,
+                SystemClock.elapsedRealtime() - startedAt,
+            )
+            if (showConfig.catchupEnabled) {
+                SpLaunchAdCatchup.arm(showConfig.catchupMs)
+            }
+            continueToShell()
         }
     }
 
@@ -315,6 +351,9 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
     companion object {
         private const val TAG = "SpBootGate"
+
+        /** 开屏兜底总时长在「最短停留 + 等待」之外的余量。 */
+        private const val BOOT_SLACK_MS = 1_000L
 
         private const val PREFS_NOTIFY_PERMIT = "sp_notify_permit_ask"
 

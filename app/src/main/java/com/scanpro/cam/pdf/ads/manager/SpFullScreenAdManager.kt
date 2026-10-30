@@ -15,6 +15,7 @@ import com.scanpro.cam.pdf.ads.SpAdInfo
 import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.ads.SpAdIncomeReport
+import com.scanpro.cam.pdf.ads.SpAdShowGate
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.ads.SpCachedAd
@@ -56,9 +57,6 @@ class SpFullScreenAdManager(
 
     private val blocking: SpBlockingLogic
         get() = SpBlockingLogic.get(appContext)
-
-    @Volatile
-    private var isAdTryShowing = false
 
     /** sessionId → 已重试次数。 */
     private val sessionIdTryCountMap = LinkedHashMap<String, Int>()
@@ -158,7 +156,7 @@ class SpFullScreenAdManager(
 
     /** 同一 [sessionId] 的一次开屏请求。重试走这里，避免重新发 session、把计数清零。 */
     private fun requestOpenAd(position: String, adInfo: SpAdInfo, scene: String, sessionId: String) {
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.OPEN, position, adInfo.adUnitId, "preload")
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.OPEN, position, adInfo.adUnitId, scene)
         AppOpenAd.load(
             appContext,
             adInfo.adUnitId,
@@ -167,7 +165,9 @@ class SpFullScreenAdManager(
                 override fun onAdLoaded(ad: AppOpenAd) {
                     loadingAdStateMap[adInfo.adUnitId] = false
                     sessionIdTryCountMap.remove(sessionId)
-                    SpAdCache.putOpenAd(SpCachedAd(ad, System.currentTimeMillis(), sessionId))
+                    SpAdCache.putOpenAd(
+                        SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit),
+                    )
                     AdTrackingHelper.filled(life, ad.responseInfo)
                     AdTrackingHelper.remember(sessionId, life)
                     AppLog.ads.i("广告加载成功 类型=open 位置=$position 单元=${adInfo.adUnitId}")
@@ -195,7 +195,7 @@ class SpFullScreenAdManager(
         scene: String,
         sessionId: String,
     ) {
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.INTERSTITIAL, position, adInfo.adUnitId, "preload")
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.INTERSTITIAL, position, adInfo.adUnitId, scene)
         InterstitialAd.load(
             appContext,
             adInfo.adUnitId,
@@ -204,7 +204,9 @@ class SpFullScreenAdManager(
                 override fun onAdLoaded(ad: InterstitialAd) {
                     loadingAdStateMap[adInfo.adUnitId] = false
                     sessionIdTryCountMap.remove(sessionId)
-                    SpAdCache.putInterstitialAd(SpCachedAd(ad, System.currentTimeMillis(), sessionId))
+                    SpAdCache.putInterstitialAd(
+                        SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit),
+                    )
                     AdTrackingHelper.filled(life, ad.responseInfo)
                     AdTrackingHelper.remember(sessionId, life)
                     AppLog.ads.i("广告加载成功 类型=interstitial 位置=$position 单元=${adInfo.adUnitId}")
@@ -226,9 +228,10 @@ class SpFullScreenAdManager(
     }
 
     /**
-     * Apollo `onAdFailedToPreload`：同一 session 失败次数小于 [tryCountLimit] 时再请求一次，
-     * 满了才换列表里的下一个单元。白牌 SDK 会自己再次回调；GMA 的 `onAdFailedToLoad` 只来一次，
-     * 所以这里必须重新 `load`。
+     * 预加载失败后的处理。
+     *
+     * 开屏**不原地重试**：开屏只有几秒窗口，同一个单元连试 3 次等于把窗口耗尽；直接换列表里的
+     * 下一个单元，成功率和时延都更好。插屏保留原来的 3 次重试。
      */
     private fun onPreloadFailed(
         position: String,
@@ -237,14 +240,13 @@ class SpFullScreenAdManager(
         sessionId: String,
         message: String,
     ) {
-        AppLog.ads.d("广告加载重试 位置=$position 单元=${adInfo.adUnitId} 错误信息=$message")
+        AppLog.ads.d("广告加载失败 位置=$position 单元=${adInfo.adUnitId} 错误信息=$message")
 
         val tried = (sessionIdTryCountMap[sessionId] ?: 0) + 1
-        if (tried < tryCountLimit) {
+        if (!adInfo.isOpen && tried < tryCountLimit) {
             sessionIdTryCountMap[sessionId] = tried
             AppLog.ads.i("广告加载重试 位置=$position 单元=${adInfo.adUnitId} 次数=$tried/$tryCountLimit")
-            if (adInfo.isOpen) requestOpenAd(position, adInfo, scene, sessionId)
-            else requestInterstitialAd(position, adInfo, scene, sessionId)
+            requestInterstitialAd(position, adInfo, scene, sessionId)
             return
         }
         loadingAdStateMap[adInfo.adUnitId] = false
@@ -309,8 +311,10 @@ class SpFullScreenAdManager(
         }
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
             AppLog.ads.i("跳过广告展示 类型=interstitial 位置=$position 原因=页面已销毁")
-            // 缓存条目已经在 getInterstitialAd 里出队了；补一次预加载
+            // 广告已经从缓存出队：放回去，并且必须回调 onDone，否则调用方流程会卡住。
+            putBack(cached.ad, cached.sessionId, position)
             checkAndLoadAd(position)
+            onDone()
             return
         }
         showAd(
@@ -329,6 +333,9 @@ class SpFullScreenAdManager(
     /**
      * Apollo `showAd(...)`：先盖 500ms 遮罩，遮罩关闭时真正 `show()`。
      *
+     * 所有提前返回都必须回调 [onResult]，否则调用方的流程（开屏 `finish`、首页跳转）
+     * 会永久卡住；展示不出去时广告要放回缓存，而不是就地丢弃。
+     *
      * @param onResult `(showed, dismissed)`，与 Apollo 的 `ds0` 回调同义。
      */
     fun showAd(
@@ -339,21 +346,21 @@ class SpFullScreenAdManager(
         onResult: (showed: Boolean, dismissed: Boolean) -> Unit,
     ) {
         val host = activity
-        if (isAdTryShowing) {
-            SpTrackEvents.adBlocked(
-                if (ad is AppOpenAd) AdTrackingHelper.AdType.OPEN else AdTrackingHelper.AdType.INTERSTITIAL,
-                reloadPosition,
-                "another_fullscreen",
-            )
+        val adType = if (ad is AppOpenAd) AdTrackingHelper.AdType.OPEN else AdTrackingHelper.AdType.INTERSTITIAL
+        if (!SpAdShowGate.tryEnter()) {
+            SpTrackEvents.adBlocked(adType, reloadPosition, "another_fullscreen")
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=已有广告正在展示")
-            return
-        }
-        if (host == null) {
-            AppLog.ads.e("跳过广告展示 位置=$scene 原因=没有宿主页面")
+            putBack(ad, sessionId, reloadPosition)
             onResult(false, false)
             return
         }
-        isAdTryShowing = true
+        if (host == null || host.isFinishing || host.isDestroyed) {
+            SpAdShowGate.exit()
+            AppLog.ads.i("跳过广告展示 位置=$scene 原因=没有可用宿主页面")
+            putBack(ad, sessionId, reloadPosition)
+            onResult(false, false)
+            return
+        }
         AppLog.ads.i("开始展示广告 位置=$scene")
 
         when (ad) {
@@ -376,8 +383,9 @@ class SpFullScreenAdManager(
                 }
                 SpFullScreenMask.show(host) {
                     if (host.isFinishing || host.isDestroyed) {
-                        isAdTryShowing = false
+                        SpAdShowGate.exit()
                         AppLog.ads.i("跳过广告展示 类型=interstitial 位置=$scene 原因=页面已销毁")
+                        putBack(ad, sessionId, reloadPosition)
                         onResult(false, false)
                         return@show
                     }
@@ -404,8 +412,9 @@ class SpFullScreenAdManager(
                 }
                 SpFullScreenMask.show(host) {
                     if (host.isFinishing || host.isDestroyed) {
-                        isAdTryShowing = false
+                        SpAdShowGate.exit()
                         AppLog.ads.i("跳过广告展示 类型=open 位置=$scene 原因=页面已销毁")
+                        putBack(ad, sessionId, reloadPosition)
                         onResult(false, false)
                         return@show
                     }
@@ -414,10 +423,23 @@ class SpFullScreenAdManager(
             }
 
             else -> {
+                SpAdShowGate.exit()
                 AppLog.ads.e("跳过广告展示 位置=$scene 原因=不支持的广告类型 ${ad.javaClass.simpleName}")
-                isAdTryShowing = false
+                onResult(false, false)
             }
         }
+    }
+
+    /** 展示没发出去时把广告放回缓存，避免「填充成功但被丢弃」。 */
+    private fun putBack(ad: Any, sessionId: String, position: String) {
+        val ttl = config.ttlSecondsOf(position) ?: 0
+        val now = System.currentTimeMillis()
+        runCatching {
+            when (ad) {
+                is AppOpenAd -> SpAdCache.putOpenAd(SpCachedAd(ad, now, sessionId, position, ttl))
+                is InterstitialAd -> SpAdCache.putInterstitialAd(SpCachedAd(ad, now, sessionId, position, ttl))
+            }
+        }.onFailure { AppLog.ads.w("广告回缓存失败 位置=$position", it) }
     }
 
     private fun fullScreenCallbacks(
@@ -438,10 +460,9 @@ class SpFullScreenAdManager(
         }
 
         override fun onAdShowedFullScreenContent() {
-            isAdTryShowing = false
             blocking.updateAdShowCount()
             onResult(true, false)
-            // Apollo: 展示成功立刻补下一次预加载
+            // Apollo: 展示成功立刻补下一次预加载（闸门保持到关闭/失败再释放）
             checkAndLoadAd(reloadPosition)
         }
 
@@ -449,11 +470,12 @@ class SpFullScreenAdManager(
             AppLog.ads.i("广告已关闭 位置=$scene")
             AdTrackingHelper.recall(sessionId)?.let { AdTrackingHelper.close(it) }
             AdTrackingHelper.forget(sessionId)
+            SpAdShowGate.exit()
             onResult(false, true)
         }
 
         override fun onAdFailedToShowFullScreenContent(error: AdError) {
-            isAdTryShowing = false
+            SpAdShowGate.exit()
             AppLog.ads.w("广告展示失败 位置=$scene 错误码=${error.code} 错误信息=${error.message}")
             AdTrackingHelper.forget(sessionId)
             SpTracker.log(
@@ -471,14 +493,8 @@ class SpFullScreenAdManager(
     }
     // endregion
 
-    /** Apollo `release()`。 */
+    /** Apollo `release()`。只清本地重试计数，不强行释放正在展示的广告。 */
     fun release() {
         sessionIdTryCountMap.clear()
-        isAdTryShowing = false
     }
-
-
-
-
-
 }

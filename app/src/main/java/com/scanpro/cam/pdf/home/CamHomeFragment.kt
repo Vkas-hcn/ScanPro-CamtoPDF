@@ -91,6 +91,8 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
         refreshStorageAccess()
         // 默认 PDF 算第一次选中，之后用户点类型才弹 `ac_top_int`
         typeAdArmed = true
+        // 文件列表页进入就预热 `ac_check_int`：原来要等用户点开文件才读缓存，几乎必然 miss。
+        runCatching { SpPageAdTriggers.preloadCheckInt(requireActivity()) }
     }
 
     override fun observeData() {

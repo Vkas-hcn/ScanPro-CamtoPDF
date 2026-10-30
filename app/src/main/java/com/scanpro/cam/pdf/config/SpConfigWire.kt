@@ -1,10 +1,10 @@
 package com.scanpro.cam.pdf.config
 
 import android.content.Context
-import android.util.Log
 import com.scanpro.cam.pdf.BuildConfig
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.ads.SpAdPosition
+import com.scanpro.cam.pdf.util.AppLog
 
 /**
  * 买量配置接口 `api/dispatch` 的接入点。
@@ -78,6 +78,14 @@ object SpConfigWire {
     const val KEY_AD_TYPE = "ad_type"
     const val KEY_AD_TIME_LIMIT = "ad_timelimit"
 
+    /** 开屏展示时序（可选块，缺项走 [com.scanpro.cam.pdf.ads.SpAdShowConfig] 默认值）。 */
+    const val KEY_AD_SHOW_CONFIG = "ad_show_config"
+    const val KEY_LAUNCH_MIN_MS = "launch_min_ms"
+    const val KEY_LAUNCH_WAIT_MS = "launch_wait_ms"
+    const val KEY_CATCHUP_MS = "catchup_ms"
+    const val KEY_PRELOAD_ON_BACKGROUND = "preload_on_background"
+    const val KEY_CATCHUP_ENABLED = "catchup_enabled"
+
     const val KEY_NAT_SWITCH_OPEN = "switch_open"
     const val KEY_NAT_JUMP_PERCENT = "jump_percent"
 
@@ -134,7 +142,7 @@ object SpConfigWire {
         val environment = if (BuildConfig.DEBUG) "staging" else "prod"
         val wire = SpDispatchWire(baseUrl, environment, fields)
         val reason = validate(wire) ?: return wire
-        Log.i(TAG, "dispatch not configured: $reason")
+        AppLog.network.w("配置接口未配置 原因=$reason")
         return null
     }
 
@@ -158,6 +166,4 @@ object SpConfigWire {
 
     private fun stringOrEmpty(context: Context, id: Int): String =
         runCatching { context.getString(id).trim() }.getOrDefault("")
-
-    private const val TAG = "SpConfig"
 }

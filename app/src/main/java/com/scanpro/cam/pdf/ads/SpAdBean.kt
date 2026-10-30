@@ -19,16 +19,25 @@ data class SpCachedAd<T>(
     val createTime: Long,
     /** Apollo 的 `sessionId`，用来做加载重试计数与失败清理。 */
     val sessionId: String,
+    /** 这条广告是为哪个位置加载的（`ac_*`）。取用时按它自己的 TTL 判断。 */
+    val position: String = "",
+    /** 入库时固化的 TTL（秒）。0 表示不按时间过期。 */
+    val ttlSeconds: Int = 0,
 ) {
     /** 缓存年龄（毫秒）。 */
     fun ageMs(now: Long = System.currentTimeMillis()): Long = now - createTime
 
     /**
-     * Apollo 的 TTL 判据：`now - createTime < adTimeLimit * 1000`，`adTimeLimit` 取
-     * 该位置列表**首条**的 `ad_timelimit`。
+     * TTL 判据：`now - createTime < adTimeLimit * 1000`。
+     *
+     * `ttlSeconds <= 0` 视为「不按时间过期」。旧实现直接返回 false，后端漏发 `ad_timelimit`
+     * 时每条已填充广告都会在出队瞬间被判失效。
      */
     fun isFresh(ttlSeconds: Int, now: Long = System.currentTimeMillis()): Boolean =
-        ageMs(now) < ttlSeconds * 1000L
+        ttlSeconds <= 0 || ageMs(now) < ttlSeconds * 1000L
+
+    /** 用入库时固化的 TTL 判断是否仍然可用。 */
+    fun isFreshNow(now: Long = System.currentTimeMillis()): Boolean = isFresh(ttlSeconds, now)
 }
 
 typealias SpCachedOpenAd = SpCachedAd<AppOpenAd>

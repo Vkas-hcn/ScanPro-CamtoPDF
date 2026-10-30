@@ -44,7 +44,11 @@ object SpAdSession {
             }
 
             override fun onActivityStopped(activity: android.app.Activity) {
+                val wasForeground = isForeground
                 isForeground = startedActivities.decrementAndGet() > 0
+                // 退到后台时预加载下一次开屏：同进程再回来（通知/图标）时直接命中，
+                // 不用再赌「冷启 3 秒内能不能加载完」。
+                if (wasForeground && !isForeground) preloadNextLaunchAd()
             }
 
             override fun onActivityCreated(a: android.app.Activity, b: Bundle?) = Unit
@@ -53,5 +57,11 @@ object SpAdSession {
             override fun onActivitySaveInstanceState(a: android.app.Activity, b: Bundle) = Unit
             override fun onActivityDestroyed(a: android.app.Activity) = Unit
         })
+    }
+
+    private fun preloadNextLaunchAd() {
+        val hub = SpAdsHub.getOrNull() ?: return
+        if (!hub.showConfig().preloadOnBackground) return
+        runCatching { hub.preloadLaunchAd("background") }
     }
 }

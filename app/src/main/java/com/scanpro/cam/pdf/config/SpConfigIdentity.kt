@@ -2,10 +2,10 @@ package com.scanpro.cam.pdf.config
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import com.scanpro.cam.pdf.BuildConfig
+import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Locale
@@ -19,7 +19,6 @@ import java.util.UUID
  */
 object SpConfigIdentity {
 
-    private const val TAG = "SpConfig"
     private const val PREFS = "sp_config_identity"
     private const val KEY_DISTINCT_ID = "distinct_id"
     private const val KEY_REFERRER = "install_referrer"
@@ -59,7 +58,7 @@ object SpConfigIdentity {
     suspend fun resolveInstallReferrer(context: Context): String = referrerMutex.withLock {
         val saved = persistedInstallReferrer(context)
         if (saved.isNotBlank()) {
-            Log.i(TAG, "Install Referrer 使用本地缓存")
+            AppLog.network.d("Install Referrer 使用本地缓存 长度=${saved.length}")
             return@withLock saved
         }
         val value = SpPlayInstallReferrerProvider(context).getInstallReferrer()
@@ -67,7 +66,7 @@ object SpConfigIdentity {
             ?.takeIf { it.isNotBlank() }
         if (value != null) {
             saveInstallReferrer(context, value)
-            Log.i(TAG, "Install Referrer 已持久化")
+            AppLog.network.i("Install Referrer 已持久化 长度=${value.length}")
         }
         value.orEmpty()
     }
@@ -97,7 +96,7 @@ object SpConfigIdentity {
         AdvertisingIdClient.getAdvertisingIdInfo(context).id.orEmpty()
             .filterNot(Char::isISOControl).trim().take(MAX_IDENTIFIER_LENGTH)
     }.onFailure {
-        Log.i(TAG, "gaid unavailable: ${it.javaClass.simpleName}")
+        AppLog.network.w("GAID 获取失败 原因=${it.javaClass.simpleName}")
     }.getOrDefault("")
 
     private fun prefs(context: Context) =

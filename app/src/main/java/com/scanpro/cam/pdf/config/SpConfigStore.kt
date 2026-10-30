@@ -1,14 +1,15 @@
 package com.scanpro.cam.pdf.config
 
-import android.util.Log
 import com.scanpro.cam.pdf.ads.SpAdConfig
 import com.scanpro.cam.pdf.ads.SpAdInfo
+import com.scanpro.cam.pdf.ads.SpAdShowConfig
 import com.scanpro.cam.pdf.ads.SpNatConfig
 import com.scanpro.cam.pdf.notice.SpAcPopConfig
 import com.scanpro.cam.pdf.notice.SpMediaConfig
 import com.scanpro.cam.pdf.notice.SpNewConfig
 import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.scanpro.cam.pdf.notice.SpWinPopConfig
+import com.scanpro.cam.pdf.util.AppLog
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -33,7 +34,7 @@ class SpConfigStore {
         val out = LinkedHashMap<String, List<SpAdInfo>>()
         root.keys().forEach { position ->
             if (!SpConfigWire.isKnownPosition(position)) {
-                Log.w(TAG, "unknown ad position in config: $position")
+                AppLog.network.w("配置位置未知，已忽略 位置=$position")
                 return@forEach
             }
             val list = parseAdInfoList(root.optJSONArray(position))
@@ -184,6 +185,24 @@ class SpConfigStore {
     fun hasPosition(config: SpAdConfig, position: String): Boolean =
         config.adInfoList(position)?.isNotEmpty() == true
 
+    /**
+     * `ad_show_config`：开屏展示时序。整块缺失时全部走默认值；单项类型不对只丢该项。
+     * 见 [SpAdShowConfig.sanitized] 的上限保护。
+     */
+    fun adShowConfig(payload: JSONObject?): SpAdShowConfig {
+        val json = valueAsObject(payload, SpConfigWire.KEY_AD_SHOW_CONFIG) ?: return SpAdShowConfig()
+        val base = SpAdShowConfig()
+        return base.copy(
+            launchMinMs = json.optLongOrNull(SpConfigWire.KEY_LAUNCH_MIN_MS) ?: base.launchMinMs,
+            launchWaitMs = json.optLongOrNull(SpConfigWire.KEY_LAUNCH_WAIT_MS) ?: base.launchWaitMs,
+            catchupMs = json.optLongOrNull(SpConfigWire.KEY_CATCHUP_MS) ?: base.catchupMs,
+            preloadOnBackground = json.optBoolOrNull(SpConfigWire.KEY_PRELOAD_ON_BACKGROUND)
+                ?: base.preloadOnBackground,
+            catchupEnabled = json.optBoolOrNull(SpConfigWire.KEY_CATCHUP_ENABLED)
+                ?: base.catchupEnabled,
+        ).sanitized()
+    }
+
     private fun parseSwitch(
         payload: JSONObject,
         containerKey: String,
@@ -195,7 +214,7 @@ class SpConfigStore {
             val obj = valueAsObject(payload, containerKey) ?: error("not object")
             obj.optIntOrNull(fieldKey)
         } catch (error: Throwable) {
-            Log.w(TAG, "blocking key $containerKey parse failed, fallback=$onError", error)
+            AppLog.network.w("总闸配置解析失败 字段=$containerKey 回落=$onError", error)
             onError
         }
     }
@@ -220,7 +239,8 @@ class SpConfigStore {
                 adUnitId = unitId,
                 adPlatform = json.optString(SpConfigWire.KEY_AD_PLATFORM).trim(),
                 adType = type,
-                adTimeLimit = json.optInt(SpConfigWire.KEY_AD_TIME_LIMIT, 0),
+                adTimeLimit = json.optInt(SpConfigWire.KEY_AD_TIME_LIMIT, 0)
+                    .let { if (it <= 0) DEFAULT_AD_TTL_SECONDS else it },
             )
         }
         return out
@@ -233,7 +253,8 @@ class SpConfigStore {
     )
 
     companion object {
-        private const val TAG = "SpConfig"
+        /** 后端漏发 `ad_timelimit` 时的兜底（秒）。旧实现默认 0，等于每条填充立刻失效。 */
+        private const val DEFAULT_AD_TTL_SECONDS = 600
     }
 }
 
@@ -251,3 +272,16 @@ private fun JSONObject.optAcquired(): Boolean {
 
 private fun JSONObject.optIntOrNull(key: String): Int? =
     if (has(key) && !isNull(key)) optInt(key) else null
+
+private fun JSONObject.optLongOrNull(key: String): Long? =
+    if (has(key) && !isNull(key)) optLong(key) else null
+
+private fun JSONObject.optBoolOrNull(key: String): Boolean? {
+    if (!has(key) || isNull(key)) return null
+    return when (val raw = opt(key)) {
+        is Boolean -> raw
+        is Number -> raw.toInt() != 0
+        is String -> raw.equals("true", ignoreCase = true) || raw == "1"
+        else -> null
+    }
+}

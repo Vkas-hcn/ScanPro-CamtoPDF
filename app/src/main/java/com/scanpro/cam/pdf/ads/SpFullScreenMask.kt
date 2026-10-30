@@ -42,13 +42,22 @@ object SpFullScreenMask {
             onDismissed()
             return
         }
-        dismissHandler.removeCallbacksAndMessages(null)
+        // 旧实现每次 show 都 removeCallbacksAndMessages(null)，会把上一个还在等的遮罩回调
+        // 一起取消掉，导致那条广告永远不会 show()。这里改成每个遮罩管自己的回调。
+        var dialog: Dialog? = null
+        val dismissAction = Runnable {
+            runCatching {
+                if (dialog?.isShowing == true) dialog?.dismiss()
+                if (loadingDialog === dialog) loadingDialog = null
+            }.onFailure { Log.w(TAG, "dismiss mask failed", it) }
+            onDismissed()
+        }
         try {
-            val dialog = Dialog(activity, R.style.SpFullScreenLoadingDialog)
-            dialog.setContentView(R.layout.sp_dialog_full_screen_loading)
-            dialog.setCancelable(false)
-            dialog.setCanceledOnTouchOutside(false)
-            dialog.window?.let { window ->
+            val created = Dialog(activity, R.style.SpFullScreenLoadingDialog)
+            created.setContentView(R.layout.sp_dialog_full_screen_loading)
+            created.setCancelable(false)
+            created.setCanceledOnTouchOutside(false)
+            created.window?.let { window ->
                 window.setLayout(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -61,17 +70,14 @@ object SpFullScreenMask {
                         WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 }
             }
-            dialog.show()
-            loadingDialog = dialog
-            dismissHandler.postDelayed({
-                runCatching {
-                    if (dialog.isShowing) dialog.dismiss()
-                    if (loadingDialog === dialog) loadingDialog = null
-                }.onFailure { Log.w(TAG, "dismiss mask failed", it) }
-                onDismissed()
-            }, LOADING_DIALOG_DURATION)
+            created.show()
+            dialog = created
+            loadingDialog = created
+            dismissHandler.postDelayed(dismissAction, LOADING_DIALOG_DURATION)
         } catch (e: Exception) {
             Log.w(TAG, "showFullScreenMask: ${e.message}")
+            dismissHandler.removeCallbacks(dismissAction)
+            runCatching { dialog?.dismiss() }
             onDismissed()
         }
     }

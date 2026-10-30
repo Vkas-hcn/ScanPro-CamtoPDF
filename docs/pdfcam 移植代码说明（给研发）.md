@@ -237,6 +237,44 @@ debug 的 Base URL 是 `https://testserver.googletogoogle.com/`；release 留空
 
 总闸解析：key 缺失保持当前值；解析异常按 Apollo 回落（`ads_limit=30`、`global=1`、`google_play=0`、`vpn=1`、`virtual=1`）。
 
+### 4.4 请求日志（与广告层同一套）
+
+接口层统一走 `AppLog.network`：tag 仍是 `spLog`，模块前缀 `[network]`，和广告层 `[ads]` 用同一个过滤器。原先 `SpConfig` 的独立 tag 已全部改掉。
+
+```bash
+# Windows 用 findstr
+adb logcat -s spLog | grep network
+```
+
+一次成功请求的顺序（`#n` 是进程内请求序号，dispatch / cloak / 重试都靠它串起来）：
+
+```
+配置调度开始 触发=应用启动
+开始请求接口 序号=#1 接口=api/dispatch 方式=POST 地址=https://…/api/dispatch 环境=staging 触发=应用启动 超时=连接15秒/读取20秒
+请求头 序号=#1 接口=api/dispatch X-App-Id=… X-App-Version=… X-Environment=staging
+请求字段 序号=#1 接口=api/dispatch 包名=… 版本=… 语言=… 机型=… 系统=… 含DistinctID=是 含GAID=是 含Referrer=否
+请求入参 序号=#1 接口=api/dispatch 长度=…
+{格式化后的请求 JSON}
+收到响应 序号=#1 接口=api/dispatch http=200 耗时=345ms 长度=2048
+响应出参 序号=#1 接口=api/dispatch http=200 长度=2048
+{格式化后的响应 JSON}
+接口完成 序号=#1 接口=api/dispatch 结果=成功 http=200 业务码=0 data字段=11 耗时=345ms 触发=应用启动
+配置请求成功 来源=远端 字段数=11 耗时=345ms 触发=应用启动
+配置已应用 位置=[…] 原生开关=1 单元变更=true
+```
+
+排查对照：
+
+| 现象 | 看哪一行 |
+|---|---|
+| 根本没发请求 | `配置调度开始` 之后是 `命中配置缓存` / `跳过远端刷新` / `跳过配置接口` / `跳过配置请求`，原因和还需等待的时间都写在行尾 |
+| 请求发了但很慢 | `请求身份就绪 耗时=…ms`（Referrer 最多等 5 秒）；再看 `收到响应 … 耗时=…ms` |
+| 失败 / 超时 | `接口异常`（带堆栈）、`配置请求超时`、`重试配置请求 次数=2/3`、`配置请求失败 … 回落缓存=有/无` |
+| 返回了但广告没变 | `接口完成 结果=成功 data字段=n` → `配置请求成功 字段数=n` → `配置已应用 位置=… 单元变更=…`，断在哪一步就是哪一层的问题 |
+| cloak | `开始 cloak 次数=1/10` → `开始请求接口 接口=api/cloak` → `接口完成`；上报过会打 `跳过 cloak 原因=本安装周期已上报成功` |
+
+入参与出参超过 3500 字符会分块，每块带 `[1/3]` 序号；JSON 已格式化，可直接复制给后端。
+
 ---
 
 ## 5. 广告层

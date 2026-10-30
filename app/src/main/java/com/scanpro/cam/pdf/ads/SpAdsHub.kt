@@ -3,6 +3,7 @@ package com.scanpro.cam.pdf.ads
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpFullScreenAdManager
@@ -20,9 +21,11 @@ import com.scanpro.cam.pdf.notice.SpMediaConfig
 import com.scanpro.cam.pdf.notice.SpNewConfig
 import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.scanpro.cam.pdf.notice.SpWinPopConfig
+import com.scanpro.cam.pdf.util.AppLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -70,13 +73,19 @@ class SpAdsHub private constructor(
     private var mediaConfig = SpMediaConfig()
     @Volatile
     private var winPopConfig = SpWinPopConfig()
+    @Volatile
+    private var adShowConfig = SpAdShowConfig()
 
     private val booted = java.util.concurrent.atomic.AtomicBoolean(false)
 
     @Volatile
     private var remotePayloadReady = false
 
-    /** 开屏 UMP 结束（或超时）后完成。预加载最多等 [SpUmpGate.DEFAULT_TIMEOUT_MS]。 */
+    /** SDK 未就绪 / consent 未就绪时被跳过的开屏预加载，等条件满足后补一次。 */
+    @Volatile
+    private var pendingLaunchPreload = false
+
+    /** 开屏 UMP 结束（或超时）后完成；预加载只做短等待，不再按 2.5 秒阻塞。 */
     private val umpGate = CompletableDeferred<Unit>()
 
     fun initialize() {
@@ -84,7 +93,7 @@ class SpAdsHub private constructor(
         SpAdSession.attachLifecycle(app)
         scope.launch(Dispatchers.Main.immediate) {
             SpWebWarmup.awaitWarmupReady(app)
-            SpAdMobInit.get(app).init(scope)
+            SpAdMobInit.get(app).init(scope) { onAdSdkReady() }
             bootstrapper.start()
         }
     }
@@ -94,6 +103,8 @@ class SpAdsHub private constructor(
         if (umpGate.isCompleted) return
         runCatching { SpUmpGate(app).requestUmpConsent(activity) }
         if (!umpGate.isCompleted) umpGate.complete(Unit)
+        // consent 结束后立刻补一次预加载：非 EEA 用户这时候才被允许请求。
+        preloadLaunchAd("consent")
     }
 
     val configApplied: StateFlow<Boolean> get() = bootstrapper.configApplied
@@ -101,6 +112,7 @@ class SpAdsHub private constructor(
     // region 配置
 
     fun config(): SpAdConfig = adConfig
+    fun showConfig(): SpAdShowConfig = adShowConfig
     fun nat(): SpNatConfig = natConfig
     fun newConfigOf(): SpNewConfig = newConfig
     fun acPopConfigOf(): SpAcPopConfig = acPopConfig
@@ -128,7 +140,10 @@ class SpAdsHub private constructor(
         // 远端配置没回来之前不发通知。这里用同一语义的开关表达。
         remotePayloadReady = true
         val next = configStore.adConfig(payload)
+        // 每次配置下发都 clearAll 会把刚填充好、还没展示的广告白扔掉；只有广告位/单元变了才清。
+        val unitsChanged = adUnitSignature(next) != adUnitSignature(adConfig)
         adConfig = next
+        adShowConfig = configStore.adShowConfig(payload)
         natConfig = configStore.natConfig(payload)
         newConfig = configStore.newConfig(payload)
         acPopConfig = configStore.acPopConfig(payload)
@@ -137,18 +152,25 @@ class SpAdsHub private constructor(
         winPopConfig = configStore.winPopConfig(payload)
         applyBlocking(payload)
         applyDispatchMeta(payload)
-        Log.i(
-            TAG,
-            "config applied positions=${next.byPosition.keys} nat=${natConfig.switchOpen}",
+        AppLog.network.i(
+            "配置已应用 位置=${next.byPosition.keys} 原生开关=${natConfig.switchOpen} " +
+                "单元变更=$unitsChanged",
         )
-        SpAdCache.clearAll()
-        preloadLaunchAd()
+        if (unitsChanged) {
+            SpAdCache.clearAll()
+            preloadLaunchAd("config-changed")
+        } else if (!SpAdCache.isHaveOpenAd(next)) {
+            preloadLaunchAd("config")
+        }
     }
+
+    private fun adUnitSignature(config: SpAdConfig): Map<String, List<String>> =
+        config.byPosition.mapValues { (_, list) -> list.map { it.adUnitId } }
 
     private fun applyUnavailable(reason: String) {
         adConfig = SpAdConfig()
         SpAdCache.clearAll()
-        Log.w(TAG, "config unavailable ads off: $reason")
+        AppLog.network.w("配置不可用，广告已关闭 原因=$reason")
     }
 
     private fun applyDispatchMeta(payload: JSONObject) {
@@ -185,12 +207,57 @@ class SpAdsHub private constructor(
         patch.virtualBlockSwitch?.let { blocking.virtualBlockSwitch = it }
     }
 
-    /** 用 `ac_launch` 预算开屏广告。Apollo 在 Application 初始化后就会预热。 */
-    fun preloadLaunchAd() {
+    /** 用 `ac_launch` 预加载开屏广告。Apollo 在 Application 初始化后就会预热。 */
+    fun preloadLaunchAd(reason: String = "auto") {
         scope.launch(Dispatchers.Main) {
-            withTimeoutOrNull(SpUmpGate.DEFAULT_TIMEOUT_MS) { umpGate.await() }
-            runCatching { preloadManager.checkAndLoadAd(SpAdPosition.AC_LAUNCH) }
-                .onFailure { Log.w(TAG, "preloadLaunchAd failed", it) }
+            if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
+                // SDK 还没 ready：记一笔，等 MobileAds 初始化回调里补。
+                pendingLaunchPreload = true
+                Log.i(TAG, "preloadLaunchAd deferred: sdk not ready reason=$reason")
+                return@launch
+            }
+            awaitConsentBriefly()
+            if (!isConsentReady()) {
+                pendingLaunchPreload = true
+                Log.i(TAG, "preloadLaunchAd deferred: consent not ready reason=$reason")
+                return@launch
+            }
+            pendingLaunchPreload = false
+            runCatching {
+                preloadManager.checkAndLoadAd(SpAdPosition.AC_LAUNCH, scene = SCENE_PRELOAD)
+            }.onFailure { Log.w(TAG, "preloadLaunchAd failed reason=$reason", it) }
+        }
+    }
+
+    /** 等 UMP 结束，但最多等 [CONSENT_WAIT_MS]，不把开屏时序再拖回去。 */
+    private suspend fun awaitConsentBriefly() {
+        if (umpGate.isCompleted) return
+        withTimeoutOrNull(CONSENT_WAIT_MS) { umpGate.await() }
+    }
+
+    private fun isConsentReady(): Boolean =
+        runCatching { SpUmpGate(app).adsEligible() }.getOrDefault(true)
+
+    /** SDK 初始化完成后由 [SpAdMobInit] 回调。 */
+    internal fun onAdSdkReady() {
+        Log.i(TAG, "ad sdk ready, pendingPreload=$pendingLaunchPreload")
+        preloadLaunchAd("sdk-ready")
+    }
+
+    /** 是否有已经就绪、可以立刻展示的开屏广告。 */
+    fun hasOpenAd(): Boolean = SpAdCache.peekOpenAd(adConfig, blocking) != null
+
+    /**
+     * 等开屏广告就绪。旧实现是固定 3 秒后只看一眼缓存，没到货就永久失去展示机会。
+     *
+     * @return true 表示 [timeoutMs] 内已经有一条可用的开屏广告
+     */
+    suspend fun awaitOpenAd(timeoutMs: Long): Boolean {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs.coerceAtLeast(0L)
+        while (true) {
+            if (SpAdCache.peekOpenAd(adConfig, blocking) != null) return true
+            if (SystemClock.elapsedRealtime() >= deadline) return false
+            delay(OPEN_AD_POLL_MS)
         }
     }
 
@@ -255,6 +322,15 @@ class SpAdsHub private constructor(
         private const val PREFS_DISPATCH = "sp_dispatch_flags"
         private const val KEY_ACTIVATED = "activated_reported"
         private const val KEY_BIORGANIC = "biorganic_reported"
+
+        /** E05 `ad_request` 用 `scene` 标预加载（规范 §4E05）。 */
+        const val SCENE_PRELOAD = "preload"
+
+        /** 预加载最多等 consent 这么久，超时也继续（非 EEA 场景 UMP 基本秒回）。 */
+        private const val CONSENT_WAIT_MS = 800L
+
+        /** 等待开屏广告就绪时的轮询间隔。 */
+        private const val OPEN_AD_POLL_MS = 50L
 
         @Volatile
         private var instance: SpAdsHub? = null

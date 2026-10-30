@@ -16,10 +16,11 @@ import com.google.android.gms.ads.ResponseInfo
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.scanpro.cam.pdf.CamPdfApp
 import com.scanpro.cam.pdf.util.AppLog
+import java.util.Locale
 
 /**
  * 广告全生命周期埋点，对接 TrackSDK 专用广告接口。
- * `adId` 使用广告单元 ID（规范 §2.3，形如 ca-app-pub-…/…），填充/失败/点击/关闭各环回传同一个值。
+ * `adId` 使用广告单元 ID（规范 §2.3 的 `ad_id`），填充/失败/点击/关闭各环回传同一个值。
  */
 object AdTrackingHelper {
     object AdType {
@@ -38,8 +39,24 @@ object AdTrackingHelper {
 
     private val lives = HashMap<String, AdTrackLife>()
 
-    fun adSourceOf(networkName: String?): String =
-        networkName?.takeIf { it.isNotBlank() } ?: SOURCE_ADMOB
+    /**
+     * `ad_source` 取值规范 §2.3 要求是可枚举的小写子平台名（`admob` / `pangle` / `facebook` / `mtg`），
+     * 而 AdMob 的 `adSourceName` 是 `AdMob Network` 这类展示名，直接上报会让 BI 维度对不上。
+     */
+    fun adSourceOf(networkName: String?): String {
+        val raw = networkName?.trim().orEmpty()
+        if (raw.isEmpty()) return SOURCE_ADMOB
+        val lower = raw.lowercase(Locale.US)
+        return when {
+            lower.contains("admob") -> SOURCE_ADMOB
+            lower.contains("meta") || lower.contains("facebook") -> "facebook"
+            lower.contains("pangle") || lower.contains("bytedance") -> "pangle"
+            lower.contains("unity") -> "unity"
+            lower.contains("applovin") -> "applovin"
+            lower.contains("mintegral") || lower.contains("mtg") -> "mtg"
+            else -> lower.replace(' ', '_').replace("-", "_")
+        }
+    }
 
     fun parseErrCode(errCode: String): Int = errCode.toIntOrNull() ?: -1
 
@@ -48,7 +65,7 @@ object AdTrackingHelper {
         return ((nowMs - showStartMs).coerceAtLeast(0L)) / 1000L
     }
 
-    /** 一次 GMA 请求。`adUnitId` 为广告单元 ID（规范 §2.3 的 ad_id，形如 ca-app-pub-…/…），贯穿后续回调。 */
+    /** 一次 GMA 请求。`adUnitId` 即规范里的 `ad_id`，贯穿后续回调。 */
     fun begin(adType: String, posId: String, adUnitId: String, scene: String = ""): AdTrackLife {
         val started = System.currentTimeMillis()
         trackAdRequestGMA(adType, posId, adUnitId, scene)
@@ -82,8 +99,8 @@ object AdTrackingHelper {
     }
 
     fun impression(life: AdTrackLife, scene: String = "") {
-        // 规范 §7：展示不另立事件（ad_show / ad_impression 已作废），展示与展示级收入统一走 ad_impression_revenue。
-        // 这里只记录展示起始时间，供 ad_close 的 stay_duration 计算，不再发 SDK 展示事件。
+        // 规范 §5.5 / §7：展示类事件只保留 ad_impression_revenue（E10），客户端不另发展示事件。
+        // 这里只记录展示起始时间，供 E09 `ad_close` 的 `stay_duration` 使用。
         if (life.showStartMs == 0L) life.showStartMs = System.currentTimeMillis()
     }
 
@@ -233,6 +250,8 @@ object AdTrackingHelper {
             if (usd < 0) return
             adRevenue.setRevenue(usd, "USD")
             adRevenue.setAdRevenueNetwork("Admob")
+            // 规范 §5.2：AdjustAdRevenue 必须同时声明展示次数，否则收入无法按曝光归因。
+            adRevenue.setAdImpressionsCount(1)
             Adjust.trackAdRevenue(adRevenue)
             AppLog.tracking.d("trackAdRevenueAdjust usd=$usd")
         }.onFailure {
@@ -295,12 +314,8 @@ object AdTrackingHelper {
         }.onFailure {
             AppLog.tracking.e("trackRevenueEvent Firebase failed: $event", it)
         }
-        //Adjust：作为 ad_impression_revenue 事件上报（token 见 adjustTokenFor），带 revenue/currency
-        runCatching {
-            adjustPoint(event, revenue, currencyCode)
-        }.onFailure {
-            AppLog.tracking.e("trackRevenueEvent Adjust failed: $event", it)
-        }
+        // Adjust 走专用收入接口（AdjustAdRevenue，见 trackAdRevenueAdjust）。
+        // 规范 §5.2 / §11.5：收入事件不走普通事件通道，这里不再发 AdjustEvent。
         //BI：ad_impression_revenue 全参数，金额字段用 value
         runCatching {
             val properties: MutableMap<String?, Any?> = java.util.HashMap<String?, Any?>()
@@ -400,7 +415,7 @@ object AdTrackingHelper {
 
     private fun adjustTokenFor(key: String): String? {
         return when (key) {
-            "ad_impression_revenue" -> "82ahw3"
+            // ad_impression_revenue 的 Adjust 出口已改为 AdjustAdRevenue，不再走事件 token。
             "total_ads_revenue_001" -> "hbsfq9"
             "notification_trigger" -> "ovwl7i"
             "notification_show" -> "bn7qcg"

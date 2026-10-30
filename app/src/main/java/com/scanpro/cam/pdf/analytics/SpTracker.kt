@@ -170,8 +170,8 @@ object SpTracker {
     // Apollo `report/InsertEvent.java` 的事件名；按规范 §3 硬约束改为小写 snake_case
     const val SHARK_AD_CHANCE = "shark_ad_chance"
     const val SHARK_AD_IMPRESSION_ERROR = "shark_ad_impression_error"
-    // 注：`ad_show_splash` / `ad_show_interstitial` / `ad_show_banner` 属规范 §7 作废名（`ad_show`），
-    // 已删除，不再保留死常量。
+    // 注：Apollo 里那批按形态命名的展示事件已按规范 §7 归并到 `ad_impression_revenue`，
+    // 本工程不再保留对应常量。
     // endregion
 
     // region Floating window (悬浮窗)

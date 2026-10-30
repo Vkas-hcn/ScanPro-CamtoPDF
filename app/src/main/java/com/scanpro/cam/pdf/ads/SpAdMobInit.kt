@@ -27,7 +27,11 @@ class SpAdMobInit private constructor(private val appContext: Context) {
 
     fun isMobileAdsInitialize(): Boolean = initialized
 
-    fun init(scope: CoroutineScope) {
+    /**
+     * @param onReady SDK 初始化完成回调。旧实现在这里只打日志，导致「配置先到、SDK 后到」
+     *   时首轮预加载被跳过后再也不会重试。
+     */
+    fun init(scope: CoroutineScope, onReady: () -> Unit = {}) {
         scope.launch(Dispatchers.IO) {
             runCatching {
                 MobileAds.setRequestConfiguration(
@@ -39,6 +43,8 @@ class SpAdMobInit private constructor(private val appContext: Context) {
                     initialized = true
                     AppLog.ads.i("广告SDK初始化完成")
                     SpTracker.log(appContext, SpTracker.AD_SDK_READY)
+                    runCatching { onReady() }
+                        .onFailure { AppLog.ads.w("广告SDK就绪回调失败", it) }
                 }
             }.onFailure { AppLog.ads.w("广告SDK初始化失败", it) }
         }

@@ -20,6 +20,10 @@ import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Banner。照抄 ApolloPDF `ad/manager/BannerAdManager.java`：
@@ -45,6 +49,8 @@ class SpBannerAdManager(
     private var adView: AdView? = null
     private var isReleased = false
     private var bannerLife: AdTrackLife? = null
+    private var retriedAfterConfig = false
+    private val scope = CoroutineScope(Dispatchers.Main)
 
     /** Apollo `loadBannerAd(position)`。 */
     fun loadBannerAd(position: String) {
@@ -76,8 +82,12 @@ class SpBannerAdManager(
         }
 
         SpTracker.log(appContext, SpTracker.SHARK_AD_CHANCE)
-        val list = config.adInfoList(position) ?: run {
+        val list = config.adInfoList(position)
+        if (list.isNullOrEmpty()) {
+            // 配置晚于页面创建是常态：这里补一次等配置就绪的重新加载，否则这个 Activity
+            // 整个生命周期都不会再请求 banner。
             AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=没有广告位配置")
+            retryWhenConfigApplied(position)
             return
         }
         val adInfo = list.firstOrNull() ?: run {
@@ -148,6 +158,19 @@ class SpBannerAdManager(
         }
         adView = null
         viewGroup.removeAllViews()
+    }
+
+    /** 配置还没到就先记着，等 `configApplied` 变 true 后补拉一次（只补一次，避免循环）。 */
+    private fun retryWhenConfigApplied(position: String) {
+        if (retriedAfterConfig) return
+        retriedAfterConfig = true
+        val flow = SpAdsHub.getOrNull()?.configApplied ?: return
+        scope.launch {
+            flow.first { it }
+            if (isReleased || activity.isFinishing || activity.isDestroyed) return@launch
+            AppLog.ads.i("banner 配置就绪后补拉 位置=$position")
+            loadBannerAd(position)
+        }
     }
 
     private fun closeShown(life: AdTrackLife?) {

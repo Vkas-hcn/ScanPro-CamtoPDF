@@ -6,7 +6,9 @@ import android.view.ViewGroup
 import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
+import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -27,6 +29,9 @@ object SpPageAdTriggers {
 
     private const val KEY_SCENE = "scene"
 
+    /** E05 `ad_request` 的预加载标记（规范 §4E05）。 */
+    private const val SCENE_PRELOAD = "preload"
+
     @Volatile
     private var lastShowAdTime = 0L
 
@@ -37,6 +42,8 @@ object SpPageAdTriggers {
         }
         if (System.currentTimeMillis() - lastShowAdTime <= TAB_THROTTLE_MS) {
             AppLog.ads.i("跳过广告展示 位置=$position 原因=距上次展示不足60秒")
+            // 规范 E12：`block_reason` 只能用规定枚举，60 秒节流归到 `interval_not_met`。
+            SpTrackEvents.adBlocked(AdTrackingHelper.AdType.INTERSTITIAL, position, "interval_not_met")
             return
         }
         val blocking = SpBlockingLogic.get(activity)
@@ -96,6 +103,11 @@ object SpPageAdTriggers {
         }
         if (System.currentTimeMillis() - lastShowAdTime <= TAB_THROTTLE_MS) {
             AppLog.ads.i("跳过广告展示 位置=${SpAdPosition.AC_FILE_INT} 原因=距上次展示不足60秒")
+            SpTrackEvents.adBlocked(
+                AdTrackingHelper.AdType.INTERSTITIAL,
+                SpAdPosition.AC_FILE_INT,
+                "interval_not_met",
+            )
             then()
             return
         }
@@ -177,7 +189,18 @@ object SpPageAdTriggers {
     fun preloadMainBack(activity: Activity) {
         SpAdsHub.getOrNull()?.fullScreen(activity)?.checkAndLoadAd(
             position = SpAdPosition.AC_MAIN_BACK_INT,
-            scene = SpAdPosition.AC_MAIN_BACK_INT,
+            scene = SCENE_PRELOAD,
+        )
+    }
+
+    /**
+     * `ac_check_int` 原来没有任何预加载点：点开文件时才读缓存，几乎必然 miss。
+     * 进文件列表页就预热一条，命中率才起得来。
+     */
+    fun preloadCheckInt(activity: Activity) {
+        SpAdsHub.getOrNull()?.fullScreen(activity)?.checkAndLoadAd(
+            position = SpAdPosition.AC_CHECK_INT,
+            scene = SCENE_PRELOAD,
         )
     }
 
