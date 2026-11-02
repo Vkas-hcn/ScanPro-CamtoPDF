@@ -13,8 +13,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * 七个场景的触发总控。逐分支照抄 ApolloPDF
@@ -62,16 +60,9 @@ internal object SpTriggerManager {
 
     private const val PREFS = "sp_trigger_manager"
 
-    /** Apollo `MAX_WAIT_CONFIG_TIME`。 */
-    private const val MAX_WAIT_CONFIG_MS = 5000L
-    private const val CONFIG_POLL_MS = 200L
-
     /** Apollo `startWhileTask`：4 秒预热，之后每 60 秒一次。 */
     private const val SCHEDULE_WARMUP_MS = 4000L
     private const val SCHEDULE_INTERVAL_MS = 60_000L
-
-    /** Apollo `startAlarmTask`：等 5 秒（让远端配置先到）再对准闹钟。 */
-    private const val ALARM_WARMUP_MS = 5000L
 
     /** 最后一条提醒发完之后隔多久把常驻通知重排回最上面（要盖过同一波里的后续场景）。 */
     private const val PERSISTENT_REFRESH_DELAY_MS = 8000L
@@ -81,9 +72,6 @@ internal object SpTriggerManager {
     /** 常驻通知重排的防抖任务，见 [schedulePersistentRefresh]。 */
     @Volatile
     private var persistentRefreshJob: Job? = null
-
-    /** Apollo `alarmMutex`：同一时刻只允许一个协程改闹钟。 */
-    private val alarmMutex = Mutex()
 
     @Volatile
     private var whileTaskJob: Job? = null
@@ -168,78 +156,48 @@ internal object SpTriggerManager {
         whileTaskJob = null
     }
 
-    /** Apollo `startAlarmTask`：等 5 秒 → 发一条闹钟提醒 → 对准下一个闹钟。 */
+    /**
+     * Apollo `startAlarmTask`：启动即同步重建闹钟（评审 P0-2：不信任 prefs 时间戳，
+     * 强停/系统清闹钟后冷启动必须无条件重建），闹钟提醒的发送仍走协程。
+     */
     fun startAlarmTask(context: Context) {
         val appContext = context.applicationContext
+        setAlarm(appContext, force = true)
         scope.launch {
-            delay(ALARM_WARMUP_MS)
             runCatching { sendClockNotification(appContext) }
                 .onFailure { AppLog.notification.w("闹钟通知触发失败", it) }
-            setAlarm(appContext, force = false)
         }
     }
 
     /**
-     * 对准下一个闹钟。Apollo `setAlarm(context, force)`。
+     * 对准下一个闹钟。同步实现（评审 P0-1/P0-2）：
+     * setAndAllowWhileIdle 是同步 binder 调用，直接在调用线程执行、不经过协程——
+     * 广播接收器一返回进程就可能被回收，异步重排会丢下一轮闹钟。
      *
-     * - `force = false`：已经排过一个还没到的闹钟就跳过（开机/启动时用）。
-     * - `force = true`：无条件重排（闹钟响了之后，`SpAlarmReceiver` 用这个把下一轮排上）。
-     *
-     * 到点时间 = 现在 + `acpop_config.ac_a` 分钟；AlarmManager 用
-     * `setAndAllowWhileIdle(RTC_WAKEUP, ...)`，Doze 里也能醒。
+     * `force` 参数保留以兼容调用方，语义统一为「总是重建」：
+     * 同一 PendingIntent（FLAG_UPDATE_CURRENT）天然覆盖旧闹钟，幂等；
+     * 不再拿 prefs 时间戳当「已排期」依据（强停/系统清闹钟后时间戳是陈旧的）。
+     * 配置缺失时用内置默认值（SpNotifyEnv.acPopConfig 恒非空，acA 默认 30 分钟）。
      */
     fun setAlarm(context: Context, force: Boolean) {
         val appContext = context.applicationContext
-        scope.launch {
-            alarmMutex.withLock {
-                runCatching {
-                    if (!force) {
-                        val existing = prefs(appContext).getLong(KEY_NEXT_ALARM_TIME, 0L)
-                        if (existing > System.currentTimeMillis()) {
-                            AppLog.notification.d("闹钟已排期，跳过 触发时间=$existing")
-                            return@runCatching
-                        }
-                    }
-                    val config = waitAcPopConfig() ?: run {
-                        AppLog.notification.w("通知被拦截 场景=${SpNotifyScene.ALARM_CLOCK.sceneType} 原因=闹钟配置未就绪")
-                        return@runCatching
-                    }
-                    val triggerAt = System.currentTimeMillis() + config.acA * 60_000L
-                    val intent = Intent(appContext, SpAlarmReceiver::class.java)
-                    val pending = PendingIntent.getBroadcast(
-                        appContext,
-                        ALARM_REQUEST_CODE,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                    )
-                    val alarmManager =
-                        appContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return@runCatching
-                    // type 0 = RTC_WAKEUP（Apollo 传的也是 0）
-                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
-                    prefs(appContext).edit().putLong(KEY_NEXT_ALARM_TIME, triggerAt).apply()
-                    AppLog.notification.i("闹钟已设置 触发时间=$triggerAt 间隔分钟=${config.acA}")
-                }.onFailure { AppLog.notification.w("闹钟设置失败", it) }
-            }
-        }
-    }
-
-    /**
-     * Apollo `waitAcPopConfig()`：最长等 5 秒，每 200ms 看一眼 `acpop_config` 到没到。
-     *
-     * 我们这边 [SpNotifyEnv.acPopConfig] 在远端没回来时给的是内置默认值（`ac_a = 30`），
-     * 所以正常路径第一轮就返回；保留轮询是为了跟 Apollo 的时序一致，远端配置真接进来以后
-     * 这条逻辑不用改。
-     */
-    private suspend fun waitAcPopConfig(): SpAcPopConfig? {
-        var waited = 0L
-        while (waited < MAX_WAIT_CONFIG_MS) {
+        runCatching {
             val config = SpNotifyEnv.acPopConfig
-            if (config.acA > 0) return config
-            delay(CONFIG_POLL_MS)
-            waited += CONFIG_POLL_MS
-        }
-        AppLog.notification.w("通知被拦截 场景=${SpNotifyScene.ALARM_CLOCK.sceneType} 原因=等待配置超时")
-        return null
+            val triggerAt = System.currentTimeMillis() + config.acA * 60_000L
+            val intent = Intent(appContext, SpAlarmReceiver::class.java)
+            val pending = PendingIntent.getBroadcast(
+                appContext,
+                ALARM_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val alarmManager =
+                appContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            // type 0 = RTC_WAKEUP（Apollo 传的也是 0）
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+            prefs(appContext).edit().putLong(KEY_NEXT_ALARM_TIME, triggerAt).apply()
+            AppLog.notification.i("闹钟已设置 触发时间=$triggerAt 间隔分钟=${config.acA}")
+        }.onFailure { AppLog.notification.w("闹钟设置失败", it) }
     }
 
     // region 分流

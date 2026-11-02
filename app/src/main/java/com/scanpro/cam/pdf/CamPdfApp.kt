@@ -15,7 +15,9 @@ import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
+import com.scanpro.cam.pdf.keepalive.SpPersistJobService
 import com.scanpro.cam.pdf.notice.PdfFMS
+import com.scanpro.cam.pdf.notice.SpRetentionRecall
 import com.scanpro.cam.pdf.notice.SpKeyReceiver
 import com.scanpro.cam.pdf.notice.SpNoticeLifecycle
 import com.scanpro.cam.pdf.notice.SpTriggerManager
@@ -59,6 +61,10 @@ class CamPdfApp : Application() {
         runCatching { SpTriggerManager.startAlarmTask(this) }
             .onFailure { Log.w(TAG, "startAlarmTask failed", it) }
         SpForegroundServiceLauncher.startAppCreateTask(this, applicationScope)
+        runCatching { SpPersistJobService.schedule(this) }
+            .onFailure { Log.w(TAG, "persist job schedule failed", it) }
+        runCatching { SpRetentionRecall.schedule(this) }
+            .onFailure { Log.w(TAG, "retention recall schedule failed", it) }
         SpKeyReceiver.register(this)
         SpNoticeLifecycle.register(this)
     }

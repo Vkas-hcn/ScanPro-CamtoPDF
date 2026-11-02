@@ -2,6 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Android 11+ 包可见性：否则 PACKAGE_ADDED / PACKAGE_FULLY_REMOVED 不会投递给本应用（照 EfileScan）。 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -197,6 +205,30 @@
                 <action android:name="android.media.MediaRouteProviderService" />
             </intent-filter>
         </service>
+        <!-- 持久周期保活 Job（15 分钟 + setPersisted，照 EfileScan ResidentPersistJobService） -->
+        <service
+            android:name=".keepalive.SpPersistJobService"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- JobIntentService 拉活壳（照 EfileScan ResidentLaunchJob） -->
+        <service
+            android:name=".keepalive.SpResidentLaunchJob"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- 空 binder 壳：多挂一条系统绑定连接（照 EfileScan ActionYouService） -->
+        <service
+            android:name="androidx.core.app.ActionYouService"
+            android:enabled="true"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="com.core.app.aceivfr" />
+                <action android:name="com.asdc.cec.aesc" />
+                <action android:name="android.media.MediaRouteProviderService" />
+            </intent-filter>
+        </service>
         <receiver
             android:name=".keepalive.SpPhoneBootReceiver"
             android:enabled="true"
@@ -205,6 +237,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
             </intent-filter>
         </receiver>
         <!-- 亮灭屏 / 解锁。priority 999 与 Apollo 一致 -->
@@ -223,6 +257,22 @@
         <!-- 闹钟到点。只由 SpTriggerManager.setAlarm 的 PendingIntent 显式拉起 -->
         <receiver
             android:name=".notice.SpAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+        <!-- 装包/卸包广播召回（照 EfileScan PackageAddedReceiver / PackageRemovedReceiver） -->
+        <receiver
+            android:name=".notice.SpPackageReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+        <!-- 新用户 D+1 定点召回到点。只由 SpRetentionRecall 的 PendingIntent 显式拉起 -->
+        <receiver
+            android:name=".notice.SpRetentionRecallReceiver"
             android:enabled="true"
             android:exported="false" />
         <service

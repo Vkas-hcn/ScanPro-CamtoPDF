@@ -12,6 +12,8 @@ import android.util.Log
 import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.notice.SpNotifyPermit
+import com.scanpro.cam.pdf.notice.SpPackageReceiver
+import com.scanpro.cam.pdf.notice.SpTriggerManager
 
 /**
  * 保活的三个壳。照抄 ApolloPDF `keep_alive/`：
@@ -46,6 +48,11 @@ class SpApoForegroundService : Service() {
         startedAtMs = System.currentTimeMillis()
         SpTrackEvents.keepaliveServiceStart(SERVICE_NAME, SpForegroundServiceLauncher.consumeTriggerSource())
         startForegroundInternal()
+        // 装包广播动态注册：Android 14+ 后台清单 PACKAGE_ADDED 会被系统拦截，服务存活期间动态兜底
+        SpPackageReceiver.registerDynamic(this)
+        // 评审 P0-2 加固：前台服务每次被拉起都同步重建闹钟（与 15 分钟持久 Job 双保险）
+        runCatching { SpTriggerManager.setAlarm(this, force = true) }
+            .onFailure { Log.e(TAG, "setAlarm failed", it) }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

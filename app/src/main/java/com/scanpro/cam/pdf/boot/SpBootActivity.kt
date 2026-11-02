@@ -38,6 +38,7 @@ import com.scanpro.cam.pdf.leave.SpUnInstall01Activity
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.scanpro.cam.pdf.notice.SpNotifyPermit
+import com.scanpro.cam.pdf.notice.SpRetentionRecall
 import com.scanpro.cam.pdf.notice.SpSendManager
 import com.scanpro.cam.pdf.notice.notificationTriggerSource
 import kotlinx.coroutines.delay
@@ -111,7 +112,12 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         ViewCompat.requestApplyInsets(binding.bootRoot)
 
         // 热启动不是冷启，别把 APP_COLD_BOOT 的基数冲掉
-        if (!isHotStart) SpTracker.log(this, SpTracker.APP_COLD_BOOT)
+        if (!isHotStart) {
+            SpTracker.log(this, SpTracker.APP_COLD_BOOT)
+            // 用户真实回访：D+1 定点召回任务完成，记录回访时间并取消未发档位
+            SpRetentionRecall.markOpened(this)
+            SpRetentionRecall.cancel(this)
+        }
         maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
         binding.bootProgress.max = maxTimeoutMs.toInt().coerceAtLeast(1)
         binding.bootProgress.progress = 0
