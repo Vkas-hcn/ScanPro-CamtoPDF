@@ -38,6 +38,10 @@ class SpPhoneBootReceiver : BroadcastReceiver() {
         scope.launch {
             runCatching {
                 delay(keepAliveDelay)
+                // BOOT_COMPLETED / MY_PACKAGE_REPLACED 是 Android 12+ 允许后台起前台服务的系统豁免；
+                // 前台服务已改成 specialUse 类型（mediaPlayback 在 Android 15 起不能从开机启动）。
+                // 所以这里直接拉起，Job 只作兜底。
+                SpForegroundServiceLauncher.launchForegroundService(app)
                 SpForegroundServiceLauncher.startLaunchService(app)
             }.onFailure { Log.w(TAG, "boot keep-alive failed", it) }
         }

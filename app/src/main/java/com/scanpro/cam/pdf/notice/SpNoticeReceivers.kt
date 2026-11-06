@@ -175,6 +175,10 @@ class SpAlarmReceiver : BroadcastReceiver() {
             runCatching { SpTriggerManager.sendClockNotification(app) }
                 .onFailure { Log.w(TAG, "clock trigger failed", it) }
         }
+        // 精确闹钟「正在触发」是 Android 12+ 允许后台启动前台服务的系统豁免之一，
+        // 所以这里直接把服务拉起来，不要绕 Job（Job 里起 FGS 会被拒）。
+        runCatching { SpForegroundServiceLauncher.launchForegroundService(app) }
+            .onFailure { Log.w(TAG, "launchForegroundService failed", it) }
         runCatching { SpForegroundServiceLauncher.startLaunchService(app) }
             .onFailure { Log.w(TAG, "startLaunchService failed", it) }
         runCatching { SpTriggerManager.setAlarm(app, force = true) }

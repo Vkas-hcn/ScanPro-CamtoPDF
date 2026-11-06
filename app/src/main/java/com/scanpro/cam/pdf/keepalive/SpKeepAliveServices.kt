@@ -48,10 +48,11 @@ class SpApoForegroundService : Service() {
         startedAtMs = System.currentTimeMillis()
         SpTrackEvents.keepaliveServiceStart(SERVICE_NAME, SpForegroundServiceLauncher.consumeTriggerSource())
         startForegroundInternal()
-        // 装包广播动态注册：Android 14+ 后台清单 PACKAGE_ADDED 会被系统拦截，服务存活期间动态兜底
-        SpPackageReceiver.registerDynamic(this)
+        // 装包/亮灭屏/解锁/充电插拔：清单注册收不到（隐式广播限制），服务存活期间动态注册兜底
+        SpKeepAliveBroadcasts.register(this)
         // 评审 P0-2 加固：前台服务每次被拉起都同步重建闹钟（与 15 分钟持久 Job 双保险）
-        runCatching { SpTriggerManager.setAlarm(this, force = true) }
+        // 注意用 force=false：已排期就跳过，否则每次服务重建都会把闹钟往后推。
+        runCatching { SpTriggerManager.setAlarm(this, force = false) }
             .onFailure { Log.e(TAG, "setAlarm failed", it) }
     }
 
@@ -63,6 +64,7 @@ class SpApoForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        SpKeepAliveBroadcasts.unregister(this)
         val aliveMs = if (startedAtMs > 0L) System.currentTimeMillis() - startedAtMs else 0L
         SpTrackEvents.keepaliveServiceStop(SERVICE_NAME, aliveMs)
         startedAtMs = 0L
@@ -86,7 +88,13 @@ class SpApoForegroundService : Service() {
         }
     }
 
-    /** Apollo `startForegroundWithNotification`。29+ 带上类型 `mediaPlayback`。 */
+    /**
+     * Apollo `startForegroundWithNotification`。
+     *
+     * 类型用 `FOREGROUND_SERVICE_TYPE_MANIFEST`：以清单里声明的 `specialUse` 为准。
+     * 原因：Android 15 起 `BOOT_COMPLETED` 禁止启动 `mediaPlayback`/`dataSync` 类型的前台服务，
+     * 而 `specialUse` 不受这条限制；传 MANIFEST 也让低版本系统不必关心具体类型常量。
+     */
     private fun startForegroundWithNotification(notification: Notification) {
         // ID 跟着轮换位走：刷新会把常驻通知挪到另一个 ID 上，这里必须用同一个，否则会多一条
         val id = SpPersistentNotifyManager.currentNotificationId(this)
@@ -94,7 +102,7 @@ class SpApoForegroundService : Service() {
             startForeground(
                 id,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST,
             )
         } else {
             startForeground(id, notification)

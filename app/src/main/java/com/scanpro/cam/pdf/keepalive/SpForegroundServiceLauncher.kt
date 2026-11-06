@@ -90,7 +90,12 @@ object SpForegroundServiceLauncher {
                 val intent = Intent(context, SpApoForegroundService::class.java)
                 context.startForegroundService(intent)
             }
-        }.onFailure { Log.w(TAG, "launchForegroundService failed", it) }
+        }.onFailure { error ->
+            // Android 12+ 后台启动前台服务被拒（ForegroundServiceStartNotAllowedException）。
+            // 目前只有「精确闹钟正在触发」「高优先级 FCM」等系统豁免路径能成功；
+            // Job 中转路径在未获额外豁免时会被拒，属预期。
+            Log.w(TAG, "launchForegroundService failed", error)
+        }
     }
 
     /** Apollo `startLaunchService(context)`：排一个 `minimumLatency = 0` 的 Job。 */

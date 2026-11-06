@@ -4,6 +4,8 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.util.Log
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.keepalive.SpPersistentNotifyManager
 import com.scanpro.cam.pdf.util.AppLog
@@ -54,6 +56,15 @@ internal object SpTriggerManager {
 
     /** Apollo `ALARM_REQUEST_CODE`。 */
     private const val ALARM_REQUEST_CODE = 41385
+
+    /** 闹钟间隔的兜底范围（分钟）：防止远程 `ac_a` 下发 0/负数导致闹钟空转。 */
+    private const val MIN_ALARM_MINUTES = 15
+    private const val MAX_ALARM_MINUTES = 24 * 60
+
+    /** 判定「已排期」的最小剩余时间，避免刚过期的闹钟被误判为仍然有效。 */
+    private const val ALARM_MIN_REMAINING_MS = 5_000L
+
+    private const val TAG = "SpTriggerManager"
 
     /** Apollo `set_alarm_next_time`。 */
     private const val KEY_NEXT_ALARM_TIME = "sp_set_alarm_next_time"
@@ -170,20 +181,33 @@ internal object SpTriggerManager {
     }
 
     /**
-     * 对准下一个闹钟。同步实现（评审 P0-1/P0-2）：
-     * setAndAllowWhileIdle 是同步 binder 调用，直接在调用线程执行、不经过协程——
-     * 广播接收器一返回进程就可能被回收，异步重排会丢下一轮闹钟。
+     * 对准下一个闹钟。
      *
-     * `force` 参数保留以兼容调用方，语义统一为「总是重建」：
-     * 同一 PendingIntent（FLAG_UPDATE_CURRENT）天然覆盖旧闹钟，幂等；
-     * 不再拿 prefs 时间戳当「已排期」依据（强停/系统清闹钟后时间戳是陈旧的）。
-     * 配置缺失时用内置默认值（SpNotifyEnv.acPopConfig 恒非空，acA 默认 30 分钟）。
+     * 1.0.3 的回归修复：`force = false` 时**先看 `sp_set_alarm_next_time`**，
+     * 未到期就直接跳过。否则 15 分钟一次的持久 Job 会每轮把闹钟往后推一次
+     * （后台进程里远程配置还没加载，`acA` 取默认 30 分钟 > 15 分钟），闹钟永远到不了期。
+     *
+     * 另外：`acA` 做 15~1440 分钟的下限/上限保护；API 31+ 且拿到精确闹钟权限时用
+     * `setExactAndAllowWhileIdle`（精确闹钟本身也是 Android 12+ 允许后台启动前台服务的豁免）。
      */
     fun setAlarm(context: Context, force: Boolean) {
         val appContext = context.applicationContext
         runCatching {
-            val config = SpNotifyEnv.acPopConfig
-            val triggerAt = System.currentTimeMillis() + config.acA * 60_000L
+            val now = System.currentTimeMillis()
+            if (!force) {
+                val existing = prefs(appContext).getLong(KEY_NEXT_ALARM_TIME, 0L)
+                if (existing > now + ALARM_MIN_REMAINING_MS) {
+                    AppLog.notification.d("闹钟已排期，跳过 触发时间=$existing")
+                    return
+                }
+            }
+            val minutes = if (com.scanpro.cam.pdf.BuildConfig.DEBUG) {
+                // debug 包用 1 分钟，方便真机验证闹钟链路；release 仍走远程配置
+                1
+            } else {
+                SpNotifyEnv.acPopConfig.acA.coerceIn(MIN_ALARM_MINUTES, MAX_ALARM_MINUTES)
+            }
+            val triggerAt = now + minutes * 60_000L
             val intent = Intent(appContext, SpAlarmReceiver::class.java)
             val pending = PendingIntent.getBroadcast(
                 appContext,
@@ -193,10 +217,22 @@ internal object SpTriggerManager {
             )
             val alarmManager =
                 appContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-            // type 0 = RTC_WAKEUP（Apollo 传的也是 0）
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+            val exact = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                alarmManager.canScheduleExactAlarms()
+            if (exact) {
+                runCatching {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                }.onFailure { error ->
+                    Log.w(TAG, "setExactAndAllowWhileIdle failed, fallback", error)
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                }
+            } else {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+            }
             prefs(appContext).edit().putLong(KEY_NEXT_ALARM_TIME, triggerAt).apply()
-            AppLog.notification.i("闹钟已设置 触发时间=$triggerAt 间隔分钟=${config.acA}")
+            AppLog.notification.i(
+                "闹钟已设置 触发时间=$triggerAt 间隔分钟=$minutes exact=$exact force=$force",
+            )
         }.onFailure { AppLog.notification.w("闹钟设置失败", it) }
     }
 

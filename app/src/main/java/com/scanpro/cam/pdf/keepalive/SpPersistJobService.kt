@@ -26,7 +26,8 @@ class SpPersistJobService : JobService() {
         SpTrackEvents.keepaliveTrigger(TRIGGER_BINDER)
         runCatching { SpResidentLaunchJob.enqueueWork(this) }
             .onFailure { Log.w(TAG, "enqueueWork failed", it) }
-        runCatching { SpTriggerManager.setAlarm(this, force = true) }
+        // force=false：已排期就跳过。否则每 15 分钟把闹钟推到 30 分钟后，闹钟永远不会到点。
+        runCatching { SpTriggerManager.setAlarm(this, force = false) }
             .onFailure { Log.w(TAG, "setAlarm failed", it) }
         runCatching { schedule(this) }
             .onFailure { Log.w(TAG, "schedule failed", it) }
@@ -48,14 +49,15 @@ class SpPersistJobService : JobService() {
         private const val TRIGGER_BINDER = "binder"
 
         fun schedule(context: Context) {
-            if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
-                Log.i(TAG, "schedule skipped: samsung")
-                return
-            }
             runCatching {
                 val scheduler =
                     context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler
                         ?: return@runCatching
+                // 已存在就不要重排：同 id 重排会重置 15 分钟周期，Job 内部重排还会中断当前执行。
+                if (scheduler.getPendingJob(JOB_ID) != null) {
+                    Log.i(TAG, "schedule skipped: pending job exists")
+                    return@runCatching
+                }
                 val job = JobInfo.Builder(
                     JOB_ID,
                     ComponentName(context, SpPersistJobService::class.java),

@@ -6,11 +6,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.media.AudioAttributes
 import android.os.Build
 import android.provider.Settings
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.boot.SpBootActivity
 
@@ -140,10 +145,15 @@ internal object SpNotifyCreator {
     // region 媒体式提醒
 
     /**
-     * Apollo `createMediaNotification(context, item, silent, scene)`。
+     * 创建真正的媒体样式通知（使用 MediaSessionCompat + MediaStyle）。
      *
-     * 和普通提醒的区别：渠道独立、`ongoing`（下拉不能划掉）、`category = CATEGORY_SERVICE`，
-     * 大图用大版式。跳转带的 `from_type` 是 `media_notify`。
+     * 参考 UltraClean 的实现，使用 MediaSessionCompat 伪装播放器，使通知获得更高优先级，
+     * 系统对媒体通知的容忍度更高，不易被用户主动关闭或被系统杀死。
+     *
+     * 和普通提醒的区别：
+     * - 使用 MediaStyle，显示在媒体通知区域
+     * - 渠道独立、完全静音
+     * - 跳转带的 `from_type` 是 `media_notify`
      */
     fun createMediaNotification(
         context: Context,
@@ -155,10 +165,66 @@ internal object SpNotifyCreator {
         ensureChannel(
             context = context,
             channelId = channelId,
-            sound = !silent,
+            sound = false, // 媒体通知始终静音
             showBadge = false,
         )
-        return buildMediaLike(context, item, scene, channelId, FROM_MEDIA)
+
+        val content = Intent(context, SpBootActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(SpNotifyExtras.JUMP_TYPE, item.jump.name)
+            putExtra(SpNotifyExtras.FROM_TYPE, FROM_MEDIA)
+            putExtra(SpNotifyExtras.SCENE_TYPE, scene.sceneType)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            SpNotifyUtils.randomCode(),
+            content,
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        // 创建 MediaSession（参考 UltraClean HintUtil.kt:657-659）
+        val mediaSession = MediaSessionCompat(context, "SpMediaSession")
+        mediaSession.setFlags(
+            MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+        )
+        // 关键：设置PlaybackState，这是MediaStyle通知保持持久化的必要条件
+        mediaSession.setPlaybackState(
+            PlaybackStateCompat.Builder()
+                .setActions(PlaybackStateCompat.ACTION_PLAY)
+                .setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1f)
+                .build()
+        )
+        mediaSession.isActive = true
+
+        // 转换 drawable 为 Bitmap（参考 UltraClean HintUtil.kt:651-655）
+        val coverIcon = SpNotifyCatalog.coverIcon(item.jump)
+        val vectorDrawable = ContextCompat.getDrawable(context, coverIcon)!!
+        val bitmap = Bitmap.createBitmap(
+            vectorDrawable.intrinsicWidth,
+            vectorDrawable.intrinsicHeight,
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        vectorDrawable.setBounds(0, 0, canvas.width, canvas.height)
+        vectorDrawable.draw(canvas)
+
+        // 使用 MediaStyle（参考 UltraClean HintUtil.kt:661-662）
+        val style = androidx.media.app.NotificationCompat.MediaStyle()
+            .setMediaSession(mediaSession.sessionToken)
+
+        return NotificationCompat.Builder(context, channelId)
+            .setStyle(style)
+            .setLargeIcon(bitmap)
+            .setSmallIcon(R.drawable.sp_ic_notify)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_LOW)  // 改为LOW，与EfileScan一致
+            .setContentIntent(pendingIntent)
+            .setContentTitle(context.getString(item.buttonRes))
+            .setContentText(context.getString(item.textRes))
+            .setOngoing(true)        // 常驻通知，不能被滑动删除
+            .setOnlyAlertOnce(true)  // 只提醒一次，与EfileScan一致
+            .build()
     }
 
     /** Apollo `createMedia2Notification(context, item, scene)`。独立渠道，自己带间隔。 */

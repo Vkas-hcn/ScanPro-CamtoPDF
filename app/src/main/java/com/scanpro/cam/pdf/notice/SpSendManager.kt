@@ -2,6 +2,7 @@ package com.scanpro.cam.pdf.notice
 
 import android.app.Notification
 import android.content.Context
+import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.analytics.SpTracker
@@ -54,6 +55,10 @@ internal object SpSendManager {
 
     @Volatile
     private var mediaNotifyJob: Job? = null
+
+    /** 媒体通知发送状态标记（进程内），避免重复发送 */
+    @Volatile
+    private var mediaNotificationSent = false
 
     // region 普通提醒
 
@@ -113,6 +118,19 @@ internal object SpSendManager {
     /** Apollo `sendMediaNotification(context, item, scene)`。 */
     fun sendMediaNotification(context: Context, item: SpNotificationItem, scene: SpNotifyScene) {
         val appContext = context.applicationContext
+        
+        // 三星机型跳过媒体通知（参考 UltraClean 的逻辑）
+        if (isSamsungDevice()) {
+            AppLog.notification.d("通知被跳过 场景=${scene.sceneType} 类型=媒体 原因=三星机型")
+            return
+        }
+        
+        // 如果媒体通知已经在通知栏中显示，跳过发送
+        if (mediaNotificationSent && hasActiveNotification(appContext, MEDIA_NOTIFY_ID)) {
+            AppLog.notification.d("通知被跳过 场景=${scene.sceneType} 类型=媒体 原因=已显示")
+            return
+        }
+        
         val blocking = SpBlockingLogic.get(appContext)
         try {
             val loud = SpNotifyCreator.createMediaNotification(appContext, item, silent = false, scene = scene)
@@ -133,6 +151,7 @@ internal object SpSendManager {
                 SpNotifyUtils.wakeScreen(appContext)
             }
             AppLog.notification.i("通知已发出 场景=${scene.sceneType} 类型=媒体 id=$MEDIA_NOTIFY_ID")
+            mediaNotificationSent = true
         } catch (t: Throwable) {
             AppLog.notification.w("通知发送失败 场景=${scene.sceneType} 类型=媒体", t)
         }
@@ -185,12 +204,17 @@ internal object SpSendManager {
     }
     // endregion
 
-    /** Apollo `stopNotifyUpdate()`：两个循环都停掉。 */
+    /** 停掉定时轮询（App 回到前台时用，Apollo 没有这一步，属于本工程的收尾）。 */
     fun stopNotifyUpdate() {
         sysNotifyJob?.cancel()
         sysNotifyJob = null
         mediaNotifyJob?.cancel()
         mediaNotifyJob = null
+    }
+
+    /** 重置媒体通知发送状态（用于测试或手动重置）。 */
+    fun resetMediaNotificationState() {
+        mediaNotificationSent = false
     }
 
     /**
@@ -225,4 +249,25 @@ internal object SpSendManager {
 
     private fun sceneTypeBundle(scene: SpNotifyScene): android.os.Bundle =
         android.os.Bundle().apply { putString("type", scene.sceneType) }
+
+    /**
+     * 判断是否为三星设备。
+     * 参考 UltraClean SpPersistJobService.kt:63
+     */
+    private fun isSamsungDevice(): Boolean {
+        return Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+    }
+
+    /**
+     * 检查指定 ID 的通知是否正在显示。
+     * 参考 UltraClean HintUtil.kt:795
+     */
+    private fun hasActiveNotification(context: Context, notificationId: Int): Boolean {
+        return try {
+            val manager = NotificationManagerCompat.from(context)
+            manager.activeNotifications.any { it.id == notificationId }
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

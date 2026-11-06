@@ -98,6 +98,7 @@ dependencies {
     implementation("com.flux.tracksdk:tracksdk:3.0.3")
     implementation("com.adjust.sdk:adjust-android:5.6.1")
     implementation("com.facebook.android:facebook-android-sdk:18.3.0")
+    implementation("androidx.media:media:1.7.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

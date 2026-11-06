@@ -20,9 +20,14 @@ class PdfFMS : FirebaseMessagingService() {
         // 规范 E15 notification_received：下发消息到达客户端（pos_id / msg_id 均可空）
         val posId = message.data["pos_id"].orEmpty()
         SpTrackEvents.notificationReceived(posId, message.messageId.orEmpty())
-        // FCM 到达即借机点一次保活：服务已在跑只补常驻通知（launchForegroundService 内有 isRunning 判断），
-        // 不在跑则经零延迟 Job 拉起（绕开 Android 12+ 后台 FGS 启动限制）
         SpForegroundServiceLauncher.markTriggerType(TRIGGER_FCM)
+        // 高优先级 FCM 属于 Android 12+ 允许后台启动前台服务的系统豁免，直接拉；
+        // 普通优先级走 Job 兜底（大概率会被系统拒，但不影响通知本身）。
+        val highPriority = message.priority == RemoteMessage.PRIORITY_HIGH
+        if (highPriority) {
+            runCatching { SpForegroundServiceLauncher.launchForegroundService(applicationContext) }
+                .onFailure { AppLog.notification.w("FCM 高优先级保活拉起失败", it) }
+        }
         runCatching { SpForegroundServiceLauncher.startLaunchService(applicationContext) }
             .onFailure { AppLog.notification.w("FCM 保活拉起失败", it) }
     }

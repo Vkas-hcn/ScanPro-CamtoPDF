@@ -20,9 +20,13 @@ class SpRetentionRecallReceiver : BroadcastReceiver() {
             runCatching {
                 val item = SpNotifyCatalog.scheduleCopywriting(app)
                 SpSendManager.sendSysNotification(app, item, SpNotifyScene.SCHEDULED)
+                SpRetentionRecall.markRecallSent(app)
             }.onFailure { Log.w(TAG, "sendSysNotification failed", it) }
         }
         SpForegroundServiceLauncher.markTriggerType(TRIGGER_RETENTION_RECALL)
+        // 召回是精确闹钟触发的，属于 Android 12+ 后台起前台服务的豁免，直接拉，别绕 Job
+        runCatching { SpForegroundServiceLauncher.launchForegroundService(app) }
+            .onFailure { Log.w(TAG, "launchForegroundService failed", it) }
         runCatching { SpForegroundServiceLauncher.startLaunchService(app) }
             .onFailure { Log.w(TAG, "startLaunchService failed", it) }
         SpRetentionRecall.advanceAndSchedule(app)
