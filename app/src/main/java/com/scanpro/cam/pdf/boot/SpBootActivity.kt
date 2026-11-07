@@ -31,15 +31,15 @@ import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.guide.SpFirstLaunch
 import com.scanpro.cam.pdf.guide.SpGuideLanguageActivity
-import com.scanpro.cam.pdf.keepalive.SpForegroundServiceLauncher
-import com.scanpro.cam.pdf.keepalive.SpPersistentNotifyManager
+import com.scanpro.cam.pdf.notice.SpNotificationEntry
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
 import com.scanpro.cam.pdf.leave.SpUnInstall01Activity
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.scanpro.cam.pdf.notice.SpNotifyPermit
-import com.scanpro.cam.pdf.notice.SpRetentionRecall
-import com.scanpro.cam.pdf.notice.SpSendManager
+import com.zppko.pdfplus.nor.horus.HintMt
+import com.zppko.pdfplus.nor.horus.HintUtil
+import com.scanpro.cam.pdf.CamPdfApp
 import com.scanpro.cam.pdf.notice.notificationTriggerSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -57,13 +57,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     private var maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
 
     /**
-     * 这次是不是「热启动」：从后台回前台时叠在当前页面上的那层启动页。
-     *
-     * 两个来源：1）[SpHotStartGate] 主动拉起（带 [EXTRA_HOT_START]）；
-     * 2）桌面图标在「任务还在后台」时把启动页压进现有任务栈——见 [initView] 里的就地判定。
-     *
-     * 热启动和冷启走同一套开屏时序，差别只有四处：task root 门槛、冷启埋点、通知循环、
-     * 以及**下一页**（热启动直接 `finish()` 回原页面，不跳首页）。
+     * 原有 SpHotStartGate 负责热启动触发；兼容接收 `g_launch=g_sh_on_ad` 入参。
+     * 热启动开屏结束后回到原页面；无通知的桌面图标再次进入也按热启动处理。
      */
     private var isHotStart = false
 
@@ -84,13 +79,14 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         SpHotStartGate.onSplashCreated()
-        isHotStart = intent?.getBooleanExtra(EXTRA_HOT_START, false) == true
+        isHotStart = intent?.getBooleanExtra(EXTRA_HOT_START, false) == true ||
+            SpNotificationEntry.isHotStart(intent)
         // Apollo `SplashActivity.onCreate`：通知进来时带的 flags 是 NEW_TASK|CLEAR_TASK，
         // 所以真正的冷启一定是 task root。
         // 不是 root 只剩一种情况：桌面图标在「任务还在后台」时被系统压进现有任务栈——
         // 这本来就是热启动要做的事，就地按热启动继续走，而不是像 Apollo 那样直接 finish
         //（直接 finish 等于点图标什么都没发生，还白闪一帧）。
-        if (!isTaskRoot && !isHotStart) {
+        if (!isTaskRoot && !isHotStart && !SpNotificationEntry.isNotification(intent)) {
             // 底下本来就是一层启动页/挽留/引导流程（比如冷启的开屏还没走完），别叠第二层
             if (SpHotStartGate.isProtectedSurface()) {
                 Log.i(TAG, "not task root and already in a protected flow, finish")
@@ -114,9 +110,6 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         // 热启动不是冷启，别把 APP_COLD_BOOT 的基数冲掉
         if (!isHotStart) {
             SpTracker.log(this, SpTracker.APP_COLD_BOOT)
-            // 用户真实回访：D+1 定点召回任务完成，记录回访时间并取消未发档位
-            SpRetentionRecall.markOpened(this)
-            SpRetentionRecall.cancel(this)
         }
         maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
         binding.bootProgress.max = maxTimeoutMs.toInt().coerceAtLeast(1)
@@ -185,10 +178,11 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
      * 既不上报点击也不撤通知，这里保持一样。
      */
     private fun handleNotificationEntry() {
-        val fromType = intent.getStringExtra(SpNotifyExtras.FROM_TYPE)
-        entryJumpType = intent.getStringExtra(SpNotifyExtras.JUMP_TYPE)
-        entrySceneType = intent.getStringExtra(SpNotifyExtras.SCENE_TYPE) ?: DEFAULT_SCENE_TYPE
+        val fromType = SpNotificationEntry.fromType(intent)
+        entryJumpType = SpNotificationEntry.route(intent)
+        entrySceneType = SpNotificationEntry.sceneType(intent)
         entrySceneCode = fromTypeToSceneCode(fromType)
+        if (intent.getBooleanExtra(SpNotificationEntry.A_NO_REPORT, false)) return
         val params = Bundle().apply { putString(KEY_TYPE, entrySceneType) }
         when (fromType) {
             SpNotifyCreator.FROM_SYS ->
@@ -197,7 +191,12 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             SpNotifyCreator.FROM_MEDIA -> {
                 SpTracker.log(this, SpTracker.MEDIA_NOTIFICATION_CLICK, params)
                 runCatching {
-                    NotificationManagerCompat.from(this).cancel(SpSendManager.MEDIA_NOTIFY_ID)
+                    HintMt.removeNOtify()
+                    if (intent.hasExtra(SpNotificationEntry.A_SHOW_TYPE)) {
+                        NotificationManagerCompat.from(this).cancel(
+                            intent.getIntExtra(SpNotificationEntry.A_SHOW_DATA, 8562),
+                        )
+                    }
                 }.onFailure { Log.w(TAG, "cancel media notification failed", it) }
             }
 
@@ -206,7 +205,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         }
         // 规范 E17 notification_click + E19 reactivation_landing（通知拉活落地）
         val posId = when (fromType) {
-            SpNotifyCreator.FROM_PERSISTENT -> SpPersistentNotifyManager.POS_ID_PERSISTENT
+            SpNotifyCreator.FROM_PERSISTENT -> "always"
             SpNotifyCreator.FROM_SYS, SpNotifyCreator.FROM_MEDIA, SpNotifyCreator.FROM_MEDIA_TWO -> entrySceneType
             else -> null
         }
@@ -219,8 +218,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             SpTrackEvents.notificationClick(this, posId, triggerSource)
             SpTrackEvents.reactivationLanding("notification", entryJumpType ?: "home", posId)
         }
-        // 热启动只是「盖一层开屏」，不是用户点了通知进来的，别把提醒重发循环掐掉
-        if (!isHotStart) SpSendManager.stopNotifyUpdate()
+        // 冷启动时停止通知发送方的重复发送任务。
+        if (!isHotStart) HintUtil.stopCalling()
     }
 
     /** Apollo `SplashActivity.fromTypeToSceneCode`：认不出来的 `from_type` 一律按自然打开算。 */
@@ -384,7 +383,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
      */
     private fun onNotifyPermissionAnswered() {
         if (SpNotifyPermit.isHaveNotifyPermission(this)) {
-            SpForegroundServiceLauncher.launchForegroundService(applicationContext)
+            CamPdfApp.get().onNotificationPermissionReady()
         }
         beginBootAdsFlow()
     }

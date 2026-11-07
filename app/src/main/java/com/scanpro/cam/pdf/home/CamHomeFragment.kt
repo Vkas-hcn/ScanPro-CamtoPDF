@@ -88,6 +88,9 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
             }
         })
 
+        (activity as? com.scanpro.cam.pdf.CamShellActivity)?.consumeNotificationFileType()?.let {
+            viewModel.selectType(it)
+        }
         refreshStorageAccess()
         // 默认 PDF 算第一次选中，之后用户点类型才弹 `ac_top_int`
         typeAdArmed = true
@@ -145,6 +148,10 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
      * 第一次选中只记账，之后的类型切换才弹 `ac_top_int`。
      */
     private var typeAdArmed = false
+
+    fun selectNotificationFileType(type: FileType) {
+        viewModel.selectType(type)
+    }
 
     private fun selectTypeAndMaybeAd(type: FileType) {
         viewModel.selectType(type)

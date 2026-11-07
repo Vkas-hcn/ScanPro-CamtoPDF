@@ -31,10 +31,12 @@ class SpUmpGate(
      * Runs UMP update + optional form. Returns when finished or when [timeoutMs] elapses.
      */
     suspend fun requestUmpConsent(activity: Activity, timeoutMs: Long = DEFAULT_TIMEOUT_MS): FormError? {
+        // A successful UMP callback also returns null; retain a separate completion marker.
+        var completed = false
         val result = withTimeoutOrNull(timeoutMs.coerceAtLeast(500L)) {
-            gatherConsentInternal(activity)
+            gatherConsentInternal(activity).also { completed = true }
         }
-        if (result == null) {
+        if (!completed) {
             Log.w(
                 DIAG_TAG,
                 "UMP timed out after ${timeoutMs}ms status=${consentInformation.consentStatus} " +
@@ -107,6 +109,11 @@ class SpUmpGate(
     }
 
     companion object {
+        /** Shared request gate, including debug builds; an unavailable consent state fails closed. */
+        fun canRequestAds(context: Context): Boolean = runCatching {
+            UserMessagingPlatform.getConsentInformation(context.applicationContext).canRequestAds()
+        }.getOrDefault(false)
+
         const val DIAG_TAG = "SpAdsDiag"
         const val DEFAULT_TIMEOUT_MS = 2_500L
 

@@ -23,6 +23,8 @@ data class SpCachedAd<T>(
     val position: String = "",
     /** 入库时固化的 TTL（秒）。0 表示不按时间过期。 */
     val ttlSeconds: Int = 0,
+    /** Actual request unit; used to revalidate cached ads against the target position. */
+    val unitId: String = "",
 ) {
     /** 缓存年龄（毫秒）。 */
     fun ageMs(now: Long = System.currentTimeMillis()): Long = now - createTime

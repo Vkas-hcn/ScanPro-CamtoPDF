@@ -22,6 +22,9 @@ import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.made.CamMadeFragment
 import com.scanpro.cam.pdf.databinding.ActivityCamShellBinding
 import com.scanpro.cam.pdf.home.CamHomeFragment
+import com.scanpro.cam.pdf.home.FileType
+import com.scanpro.cam.pdf.notice.SpNotificationEntry
+import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.scanpro.cam.pdf.main.CamStubFragment
 import com.scanpro.cam.pdf.rate.SpRateFlow
 import com.scanpro.cam.pdf.recent.CamRecentFragment
@@ -36,6 +39,7 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     override val applySystemBarsPadding: Boolean = false
 
     private var currentTab = Tab.HOME
+    private var pendingNotificationFileType: FileType? = null
     private var appliedLocaleGeneration = SpLocale.generation
     private var mainNativeAdManager: SpNativeAdManager? = null
     private var bannerAdManager: SpBannerAdManager? = null
@@ -55,7 +59,7 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         binding.tabMade.setOnClickListener { onBottomTabClicked(Tab.CREATION) }
 
         if (savedInstanceState == null) {
-            switchShellTab(Tab.HOME)
+            if (!handleNotificationRoute(intent)) switchShellTab(Tab.HOME)
             maybeOpenLeaveFlow(intent)
             binding.root.post {
                 if (!isFinishing && !isDestroyed) {
@@ -79,12 +83,57 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleNotificationRoute(intent)
         maybeOpenLeaveFlow(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(KEY_TAB, currentTab.ordinal)
+    }
+
+    /** Existing notification routes only: no cleaner/file-management business is introduced. */
+    private fun handleNotificationRoute(entry: Intent): Boolean {
+        if (SpLeaveEntry.isLeaveLaunch(entry)) return false
+        val route = SpNotificationEntry.route(entry) ?: return false
+        entry.removeExtra(SpNotificationEntry.A_NAV)
+        entry.removeExtra(SpNotifyExtras.JUMP_TYPE)
+        when (route) {
+            "b_recents" -> switchShellTab(Tab.RECENT)
+            "b_scan" -> {
+                switchShellTab(Tab.HOME)
+                SpLaunchAdCatchup.cancel()
+                binding.root.post {
+                    if (!isFinishing && !isDestroyed) {
+                        SpPageAdTriggers.showFileIntThen(this) {
+                            if (!isFinishing && !isDestroyed) CamCaptureActivity.start(this)
+                        }
+                    }
+                }
+            }
+            "b_home" -> switchShellTab(Tab.HOME)
+            else -> {
+                val type = when (route) {
+                    "WORD" -> FileType.DOC
+                    "EXCEL" -> FileType.XLS
+                    "PPT" -> FileType.PPT
+                    "PDF" -> FileType.PDF
+                    else -> return false
+                }
+                pendingNotificationFileType = type
+                switchShellTab(Tab.HOME)
+                val home = supportFragmentManager.findFragmentByTag(Tab.HOME.name) as? CamHomeFragment
+                if (home?.view != null) {
+                    home.selectNotificationFileType(type)
+                    pendingNotificationFileType = null
+                }
+            }
+        }
+        return true
+    }
+
+    fun consumeNotificationFileType(): FileType? = pendingNotificationFileType.also {
+        pendingNotificationFileType = null
     }
 
     private fun maybeOpenLeaveFlow(intent: Intent?) {

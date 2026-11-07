@@ -42,6 +42,10 @@ class SpConfigBootstrapper(
     private val _configApplied = MutableStateFlow(false)
     val configApplied: StateFlow<Boolean> = _configApplied.asStateFlow()
 
+    private var consecutiveFailures = 0
+    @Volatile
+    private var retryNotBeforeElapsed = 0L
+
     fun start() {
         scope.launch {
             runCatching { loadAndApplyConfig(TRIGGER_STARTUP) }
@@ -63,6 +67,7 @@ class SpConfigBootstrapper(
         val wire = SpConfigWire.load(app)
         if (wire == null) {
             AppLog.network.w("跳过配置接口 原因=接口未配置 触发=$trigger")
+            deferAfterFailure()
             dispatch(SpConfigLoadResult.Unavailable("配置接口未配置"))
             return
         }
@@ -70,8 +75,9 @@ class SpConfigBootstrapper(
         configLoadMutex.withLock {
             val now = System.currentTimeMillis()
             val cached = repository.loadCache()
-            val lastRequestedAt = lastConfigRequestAt(repository.lastSuccessfulFetchAtMillis())
-            val needRemote = shouldRequestConfig(lastRequestedAt, now)
+            val lastRequestedAt = repository.lastSuccessfulFetchAtMillis()
+            val waitMillis = requestWaitMillis(cached != null, now)
+            val needRemote = waitMillis == 0L
             if (cached != null) {
                 AppLog.network.i(
                     "命中配置缓存 触发=$trigger 需要远端刷新=${needRemote.flagText()} " +
@@ -83,19 +89,18 @@ class SpConfigBootstrapper(
             }
             if (!needRemote) {
                 AppLog.network.i(
-                    "跳过远端刷新 原因=距上次请求不足刷新间隔 触发=$trigger " +
-                        "距上次=${sinceText(now, lastRequestedAt)} " +
-                        "还需等待=${durationText(CONFIG_REFRESH_INTERVAL_MILLIS - (now - lastRequestedAt))}",
+                    "跳过远端刷新 原因=失败退避尚未结束 触发=$trigger " +
+                        "距上次成功=${sinceText(now, lastRequestedAt)} " +
+                        "还需等待=${durationText(waitMillis)}",
                 )
-                dispatch(SpConfigLoadResult.Unavailable("距上次配置请求不足刷新间隔"))
+                dispatch(SpConfigLoadResult.Unavailable("配置请求失败退避中"))
                 return@withLock
             }
             fetchRemote(wire, cached = null, trigger = trigger)
         }
         if (!refreshRemoteAfterCache) return
         configLoadMutex.withLock {
-            val lastRequestedAt = lastConfigRequestAt(repository.lastSuccessfulFetchAtMillis())
-            if (!shouldRequestConfig(lastRequestedAt, System.currentTimeMillis())) {
+            if (requestWaitMillis(repository.loadCache() != null, System.currentTimeMillis()) > 0L) {
                 AppLog.network.i("跳过后台刷新 原因=缓存生效后不足刷新间隔 触发=$trigger")
                 return@withLock
             }
@@ -104,6 +109,22 @@ class SpConfigBootstrapper(
     }
 
     private suspend fun fetchRemote(
+        wire: SpDispatchWire,
+        cached: SpConfigLoadResult.Available?,
+        trigger: String,
+    ) {
+        try {
+            fetchRemoteAttempt(wire, cached, trigger)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            deferAfterFailure()
+            AppLog.network.w("配置请求异常，稍后重试 触发=$trigger", error)
+            if (cached == null) dispatch(SpConfigLoadResult.Unavailable("配置请求异常"))
+        }
+    }
+
+    private suspend fun fetchRemoteAttempt(
         wire: SpDispatchWire,
         cached: SpConfigLoadResult.Available?,
         trigger: String,
@@ -118,6 +139,7 @@ class SpConfigBootstrapper(
         )
         if (request.distinctId.isBlank()) {
             AppLog.network.w("跳过配置请求 原因=Distinct ID 为空 触发=$trigger")
+            deferAfterFailure()
             if (cached == null) {
                 dispatch(SpConfigLoadResult.Unavailable("BI Distinct ID 不可用"))
             }
@@ -130,6 +152,13 @@ class SpConfigBootstrapper(
             repository.markAttempt()
         }
         val cost = SystemClock.elapsedRealtime() - startedAt
+        if (remoteResult is SpConfigLoadResult.Available && remoteResult.origin == SpConfigOrigin.REMOTE) {
+            consecutiveFailures = 0
+            retryNotBeforeElapsed = 0L
+        } else {
+            // Cache fallback is still a failed remote attempt; never apply the 3-hour success throttle.
+            deferAfterFailure()
+        }
         when (remoteResult) {
             is SpConfigLoadResult.Available -> {
                 if (cached == null || remoteResult.origin == SpConfigOrigin.REMOTE) {
@@ -187,14 +216,9 @@ class SpConfigBootstrapper(
         configApplied.first { it }
         AppLog.network.i("配置定时刷新已启动 间隔=${durationText(CONFIG_REFRESH_INTERVAL_MILLIS)}")
         while (true) {
-            val lastRequestedAt = lastConfigRequestAt(repository.lastSuccessfulFetchAtMillis())
-            val waitMillis = if (lastRequestedAt <= 0L) {
-                CONFIG_REFRESH_INTERVAL_MILLIS
-            } else {
-                (CONFIG_REFRESH_INTERVAL_MILLIS - (System.currentTimeMillis() - lastRequestedAt))
-                    .coerceAtLeast(0L)
-            }
-            if (waitMillis > 0L) delay(waitMillis)
+            val waitMillis = requestWaitMillis(repository.loadCache() != null, System.currentTimeMillis())
+                .coerceAtLeast(1_000L)
+            delay(waitMillis)
             runCatching { loadAndApplyConfig(TRIGGER_TIMER) }
                 .onFailure { AppLog.network.w("配置定时刷新失败 触发=$TRIGGER_TIMER", it) }
         }
@@ -238,11 +262,32 @@ class SpConfigBootstrapper(
         AppLog.network.w("cloak 上报失败 次数=$CLOAK_ATTEMPTS")
     }
 
-    private fun lastConfigRequestAt(lastFetchedAtMillis: Long): Long =
-        maxOf(lastFetchedAtMillis, repository.lastAttemptAtMillis())
+    private fun requestWaitMillis(hasCache: Boolean, nowMillis: Long): Long {
+        val successAt = repository.lastSuccessfulFetchAtMillis()
+        val successWait = if (hasCache && successAt > 0L) {
+            (CONFIG_REFRESH_INTERVAL_MILLIS - (nowMillis - successAt))
+                .coerceIn(0L, CONFIG_REFRESH_INTERVAL_MILLIS)
+        } else 0L
+        val inProcessRetryWait = (retryNotBeforeElapsed - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        val attemptAt = repository.lastAttemptAtMillis()
+        val restartRetryWait = if (attemptAt > successAt) {
+            (CONFIG_RETRY_INITIAL_MS - (nowMillis - attemptAt)).coerceIn(0L, CONFIG_RETRY_INITIAL_MS)
+        } else 0L
+        return maxOf(successWait, inProcessRetryWait, restartRetryWait)
+    }
+
+    private fun deferAfterFailure() {
+        consecutiveFailures = (consecutiveFailures + 1).coerceAtMost(5)
+        val backoff = (CONFIG_RETRY_INITIAL_MS * (1L shl (consecutiveFailures - 1)))
+            .coerceAtMost(CONFIG_RETRY_MAX_MS)
+        retryNotBeforeElapsed = SystemClock.elapsedRealtime() + backoff
+        AppLog.network.w("配置未取得远端结果，将重试 退避=${durationText(backoff)}")
+    }
 
     companion object {
         const val CONFIG_REFRESH_INTERVAL_MILLIS = 3 * 60 * 60 * 1_000L
+        private const val CONFIG_RETRY_INITIAL_MS = 30_000L
+        private const val CONFIG_RETRY_MAX_MS = 5 * 60_000L
         private const val MAX_IDENTIFIER_LENGTH = 256
         private const val CLOAK_ATTEMPTS = 10
         private const val CLOAK_TIMEOUT_MS = 10_000L

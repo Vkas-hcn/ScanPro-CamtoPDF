@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.CamPdf" parent="Theme.Material3.Light.NoActionBar">
+    <style name="Base.Theme.CamPdf" parent="Theme.Material3.Light.NoActionBar">
         <!-- Avoid black/dark flash when Activities recreate on locale change -->
         <item name="android:windowBackground">@drawable/bg</item>
         <item name="android:windowAnimationStyle">@style/CamWindow.NoFlash</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:forceDarkAllowed">false</item>
     </style>
+
+    <style name="Theme.CamPdf" parent="Base.Theme.CamPdf" />
 
     <style name="CamWindow.NoFlash" parent="@android:style/Animation.Activity">
         <item name="android:activityOpenEnterAnimation">@anim/none</item>

@@ -17,6 +17,7 @@ import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.ads.SpAdIncomeReport
 import com.scanpro.cam.pdf.ads.SpAdShowGate
 import com.scanpro.cam.pdf.ads.SpAdsHub
+import com.scanpro.cam.pdf.ads.SpUmpGate
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.ads.SpCachedAd
 import com.scanpro.cam.pdf.ads.SpFullScreenMask
@@ -76,6 +77,10 @@ class SpFullScreenAdManager(
      * @param index 从列表第几个单元开始（失败后 +1）
      */
     fun checkAndLoadAd(position: String, scene: String = position, index: Int = 0) {
+        if (!SpUmpGate.canRequestAds(appContext)) {
+            AppLog.ads.i("跳过广告加载 位置=$position 原因=用户同意尚未就绪")
+            return
+        }
         if (!SpAdMobInit.getOrNull()?.isMobileAdsInitialize().let { it == true }) {
             AppLog.ads.i("跳过广告加载 位置=$position 原因=广告SDK未初始化")
             return
@@ -140,7 +145,7 @@ class SpFullScreenAdManager(
         }
         val sessionId = SpAdSession.newId()
         sessionIdTryCountMap[sessionId] = 0
-        AppLog.ads.i("开始加载广告 类型=open 位置=$position 单元=${adInfo.adUnitId}")
+        AppLog.ads.i("开始加载广告 类型=open 位置=$position 单元=${adInfo.requestUnitId}")
         requestOpenAd(position, adInfo, scene, sessionId)
     }
 
@@ -151,31 +156,32 @@ class SpFullScreenAdManager(
         }
         val sessionId = SpAdSession.newId()
         sessionIdTryCountMap[sessionId] = 0
-        AppLog.ads.i("开始加载广告 类型=interstitial 位置=$position 单元=${adInfo.adUnitId}")
+        AppLog.ads.i("开始加载广告 类型=interstitial 位置=$position 单元=${adInfo.requestUnitId}")
         requestInterstitialAd(position, adInfo, scene, sessionId)
     }
 
     /** 同一 [sessionId] 的一次开屏请求。重试走这里，避免重新发 session、把计数清零。 */
     private fun requestOpenAd(position: String, adInfo: SpAdInfo, scene: String, sessionId: String) {
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.OPEN, position, adInfo.adUnitId, scene)
+        if (!canContinueRequest(position, sessionId)) return
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.OPEN, position, adInfo.requestUnitId, scene)
         AppOpenAd.load(
             appContext,
-            adInfo.adUnitId,
+            adInfo.requestUnitId,
             AdRequest.Builder().build(),
             object : AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: AppOpenAd) {
                     loadingPositions.remove(position)
                     sessionIdTryCountMap.remove(sessionId)
                     SpAdCache.putOpenAd(
-                        SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit),
+                        SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit, adInfo.requestUnitId),
                     )
                     AdTrackingHelper.filled(life, ad.responseInfo)
                     AdTrackingHelper.remember(sessionId, life)
-                    AppLog.ads.i("广告加载成功 类型=open 位置=$position 单元=${adInfo.adUnitId}")
+                    AppLog.ads.i("广告加载成功 类型=open 位置=$position 单元=${adInfo.requestUnitId}")
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    AppLog.ads.w("广告加载失败 类型=open 位置=$position 单元=${adInfo.adUnitId} 错误码=${error.code} 错误信息=${error.message}")
+                    AppLog.ads.w("广告加载失败 类型=open 位置=$position 单元=${adInfo.requestUnitId} 错误码=${error.code} 错误信息=${error.message}")
                     AdTrackingHelper.failed(life, error.code, error.message)
                     onPreloadFailed(
                         position = position,
@@ -196,25 +202,26 @@ class SpFullScreenAdManager(
         scene: String,
         sessionId: String,
     ) {
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.INTERSTITIAL, position, adInfo.adUnitId, scene)
+        if (!canContinueRequest(position, sessionId)) return
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.INTERSTITIAL, position, adInfo.requestUnitId, scene)
         InterstitialAd.load(
             appContext,
-            adInfo.adUnitId,
+            adInfo.requestUnitId,
             AdRequest.Builder().build(),
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
                     loadingPositions.remove(position)
                     sessionIdTryCountMap.remove(sessionId)
                     SpAdCache.putInterstitialAd(
-                        SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit),
+                        SpCachedAd(ad, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit, adInfo.requestUnitId),
                     )
                     AdTrackingHelper.filled(life, ad.responseInfo)
                     AdTrackingHelper.remember(sessionId, life)
-                    AppLog.ads.i("广告加载成功 类型=interstitial 位置=$position 单元=${adInfo.adUnitId}")
+                    AppLog.ads.i("广告加载成功 类型=interstitial 位置=$position 单元=${adInfo.requestUnitId}")
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    AppLog.ads.w("广告加载失败 类型=interstitial 位置=$position 单元=${adInfo.adUnitId} 错误码=${error.code} 错误信息=${error.message}")
+                    AppLog.ads.w("广告加载失败 类型=interstitial 位置=$position 单元=${adInfo.requestUnitId} 错误码=${error.code} 错误信息=${error.message}")
                     AdTrackingHelper.failed(life, error.code, error.message)
                     onPreloadFailed(
                         position = position,
@@ -226,6 +233,14 @@ class SpFullScreenAdManager(
                 }
             },
         )
+    }
+
+    private fun canContinueRequest(position: String, sessionId: String): Boolean {
+        if (SpUmpGate.canRequestAds(appContext)) return true
+        loadingPositions.remove(position)
+        sessionIdTryCountMap.remove(sessionId)
+        AppLog.ads.i("跳过广告请求 位置=$position 原因=用户同意尚未就绪")
+        return false
     }
 
     /**
@@ -241,12 +256,12 @@ class SpFullScreenAdManager(
         sessionId: String,
         message: String,
     ) {
-        AppLog.ads.d("广告加载失败 位置=$position 单元=${adInfo.adUnitId} 错误信息=$message")
+        AppLog.ads.d("广告加载失败 位置=$position 单元=${adInfo.requestUnitId} 错误信息=$message")
 
         val tried = (sessionIdTryCountMap[sessionId] ?: 0) + 1
         if (!adInfo.isOpen && tried < tryCountLimit) {
             sessionIdTryCountMap[sessionId] = tried
-            AppLog.ads.i("广告加载重试 位置=$position 单元=${adInfo.adUnitId} 次数=$tried/$tryCountLimit")
+            AppLog.ads.i("广告加载重试 位置=$position 单元=${adInfo.requestUnitId} 次数=$tried/$tryCountLimit")
             requestInterstitialAd(position, adInfo, scene, sessionId)
             return
         }
@@ -348,6 +363,12 @@ class SpFullScreenAdManager(
     ) {
         val host = activity
         val adType = if (ad is AppOpenAd) AdTrackingHelper.AdType.OPEN else AdTrackingHelper.AdType.INTERSTITIAL
+        if (!canPresent(ad, reloadPosition)) {
+            AppLog.ads.i("跳过广告展示 位置=$reloadPosition 原因=当前同意/总闸/位置配置不允许")
+            putBack(ad, sessionId, reloadPosition)
+            onResult(false, false)
+            return
+        }
         if (!SpAdShowGate.tryEnter()) {
             SpTrackEvents.adBlocked(adType, reloadPosition, "another_fullscreen")
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=已有广告正在展示")
@@ -383,9 +404,9 @@ class SpFullScreenAdManager(
                     )
                 }
                 SpFullScreenMask.show(host) {
-                    if (host.isFinishing || host.isDestroyed) {
+                    if (host.isFinishing || host.isDestroyed || !canPresent(ad, reloadPosition)) {
                         SpAdShowGate.exit()
-                        AppLog.ads.i("跳过广告展示 类型=interstitial 位置=$scene 原因=页面已销毁")
+                        AppLog.ads.i("跳过广告展示 类型=interstitial 位置=$scene 原因=页面或当前投放条件不允许")
                         putBack(ad, sessionId, reloadPosition)
                         onResult(false, false)
                         return@show
@@ -412,9 +433,9 @@ class SpFullScreenAdManager(
                     )
                 }
                 SpFullScreenMask.show(host) {
-                    if (host.isFinishing || host.isDestroyed) {
+                    if (host.isFinishing || host.isDestroyed || !canPresent(ad, reloadPosition)) {
                         SpAdShowGate.exit()
-                        AppLog.ads.i("跳过广告展示 类型=open 位置=$scene 原因=页面已销毁")
+                        AppLog.ads.i("跳过广告展示 类型=open 位置=$scene 原因=页面或当前投放条件不允许")
                         putBack(ad, sessionId, reloadPosition)
                         onResult(false, false)
                         return@show
@@ -431,14 +452,29 @@ class SpFullScreenAdManager(
         }
     }
 
+    private fun canPresent(ad: Any, position: String): Boolean {
+        if (!SpUmpGate.canRequestAds(appContext) || !blocking.canShowAllAd() ||
+            blocking.isVPNBlock() || blocking.isShowPartialAdsOnly(position) ||
+            !blocking.canShowAdByShowCountLimit()) return false
+        val unitId = when (ad) {
+            is AppOpenAd -> ad.adUnitId
+            is InterstitialAd -> ad.adUnitId
+            else -> return false
+        }
+        return config.adInfoList(position)?.any {
+            ((ad is AppOpenAd && it.isOpen) || (ad is InterstitialAd && it.isInterstitial)) &&
+                it.requestUnitId == unitId
+        } == true
+    }
+
     /** 展示没发出去时把广告放回缓存，避免「填充成功但被丢弃」。 */
     private fun putBack(ad: Any, sessionId: String, position: String) {
         val ttl = config.ttlSecondsOf(position) ?: 0
         val now = System.currentTimeMillis()
         runCatching {
             when (ad) {
-                is AppOpenAd -> SpAdCache.putOpenAd(SpCachedAd(ad, now, sessionId, position, ttl))
-                is InterstitialAd -> SpAdCache.putInterstitialAd(SpCachedAd(ad, now, sessionId, position, ttl))
+                is AppOpenAd -> SpAdCache.putOpenAd(SpCachedAd(ad, now, sessionId, position, ttl, ad.adUnitId))
+                is InterstitialAd -> SpAdCache.putInterstitialAd(SpCachedAd(ad, now, sessionId, position, ttl, ad.adUnitId))
             }
         }.onFailure { AppLog.ads.w("广告回缓存失败 位置=$position", it) }
     }

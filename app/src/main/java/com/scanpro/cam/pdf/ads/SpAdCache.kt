@@ -1,6 +1,9 @@
 package com.scanpro.cam.pdf.ads
 
 import android.util.Log
+import com.google.android.gms.ads.appopen.AppOpenAd
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.nativead.NativeAd
 
 /**
  * 全屏广告缓存。照抄 ApolloPDF `ad/AdCache.java`，但修正了两处会白丢填充的行为：
@@ -50,103 +53,39 @@ object SpAdCache {
 
     // region 探测（不出队）
 
-    /** 只看有没有可用开屏，不取用。等待「广告就绪」时用。 */
-    fun peekOpenAd(config: SpAdConfig, blocking: SpBlockingLogic): SpCachedOpenAd? {
-        return synchronized(openAds) {
-            if (!blocking.canShowAdByShowCountLimit()) return null
-            val ad = openAds.lastOrNull() ?: return null
-            if (!isFresh(ad, config, SpAdPosition.AC_LAUNCH)) {
-                openAds.removeLast()
-                return null
-            }
-            ad
-        }
-    }
+    /** Probe and consumption both use the current target position and gates. */
+    fun peekOpenAd(config: SpAdConfig, blocking: SpBlockingLogic): SpCachedOpenAd? =
+        select(openAds, SpAdPosition.AC_LAUNCH, config, blocking, consume = false)
 
     fun peekInterstitialAd(
         position: String,
         config: SpAdConfig,
         blocking: SpBlockingLogic,
-    ): SpCachedInterstitialAd? {
-        return synchronized(interstitialAds) {
-            if (!blocking.canShowAdByShowCountLimit()) return null
-            val ad = interstitialAds.lastOrNull() ?: return null
-            if (!isFresh(ad, config, position)) {
-                interstitialAds.removeLast()
-                return null
-            }
-            ad
-        }
-    }
+    ): SpCachedInterstitialAd? = select(interstitialAds, position, config, blocking, consume = false)
 
     fun peekNativeAd(
         position: String,
         config: SpAdConfig,
         blocking: SpBlockingLogic,
-    ): SpCachedNativeAd? {
-        return synchronized(nativeAds) {
-            if (!blocking.canShowAdByShowCountLimit()) return null
-            val ad = nativeAds.lastOrNull() ?: return null
-            if (!isFresh(ad, config, position)) {
-                nativeAds.removeLast()?.releaseNative()
-                return null
-            }
-            ad
-        }
-    }
+    ): SpCachedNativeAd? = select(nativeAds, position, config, blocking, consume = false)
     // endregion
 
     // region 取用（先校验后出队）
 
-    /** 取开屏：TTL 通过才出队，否则丢弃并返回 null。 */
-    fun getOpenAd(config: SpAdConfig, blocking: SpBlockingLogic): SpCachedOpenAd? {
-        return synchronized(openAds) {
-            if (!blocking.canShowAdByShowCountLimit()) return null
-            val ad = openAds.lastOrNull() ?: return null
-            if (!isFresh(ad, config, SpAdPosition.AC_LAUNCH)) {
-                openAds.removeLast()
-                return null
-            }
-            openAds.removeLast()
-            ad
-        }
-    }
+    fun getOpenAd(config: SpAdConfig, blocking: SpBlockingLogic): SpCachedOpenAd? =
+        select(openAds, SpAdPosition.AC_LAUNCH, config, blocking, consume = true)
 
-    /** 取插屏，TTL 取 [position] 的列表首条；没配就退回入库时固化的 TTL。 */
     fun getInterstitialAd(
         position: String,
         config: SpAdConfig,
         blocking: SpBlockingLogic,
-    ): SpCachedInterstitialAd? {
-        return synchronized(interstitialAds) {
-            if (!blocking.canShowAdByShowCountLimit()) return null
-            val ad = interstitialAds.lastOrNull() ?: return null
-            if (!isFresh(ad, config, position)) {
-                interstitialAds.removeLast()
-                return null
-            }
-            interstitialAds.removeLast()
-            ad
-        }
-    }
+    ): SpCachedInterstitialAd? = select(interstitialAds, position, config, blocking, consume = true)
 
-    /** 取原生，TTL 取 [position] 的列表首条；没配就退回入库时固化的 TTL。 */
     fun getNativeAd(
         position: String,
         config: SpAdConfig,
         blocking: SpBlockingLogic,
-    ): SpCachedNativeAd? {
-        return synchronized(nativeAds) {
-            if (!blocking.canShowAdByShowCountLimit()) return null
-            val ad = nativeAds.lastOrNull() ?: return null
-            if (!isFresh(ad, config, position)) {
-                nativeAds.removeLast()?.releaseNative()
-                return null
-            }
-            nativeAds.removeLast()
-            ad
-        }
-    }
+    ): SpCachedNativeAd? = select(nativeAds, position, config, blocking, consume = true)
     // endregion
 
     // region 探测（Apollo isHaveOpenAd / isHaveEnableInterstitialAd / isHaveEnableNativeAd）
@@ -186,25 +125,44 @@ object SpAdCache {
         expiredNative.forEach { it.releaseNative() }
     }
 
-    private fun <T> isFresh(ad: SpCachedAd<T>, config: SpAdConfig, position: String): Boolean {
-        val fromConfig = config.ttlSecondsOf(position)
-        return if (fromConfig != null) ad.isFresh(fromConfig) else ad.isFreshNow()
+    private fun <T> matchesTarget(ad: SpCachedAd<T>, config: SpAdConfig, position: String): Boolean =
+        config.adInfoList(position)?.any { info ->
+            val typeMatches = when (ad.ad) {
+                is AppOpenAd -> info.isOpen
+                is InterstitialAd -> info.isInterstitial
+                is NativeAd -> info.isNative
+                else -> false
+            }
+            typeMatches && ad.unitId.isNotBlank() && info.requestUnitId == ad.unitId &&
+                ad.isFreshNow() && ad.isFresh(info.adTimeLimit)
+        } == true
+
+    private fun <T> select(
+        queue: ArrayDeque<SpCachedAd<T>>,
+        position: String,
+        config: SpAdConfig,
+        blocking: SpBlockingLogic? = null,
+        consume: Boolean = false,
+    ): SpCachedAd<T>? = synchronized(queue) {
+        if (blocking != null &&
+            (!blocking.canShowAdByShowCountLimit() || !blocking.canShowAllAd() ||
+                blocking.isVPNBlock() || blocking.isShowPartialAdsOnly(position))) return@synchronized null
+        // A mismatching newest entry must not hide an older eligible entry or be lost to another slot.
+        queue.removeAll { cached ->
+            val expired = !cached.isFreshNow()
+            if (expired && cached.ad is NativeAd) cached.ad.destroy()
+            expired
+        }
+        val ad = queue.lastOrNull { matchesTarget(it, config, position) } ?: return@synchronized null
+        if (consume) queue.remove(ad)
+        ad
     }
 
     private fun <T> peekWithoutGate(
         queue: ArrayDeque<SpCachedAd<T>>,
         config: SpAdConfig,
         position: String = SpAdPosition.AC_LAUNCH,
-    ): SpCachedAd<T>? {
-        return synchronized(queue) {
-            val ad = queue.lastOrNull() ?: return null
-            if (!isFresh(ad, config, position)) {
-                queue.removeLast()
-                return null
-            }
-            ad
-        }
-    }
+    ): SpCachedAd<T>? = select(queue, position, config)
 
     private fun <T> trim(queue: ArrayDeque<SpCachedAd<T>>) {
         while (queue.size >= MAX_CACHED) queue.removeFirstOrNull()

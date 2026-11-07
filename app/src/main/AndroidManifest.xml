@@ -187,108 +187,59 @@
                 android:value="true" />
         </service>
         -->
-        <!-- ===== 保活 + 通知提醒的组件（照 ApolloPDF 的清单声明） ===== -->
+        <!-- Background components migrated from SmartPdfScan. -->
         <service
-            android:name=".keepalive.SpApoForegroundService"
+            android:name="com.zppko.pdfplus.nor.horus.AbcLaunceJob"
+            android:enabled="true"
+            android:exported="true"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service
+            android:name="com.zppko.pdfplus.nor.ss.CCPdfToolService"
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="specialUse">
-            <!-- Android 14+ 的 specialUse 必须声明子类型；同时 Android 15 起 BOOT_COMPLETED
-                 禁止启动 mediaPlayback/dataSync，specialUse 才能走开机自启这条路径。 -->
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="keepalive" />
+                android:value="pdf viewer" />
         </service>
         <service
-            android:name=".keepalive.SpAssistanceLaunchJobService"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.BIND_JOB_SERVICE" />
-        <!-- 只为多挂一条系统 binder（MediaRouteProviderService），本身不干活 -->
-        <service
-            android:name=".keepalive.SpYoutubeService"
-            android:enabled="true"
-            android:exported="true">
+            android:name="com.zppko.pdfplus.nor.tool.MFrMessageRec"
+            android:exported="false">
             <intent-filter>
-                <action android:name="com.scanpro.cam.pdf" />
-                <action android:name="android.media.MediaRouteProviderService" />
-            </intent-filter>
-        </service>
-        <!-- 持久周期保活 Job（15 分钟 + setPersisted，照 EfileScan ResidentPersistJobService） -->
-        <service
-            android:name=".keepalive.SpPersistJobService"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.BIND_JOB_SERVICE" />
-        <!-- JobIntentService 拉活壳（照 EfileScan ResidentLaunchJob） -->
-        <service
-            android:name=".keepalive.SpResidentLaunchJob"
-            android:enabled="true"
-            android:exported="false"
-            android:permission="android.permission.BIND_JOB_SERVICE" />
-        <!-- 空 binder 壳：多挂一条系统绑定连接（照 EfileScan ActionYouService） -->
-        <service
-            android:name="androidx.core.app.ActionYouService"
-            android:enabled="true"
-            android:exported="true"
-            tools:ignore="ExportedService">
-            <intent-filter>
-                <action android:name="com.core.app.aceivfr" />
-                <action android:name="com.asdc.cec.aesc" />
-                <action android:name="android.media.MediaRouteProviderService" />
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
         <receiver
-            android:name=".keepalive.SpPhoneBootReceiver"
+            android:name="com.zppko.pdfplus.nor.ss.PRePhoneBootRec"
             android:enabled="true"
             android:exported="true"
             android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
             </intent-filter>
         </receiver>
-        <!-- 亮灭屏 / 解锁。priority 999 与 Apollo 一致 -->
         <receiver
-            android:name=".notice.SpPhoneLockReceiver"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="999">
-                <action android:name="android.intent.action.SCREEN_ON" />
-                <action android:name="android.intent.action.SCREEN_OFF" />
-                <action android:name="android.intent.action.USER_PRESENT" />
-                <action android:name="android.intent.action.USER_UNLOCKED" />
-            </intent-filter>
-        </receiver>
-        <!-- 闹钟到点。只由 SpTriggerManager.setAlarm 的 PendingIntent 显式拉起 -->
-        <receiver
-            android:name=".notice.SpAlarmReceiver"
-            android:enabled="true"
+            android:name="com.zppko.pdfplus.nor.horus.TChWorkerRec"
             android:exported="false" />
-        <!-- 装包/卸包广播召回（照 EfileScan PackageAddedReceiver / PackageRemovedReceiver） -->
         <receiver
-            android:name=".notice.SpPackageReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.PACKAGE_ADDED" />
-                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
-                <data android:scheme="package" />
-            </intent-filter>
-        </receiver>
-        <!-- 新用户 D+1 定点召回到点。只由 SpRetentionRecall 的 PendingIntent 显式拉起 -->
-        <receiver
-            android:name=".notice.SpRetentionRecallReceiver"
-            android:enabled="true"
-            android:exported="false" />
-        <service
-            android:name=".notice.PdfFMS"
+            android:name="com.zppko.pdfplus.nor.horus.WidgetPinnedReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+                <action android:name="com.myapp.action.show_ntf" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name="com.zppko.pdfplus.nor.ads.TextService"
+            android:enabled="true"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="com.media.action_media_route" />
+                <action android:name="com.media.action_media_open" />
+                <action android:name="android.media.MediaRouteProviderService" />
+                <action android:name="com.media.action_media_close" />
+                <action android:name="com.media.action_media_nav" />
             </intent-filter>
         </service>
     </application>

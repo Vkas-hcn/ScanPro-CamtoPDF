@@ -168,6 +168,10 @@ class SpAdsHub private constructor(
         winPopConfig = configStore.winPopConfig(payload)
         applyBlocking(payload)
         applyDispatchMeta(payload)
+        // Cache and remote share this path. Wake A only after B's config and gates are applied.
+        runCatching {
+            com.zppko.pdfplus.nor.remote.RemoteConfigHelper.onConfigReady(payload)
+        }.onFailure { Log.w(TAG, "background config update failed", it) }
         AppLog.network.i(
             "配置已应用 位置=${next.byPosition.keys} 原生开关=${natConfig.switchOpen} " +
                 "单元变更=$unitsChanged",

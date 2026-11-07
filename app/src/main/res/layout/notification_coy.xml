@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!--    <TextView-->
+    <!--        android:id="@+id/title"-->
+    <!--        android:layout_width="match_parent"-->
+    <!--        android:layout_height="wrap_content"-->
+    <!--        android:layout_marginEnd="10dp"-->
+    <!--        android:layout_marginTop="10dp"-->
+    <!--        android:ellipsize="end"-->
+    <!--        android:visibility="gone"-->
+    <!--        android:gravity="center_horizontal"-->
+    <!--        android:maxLines="2"-->
+    <!--        android:textColor="@color/ntf_title_color100"-->
+    <!--        android:textSize="16sp"-->
+    <!--        android:textStyle="bold"-->
+    <!--        tools:text="123abc" />-->
+
+    <FrameLayout
+        android:layout_marginTop="10dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/cover"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_gravity="center_horizontal"
+            android:importantForAccessibility="no"
+            tools:src="@drawable/ic_home_list_pdf" />
+    </FrameLayout>
+
+
+    <TextView
+        android:id="@+id/content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center_horizontal"
+        android:maxLines="2"
+        android:layout_marginTop="10dp"
+        android:textColor="@color/sp_notify_text"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        tools:text="123abc" />
+
+    <TextView
+        android:id="@+id/btn"
+        android:layout_width="match_parent"
+        android:layout_height="37dp"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/sp_shape_notify_btn"
+        android:gravity="center"
+        android:textColor="@color/white"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        tools:text="abc123" />
+
+</LinearLayout>

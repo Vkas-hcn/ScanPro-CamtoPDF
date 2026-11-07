@@ -22,6 +22,20 @@ data class SpAdInfo(
     val isNative: Boolean get() = adType == TYPE_NATIVE
     val isBanner: Boolean get() = adType == TYPE_BANNER
 
+    /** Resolve at the request boundary so remote IDs cannot send debug traffic to production. */
+    val requestUnitId: String
+        get() = if (SpAdDevFlags.preferTestUnits()) {
+            when (adType) {
+                TYPE_OPEN -> "ca-app-pub-3940256099942544/9257395921"
+                TYPE_INTERSTITIAL -> "ca-app-pub-3940256099942544/1033173712"
+                TYPE_NATIVE -> "ca-app-pub-3940256099942544/2247696110"
+                TYPE_BANNER -> "ca-app-pub-3940256099942544/6300978111"
+                else -> ""
+            }
+        } else {
+            adUnitId
+        }
+
     companion object {
         const val TYPE_OPEN = "op"
         const val TYPE_INTERSTITIAL = "int"

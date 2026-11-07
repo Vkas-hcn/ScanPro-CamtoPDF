@@ -15,6 +15,7 @@ import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.ads.SpAdsHub
+import com.scanpro.cam.pdf.ads.SpUmpGate
 import com.scanpro.cam.pdf.analytics.AdTrackLife
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpTracker
@@ -58,6 +59,10 @@ class SpBannerAdManager(
             AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=管理器已释放")
             return
         }
+        if (!SpUmpGate.canRequestAds(appContext)) {
+            AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=用户同意尚未就绪")
+            return
+        }
         if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
             AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=广告SDK未初始化")
             return
@@ -90,7 +95,7 @@ class SpBannerAdManager(
             retryWhenConfigApplied(position)
             return
         }
-        val adInfo = list.firstOrNull() ?: run {
+        val adInfo = list.firstOrNull { it.isBanner } ?: run {
             AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=广告单元为空")
             return
         }
@@ -98,14 +103,14 @@ class SpBannerAdManager(
         val metrics = activity.resources.displayMetrics
         val widthDp = (metrics.widthPixels / metrics.density).toInt()
         val banner = AdView(activity).apply {
-            adUnitId = adInfo.adUnitId
+            adUnitId = adInfo.requestUnitId
             setAdSize(AdSize(widthDp, 70))
         }
         adView = banner
 
 
         closeShown(bannerLife)
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.BANNER, position, adInfo.adUnitId)
+        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.BANNER, position, adInfo.requestUnitId)
         bannerLife = life
         banner.setOnPaidEventListener { value ->
             SpAdIncomeReport.sendAdIncome(
@@ -119,12 +124,12 @@ class SpBannerAdManager(
         }
         banner.adListener = object : AdListener() {
             override fun onAdLoaded() {
-                AppLog.ads.i("广告加载成功 类型=banner 位置=$position 单元=${adInfo.adUnitId}")
+                AppLog.ads.i("广告加载成功 类型=banner 位置=$position 单元=${adInfo.requestUnitId}")
                 AdTrackingHelper.filled(life, banner.responseInfo)
             }
 
             override fun onAdFailedToLoad(error: LoadAdError) {
-                AppLog.ads.w("广告加载失败 类型=banner 位置=$position 单元=${adInfo.adUnitId} 错误码=${error.code} 错误信息=${error.message}")
+                AppLog.ads.w("广告加载失败 类型=banner 位置=$position 单元=${adInfo.requestUnitId} 错误码=${error.code} 错误信息=${error.message}")
 
                 AdTrackingHelper.failed(life, error.code, error.message)
             }
@@ -144,7 +149,7 @@ class SpBannerAdManager(
 
         viewGroup.removeAllViews()
         viewGroup.addView(banner)
-        AppLog.ads.i("开始加载广告 类型=banner 位置=$position 单元=${adInfo.adUnitId}")
+        AppLog.ads.i("开始加载广告 类型=banner 位置=$position 单元=${adInfo.requestUnitId}")
         banner.loadAd(AdRequest.Builder().build())
     }
 

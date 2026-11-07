@@ -5,8 +5,9 @@ import com.scanpro.cam.pdf.BuildConfig
 /** Local switches for development / QA. */
 object SpAdDevFlags {
 
-    /** Set to true/false to force; set to null to follow [BuildConfig.USE_TEST_ADS]. */
+    /** Kept for callers; debug builds always use test units and release always uses configured units. */
+    @Deprecated("Ad safety follows BuildConfig.DEBUG and cannot be overridden")
     var FORCE_USE_TEST_ADS: Boolean? = null
 
-    fun preferTestUnits(): Boolean = FORCE_USE_TEST_ADS ?: BuildConfig.USE_TEST_ADS
+    fun preferTestUnits(): Boolean = BuildConfig.DEBUG
 }
