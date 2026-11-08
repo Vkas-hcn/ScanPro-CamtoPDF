@@ -1,0 +1,42 @@
+{
+  "code": 0,
+  "msg": "non-production release example",
+  "data": {
+    "facebook_app_id": "",
+    "client_token": "",
+    "isAcquiredUser": false,
+    "ac_ad_config": {
+      "ac_launch": [{"ad_unit_id": "EXAMPLE_RELEASE_OPEN_NOT_PRODUCTION", "ad_paltfrom": "admob", "ad_type": "op", "ad_timelimit": 600}],
+      "ac_language_int": [{"ad_unit_id": "EXAMPLE_RELEASE_INTERSTITIAL_NOT_PRODUCTION", "ad_paltfrom": "admob", "ad_type": "int", "ad_timelimit": 600}],
+      "ac_guide_int": [],
+      "ac_file_int": [],
+      "ac_top_int": [],
+      "ac_check_int": [],
+      "ac_mainback_int": [],
+      "ac_uninstall1_int": [],
+      "ac_uninstall2_int": [],
+      "ac_main_nat": [{"ad_unit_id": "EXAMPLE_RELEASE_NATIVE_NOT_PRODUCTION", "ad_paltfrom": "admob", "ad_type": "nat", "ad_timelimit": 600}],
+      "ac_recent_nat": [],
+      "ac_recent_banner": [{"ad_unit_id": "EXAMPLE_RELEASE_BANNER_NOT_PRODUCTION", "ad_paltfrom": "admob", "ad_type": "banner", "ad_timelimit": 600}],
+      "ac_setting_nat": [],
+      "ac_uninstall1_nat": [],
+      "ac_uninstall2_nat": [],
+      "ac_language_nat": [],
+      "ac_guide_nat": []
+    },
+    "ac_nat_config": {"switch_open": 1},
+    "ad_show_config": {"launch_min_ms": 1500, "launch_wait_ms": 8000, "catchup_ms": 20000, "preload_on_background": true, "catchup_enabled": true},
+    "new_config": {"ac_on": 1, "ac_home": 30, "ac_home_limit": 40, "home_delay": 3, "ac_exit": 30, "ac_exit_limit": 40, "exit_delay": 3, "ac_recent": 30, "ac_recent_limit": 40, "recent_delay": 5, "ac_adclick": 30, "ac_adclick_limit": 40, "adclick_delay": 2},
+    "samsung_new_config": {"ac_on": 1, "ac_exit": 30, "ac_home": 30, "ac_recent": 30, "ac_adclick": 30, "exit_delay": 3, "home_delay": 2, "recent_delay": 5, "ac_exit_limit": 20, "ac_home_limit": 20, "adclick_delay": 2, "ac_recent_limit": 20, "ac_adclick_limit": 20},
+    "acpop_config": {"nopop_start": 24, "nopop_end": 6, "ac_on": 1, "ac_t": 30, "ac_t_limit": 30, "ac_u": 5, "ac_u_limit": 40, "ac_a": 30, "ac_a_limit": 40},
+    "samsung_ac_pop": {"ac_a": 30, "ac_t": 30, "ac_u": 0, "ac_on": 1, "nopop_end": 6, "ac_a_limit": 20, "ac_t_limit": 15, "ac_u_limit": 50, "nopop_start": 24},
+    "pop_refresh": {"pop_refresh_switch": 1, "times": 30, "interval": 2},
+    "media_config": {"switch": 1, "intervalTime": 30},
+    "win_pop_config": {"first_interval": 0, "jump_percent": 0, "winpop_jump_switch": 0},
+    "ads_limit": {"ac_ads_limit": 50},
+    "global_block": {"global_block_switch": 1},
+    "google_play_block": {"google_play_block": 0},
+    "vpn_config_switch": {"vpn_config_switch": 0},
+    "virtual_block_switch": {"virtual_block_switch": 1}
+  }
+}

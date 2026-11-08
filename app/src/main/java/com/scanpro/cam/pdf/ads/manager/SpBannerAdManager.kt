@@ -10,7 +10,7 @@ import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import com.scanpro.cam.pdf.ads.SpAdConfig
-import com.scanpro.cam.pdf.ads.SpAdIncomeReport
+import com.zppko.pdfplus.nor.ads.tool.Price
 import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
@@ -112,15 +112,9 @@ class SpBannerAdManager(
         closeShown(bannerLife)
         val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.BANNER, position, adInfo.requestUnitId)
         bannerLife = life
+        // 收益对齐 PDF26：统一走 Price.qqq（OnPaidEvent → USD 换算 + 三路 + 累积）
         banner.setOnPaidEventListener { value ->
-            SpAdIncomeReport.sendAdIncome(
-                appContext,
-                value,
-                banner.responseInfo,
-                AdTrackingHelper.AdType.BANNER,
-                position,
-                life,
-            )
+            Price.qqq(value.valueMicros, value.currencyCode)
         }
         banner.adListener = object : AdListener() {
             override fun onAdLoaded() {

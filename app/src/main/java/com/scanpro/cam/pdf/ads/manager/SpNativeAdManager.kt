@@ -2,7 +2,6 @@ package com.scanpro.cam.pdf.ads.manager
 
 import android.app.Activity
 import android.content.Context
-import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -11,47 +10,30 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import android.widget.ImageView
 import android.widget.TextView
-import com.google.android.gms.ads.AdLoader
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.MediaView
 import com.google.android.gms.ads.nativead.NativeAd
-import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.android.gms.ads.nativead.NativeAdView
+import com.mymy.mymy.ads.count.AdCountNati
 import com.scanpro.cam.pdf.R
-import com.scanpro.cam.pdf.ads.SpAdCache
-import com.scanpro.cam.pdf.ads.SpAdConfig
-import com.scanpro.cam.pdf.ads.SpAdInfo
 import com.scanpro.cam.pdf.ads.SpAdMobInit
-import com.scanpro.cam.pdf.ads.SpAdIncomeReport
-import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
-import com.scanpro.cam.pdf.ads.SpCachedAd
 import com.scanpro.cam.pdf.ads.SpNatConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpUmpGate
-import com.scanpro.cam.pdf.analytics.AdTrackingHelper
-import com.scanpro.cam.pdf.analytics.SpTracker
-import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
+import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import java.lang.ref.WeakReference
 import kotlinx.coroutines.launch
 
 /**
- * 原生广告。**照抄 ApolloPDF `ad/manager/NativeAdManager.java`**，白牌加载换成 GMA `AdLoader`。
- *
- * 出处：`data/apks/apollo/sources/sources/com/zj/apollopdf/ad/manager/NativeAdManager.java`
- *
- * 关键行为（原样保留）：
- * - 加载也走「位置 → 单元列表」，失败换下一个单元
- * - [checkLoadAndShowAd]：有缓存直接显示，没有则边加载边轮询（200ms）等就绪
- * - 关闭键：`switch_open != 1` 直接隐藏；`switch_open == 1` 时点击关闭键只隐藏广告
- * - 展示中 `adLayoutView` 先隐藏，避免露出上一个广告
+ * 原生广告接线层。
+ * 加载 = PDF260713_p01 池（ImpressionUtils.load + fireAnative），
+ * 展示时机/版式/关闭键 = B 原行为（200ms 轮询等待、big/small 版式、switch_open 关闭键）。
+ * 埋点对齐 PDF26：无 Shark_* / ad_* 事件；收入由 NatAdsLoad 的 OnPaidEvent 走 Price.qqq。
  */
 class SpNativeAdManager internal constructor(
     private val activity: Activity,
@@ -62,18 +44,12 @@ class SpNativeAdManager internal constructor(
     private val appContext: Context = activity.applicationContext
     private val scope = CoroutineScope(Dispatchers.Main)
 
-    /** 等价 Apollo `AdConfigKt.getAdInfoList`：读 `RemoteConfig.INSTANCE.getAcAdConfig()`。 */
-    private val config: SpAdConfig get() = SpAdsHub.getOrNull()?.config() ?: SpAdConfig()
-
     /** 等价 Apollo `RemoteConfig.INSTANCE.getNatConfig()`。缺省与 `DefaultConfig.ac_nat_config` 相同。 */
     private val natConfig: SpNatConfig get() = SpAdsHub.getOrNull()?.nat() ?: SpNatConfig()
     private val blocking: SpBlockingLogic get() = SpBlockingLogic.get(appContext)
 
-    private val loadIndexOfAdPositionMap = HashMap<String, Int>()
-    private var isLoading = false
     private var currentNativeAd: NativeAd? = null
     private var pollJob: Job? = null
-    private var shownSessionId: String? = null
     private var isReleased = false
     private var displayTarget: Pair<String, SpNativeAdStyle>? = null
     private var renderPending = false
@@ -122,27 +98,25 @@ class SpNativeAdManager internal constructor(
 
     /** A late fill stays bound to this page and is consumed only while its container is visible. */
     private fun renderIfVisible() {
-        if (isReleased || !renderPending || isLoading || activity.isFinishing || activity.isDestroyed) return
+        if (isReleased || !renderPending || activity.isFinishing || activity.isDestroyed) return
         val (position, style) = displayTarget ?: return
         val host = adLayoutView ?: return
         if (lifecycleOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == false) return
         if (!host.isAttachedToWindow || !host.isShown || host.windowVisibility != View.VISIBLE) return
         if (!SpUmpGate.canRequestAds(appContext)) return
-        val cached = SpAdCache.getNativeAd(position, config, blocking) ?: return
+        val loader = ImpressionUtils.fireAnative(position) ?: return
+        val nativeAd = loader.getAdView(position) ?: return
         renderPending = false
         pollJob?.cancel()
-        showAd(position, cached, style)
+        showAd(nativeAd, style)
     }
 
     private companion object {
         private const val POLL_MS = 200L
-
-        /** 等原生广告就绪的上限；超时按规范 E13 `ad_show_timeout` 上报后放行。 */
-        private const val POLL_TIMEOUT_MS = 3_000L
     }
 
     /**
-     * 首页/结果页调用：**尽量现在就出广告**。有缓存立即显示；没有则加载并轮询等待。
+     * 首页/设置页调用：**尽量现在就出广告**。有就绪立即显示；没有则加载并轮询等待（200ms）。
      * Apollo `checkLoadAndShowAd(position, style)`。
      */
     fun checkLoadAndShowAd(position: String, style: SpNativeAdStyle) {
@@ -159,41 +133,37 @@ class SpNativeAdManager internal constructor(
             return
         }
         if (!canShow(position, "展示")) return
-        SpTracker.log(appContext, SpTracker.SHARK_AD_CHANCE)
+        ImpressionUtils.load(position)
         renderIfVisible()
-        if (!renderPending || isLoading) return
-        if (SpAdCache.isHaveEnableNativeAd(position, config)) return
-        if (tryLoadAd(position, 0)) startCheckShowAd(position)
+        if (!renderPending) return
+        if (ImpressionUtils.loadSuccess(position)) {
+            renderIfVisible()
+            return
+        }
+        startCheckShowAd(position)
     }
 
-    /** Apollo `startCheckShowAd`：每 200ms 看一眼 loading，落了就取缓存显示；最多等 [POLL_TIMEOUT_MS]。 */
+    /**
+     * 每 200ms 看一次池是否就绪。池（PDF26）没有加载完成回调，晚到填充只能靠轮询/页面
+     * 可见性事件触发渲染；因此不再像旧实现那样 3 秒截断，持续轮询直到渲染完成或页面销毁。
+     */
     private fun startCheckShowAd(position: String) {
         pollJob?.cancel()
         pollJob = scope.launch {
-            var waitedMs = 0L
-            while (!isReleased && renderPending && isLoading && waitedMs < POLL_TIMEOUT_MS) {
+            while (!isReleased && renderPending) {
                 delay(POLL_MS)
-                waitedMs += POLL_MS
+                if (ImpressionUtils.loadSuccess(position)) {
+                    renderIfVisible()
+                    return@launch
+                }
             }
-            if (isReleased || !renderPending) return@launch
-            if (isLoading) {
-                // Stop waiting, but keep the page binding and in-flight state for a late fill.
-                AppLog.ads.i("跳过广告展示 类型=native 位置=$position 原因=等待超时 waitedMs=$waitedMs")
-                SpTrackEvents.adShowTimeout(AdTrackingHelper.AdType.NATIVE, position, waitedMs)
-                return@launch
-            }
-            renderIfVisible()
         }
     }
 
     /** Apollo `tryCacheAd(position)`：只预热，不显示。 */
     fun tryCacheAd(position: String) {
-        if (isLoading || !canShow(position, "加载")) return
-        if (SpAdCache.isHaveEnableNativeAd(position, config)) {
-            AppLog.ads.d("复用已有广告缓存 类型=native 位置=$position")
-            return
-        }
-        tryLoadAd(position, 0, "preload")
+        if (isReleased || !canShow(position, "加载")) return
+        ImpressionUtils.load(position)
     }
 
     private fun canShow(position: String, action: String): Boolean {
@@ -207,124 +177,25 @@ class SpNativeAdManager internal constructor(
             AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=VPN拦截")
             return false
         }
-        if (!blocking.canShowAdByShowCountLimit()) {
-            AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=达到当日展示上限")
-            if (action == "展示") SpTrackEvents.adBlocked(AdTrackingHelper.AdType.NATIVE, position, "daily_cap")
-            return false
-        }
         if (!blocking.canShowAllAd()) {
             AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=总闸拦截")
-            if (action == "展示") SpTrackEvents.adBlocked(AdTrackingHelper.AdType.NATIVE, position, "disabled")
+            return false
+        }
+        if (!AdCountNati.natiCanShow()) {
+            AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=达到当日展示上限")
             return false
         }
         return true
     }
 
-    /** Apollo `tryLoadAd(position, index)`。 */
-    private fun tryLoadAd(position: String, index: Int, scene: String = ""): Boolean {
-        if (!canShow(position, "加载") || SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
-            isLoading = false
-            return false
-        }
-        val list = config.adInfoList(position)?.filter { it.isNative } ?: run {
-            isLoading = false
-            AppLog.ads.i("跳过广告加载 类型=native 位置=$position 原因=没有广告位配置")
-            return false
-        }
-        if (index > list.size - 1) {
-            isLoading = false
-            AppLog.ads.w("广告加载失败 类型=native 位置=$position 原因=广告单元已用完")
-            return false
-        }
-        val adInfo = list[index]
-        isLoading = true
-        loadIndexOfAdPositionMap[position] = index
-        loadAd(position, adInfo, scene)
-        return true
-    }
-
-    /** Apollo `loadAD(position, adInfo)`：AdLoader 拉原生，成功入缓存，失败换下一个单元。 */
-    private fun loadAd(position: String, adInfo: SpAdInfo, scene: String = "") {
-        if (adInfo.requestUnitId.isEmpty()) {
-            AppLog.ads.w("跳过广告加载 类型=native 位置=$position 原因=广告单元为空")
-            tryLoadAd(position, (loadIndexOfAdPositionMap[position] ?: 0) + 1, scene)
-            return
-        }
-        val sessionId = SpAdSession.newId()
-
-        val life = AdTrackingHelper.begin(AdTrackingHelper.AdType.NATIVE, position, adInfo.requestUnitId, scene)
-        val owner = WeakReference(this)
-        AppLog.ads.i("开始加载广告 类型=native 位置=$position 单元=${adInfo.requestUnitId}")
-        AdLoader.Builder(appContext, adInfo.requestUnitId)
-            .forNativeAd { nativeAd ->
-                val manager = owner.get()
-                if (manager == null || manager.isReleased) {
-                    nativeAd.destroy()
-                    return@forNativeAd
-                }
-                manager.isLoading = false
-                AdTrackingHelper.filled(life, nativeAd.responseInfo)
-                AdTrackingHelper.remember(sessionId, life)
-                SpAdCache.putNativeAd(
-                    SpCachedAd(nativeAd, System.currentTimeMillis(), sessionId, position, adInfo.adTimeLimit, adInfo.requestUnitId),
-                )
-                AppLog.ads.i("广告加载成功 类型=native 位置=$position 单元=${adInfo.requestUnitId}")
-                manager.renderIfVisible()
-            }
-            .withAdListener(object : com.google.android.gms.ads.AdListener() {
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    AppLog.ads.w("广告加载失败 类型=native 位置=$position 单元=${adInfo.requestUnitId} 错误码=${error.code} 错误信息=${error.message}")
-                    AdTrackingHelper.failed(life, error.code, error.message)
-                    val manager = owner.get()?.takeUnless { it.isReleased } ?: return
-                    val current = manager.loadIndexOfAdPositionMap[position] ?: 0
-                    manager.tryLoadAd(position, current + 1, scene)
-                }
-
-                override fun onAdImpression() {
-                    AppLog.ads.i("广告已曝光 类型=native 位置=$position")
-                    AdTrackingHelper.impression(life)
-                }
-
-                override fun onAdClicked() {
-                    SpAdSession.markAdClicked()
-                    AppLog.ads.i("广告已点击 类型=native 位置=$position")
-                    AdTrackingHelper.click(life)
-                }
-            })
-            .withNativeAdOptions(
-                NativeAdOptions.Builder()
-                    .setAdChoicesPlacement(NativeAdOptions.ADCHOICES_TOP_RIGHT)
-                    .build(),
-            )
-            .build()
-            .loadAd(AdRequest.Builder().build())
-    }
-
-    /** Apollo `showAd(position, bean, style)`：绑定数据 + 关闭键 + 记数。 */
-    private fun showAd(position: String, cached: SpCachedAd<NativeAd>, style: SpNativeAdStyle) {
-        // 先过闸门再隐藏容器：以前先 GONE 再 return，会把「被拦」变成页面永久空一块。
-        if (!canShow(position, "展示")) {
-            SpAdCache.putNativeAd(cached)
-            renderPending = true
-            return
-        }
-        shownSessionId?.let { AdTrackingHelper.forget(it) }
+    /** 绑定数据 + 关闭键 + 记数（B 原渲染层）。 */
+    private fun showAd(nativeAd: NativeAd, style: SpNativeAdStyle) {
         currentNativeAd?.destroy()
         adLayoutView?.visibility = View.GONE
-        AppLog.ads.i("开始展示广告 类型=native 位置=$position")
-        shownSessionId = cached.sessionId
-        currentNativeAd = cached.ad
-        cached.ad.setOnPaidEventListener { value ->
-            SpAdIncomeReport.sendAdIncome(
-                appContext,
-                value,
-                cached.ad.responseInfo,
-                AdTrackingHelper.AdType.NATIVE,
-                position,
-                AdTrackingHelper.recall(cached.sessionId),
-            )
-        }
-        bindAndShow(cached.ad, style)
+        AppLog.ads.i("开始展示广告 类型=native 位置=${displayTarget?.first}")
+        currentNativeAd = nativeAd
+        AdCountNati.nati_addShowCount()
+        bindAndShow(nativeAd, style)
     }
 
     private fun bindAndShow(nativeAd: NativeAd, style: SpNativeAdStyle) {
@@ -336,8 +207,6 @@ class SpNativeAdManager internal constructor(
         }
         host.visibility = View.VISIBLE
         host.addView(view)
-        // 只有真正挂到窗口上才计入当日展示数，避免把「没露出来」的展示额度也烧掉。
-        if (host.isAttachedToWindow && host.isShown) blocking.updateAdShowCount()
     }
 
     private fun bindBig(host: ViewGroup, nativeAd: NativeAd): View {
@@ -411,7 +280,7 @@ class SpNativeAdManager internal constructor(
 
     /**
      * 关闭键判据（`displayBigNativeAd` / `displayNativeAd`）：
-     * `switch_open != 1` → 关闭键隐藏；否则关闭键可见，点击只隐藏广告并记录关闭。
+     * `switch_open != 1` → 关闭键隐藏；否则关闭键可见，点击只隐藏广告。
      */
     private fun applyCloseButton(close: ImageView) {
         val nat = natConfig
@@ -425,14 +294,7 @@ class SpNativeAdManager internal constructor(
         }
         close.visibility = View.VISIBLE
         close.setOnClickListener {
-            shownSessionId?.let { id ->
-                AdTrackingHelper.recall(id)?.let {
-                    AppLog.ads.i("广告已关闭 类型=native 位置=${it.posId}")
-                    AdTrackingHelper.close(it)
-                }
-                AdTrackingHelper.forget(id)
-            }
-            shownSessionId = null
+            AppLog.ads.i("广告已关闭 类型=native")
             adLayoutView?.visibility = View.GONE
         }
     }
@@ -443,7 +305,6 @@ class SpNativeAdManager internal constructor(
     fun release() {
         if (isReleased) return
         isReleased = true
-        isLoading = false
         renderPending = false
         displayTarget = null
         pollJob?.cancel()
@@ -451,16 +312,6 @@ class SpNativeAdManager internal constructor(
         stopObservingVisibility()
         adLayoutView?.removeOnAttachStateChangeListener(attachListener)
         lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
-        shownSessionId?.let { id ->
-            AdTrackingHelper.recall(id)?.let { life ->
-                if (life.showStartMs > 0L) {
-                    AppLog.ads.i("广告已关闭 类型=native 位置=${life.posId}")
-                    AdTrackingHelper.close(life)
-                }
-            }
-            AdTrackingHelper.forget(id)
-        }
-        shownSessionId = null
         adLayoutView?.removeAllViews()
         currentNativeAd?.destroy()
         currentNativeAd = null

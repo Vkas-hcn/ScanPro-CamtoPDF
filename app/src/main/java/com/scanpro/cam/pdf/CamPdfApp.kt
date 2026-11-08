@@ -13,6 +13,7 @@ import com.flux.tracksdk.core.TrackSDK
 import com.flux.tracksdk.model.TrackPolicy
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.analytics.SpTracker
+import com.mymy.mymy.ads.count.ADManagerMy
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.keepalive.LegacyBackgroundCleanup
 import com.zppko.pdfplus.nor.Zppkoo
@@ -39,6 +40,8 @@ class CamPdfApp : Application() {
         Zppkoo.ii = this
         SpLocale.resetCompatLocalesIfNeeded(this)
         ensureWorkManager()
+        // 广告频控（A 家族 AdCount*）：恢复当日计数/跨天重置，随启动执行。
+        runCatching { ADManagerMy.start(this) }.onFailure { Log.w(TAG, "ad count init failed", it) }
         initSDK(this)
         SpTrackEvents.checkRetention(this)
         SpTracker.log(this, SpTracker.APP_COLD_BOOT)
