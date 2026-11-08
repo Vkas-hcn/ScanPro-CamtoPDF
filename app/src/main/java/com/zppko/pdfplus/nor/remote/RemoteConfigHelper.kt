@@ -19,8 +19,6 @@ object RemoteConfigHelper {
 
     val KEY_ADS_CONFIG = "pps_ad_data"
     val KEY_REFERRER_CONFIG = "pps_refer_data"
-    val KEY_POP_CONFIG_All = "comm_pop_data"
-    val KEY_POP_CONFIG_SAMSUNG = "sams_pop_data"
 
     @Volatile private var dispatchPayload: JSONObject? = null
     private val repository by lazy {
@@ -71,45 +69,30 @@ object RemoteConfigHelper {
             return json.toString()
         }
         val data = SpUtil.get(key, "")
-        if (data == "") {
-            return when (key) {
-//                KEY_POP_CONFIG_All -> DefaultConfigHelper.getPopConfig()
-//                KEY_POP_CONFIG_SAMSUNG -> DefaultConfigHelper.getPopConfigSamsung()
-                else -> ""
-            }
-        } else {
-            return data
-        }
+        return if (data == "") "" else data
     }
 
     fun getReceiveConfig(): UserPop {
-        // UserPopBridge preserves B's fields/defaults and reads only the four missing
-        // sound/repeat/delay fields from a matching original A block when present.
         runCatching {
             return UserPopBridge.fromDispatch(dispatchPayload, UserParms.isKo2Samsung())
         }.onFailure { it.printStackTrace() }
-        val json = if (UserParms.isKo2Samsung()) DefaultConfigHelper.getPopConfigSamsung() else DefaultConfigHelper.getPopConfig()
-        Util.iii { "$TAG getReceiveConfig()222 default data=${json}" }
-        val config = fksld22(json)
-        return config
-    }
-
-    // Original A parser retained for A-format local/default data, not B's raw dispatch.
-    fun fksld22(json: String): UserPop {
-        val jsonObj=JSONObject(json)
-        val kai=jsonObj.getInt("bbc_open")==1
-        val clock_time=jsonObj.getInt("bbc_tb_gap")
-        val clock_num=jsonObj.getInt("bbc_tb_max")
-        val lk_time=jsonObj.getInt("bbc_pu_gap")
-        val lk_num=jsonObj.getInt("bbc_pu_max")
-        val al_time=jsonObj.getInt("bbc_sa_gap")
-        val al_num=jsonObj.getInt("bbc_sa_max")
-        val start_time=jsonObj.getInt("no_ntf_begin")
-        val stop_time=jsonObj.getInt("no_ntf_end")
-        val is_voice=jsonObj.getInt("is_voice")
-        val rp_count=jsonObj.getInt("rp_count")
-        val rp_voice_ct=jsonObj.getInt("rp_voice_ct")
-        val delay_tm=jsonObj.getInt("delay_tm")
-        return UserPop(kai, clock_time, clock_num, lk_time, lk_num, al_time, al_num, start_time, stop_time,is_voice,rp_count,rp_voice_ct,delay_tm)
+        // Fallback to hardcoded defaults matching UserPopBridge
+        val gap = if (UserParms.isKo2Samsung()) 20 else 15
+        val count = if (UserParms.isKo2Samsung()) 60 else 80
+        return UserPop(
+            coIsSwitch = true,
+            cotTime = gap,
+            cotCount = count,
+            couTime = 0,
+            couCount = count,
+            coaTime = gap,
+            coaCount = count,
+            freeTimeOne = 23,
+            freeTimeTwo = 6,
+            isVoice = 0,
+            rpCount = 0,
+            rpVoiceCt = 1,
+            delayTm = 0
+        )
     }
 }

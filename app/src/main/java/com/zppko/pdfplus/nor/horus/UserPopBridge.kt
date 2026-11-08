@@ -4,19 +4,18 @@ import org.json.JSONObject
 
 /** Adapts B's raw dispatch payload. The caller supplies A's Korean Samsung classification. */
 object UserPopBridge {
+    private fun asObject(value: Any?): JSONObject? = when (value) {
+        is JSONObject -> value
+        is String -> runCatching { JSONObject(value) }.getOrNull()
+        else -> null
+    }
+
     fun fromDispatch(payload: JSONObject?, isKoreanSamsung: Boolean): UserPop {
-        val raw = payload?.opt("acpop_config")
-        val pop = when (raw) {
-            is JSONObject -> raw
-            is String -> runCatching { JSONObject(raw) }.getOrNull()
-            else -> null
-        }
-        // Only original A blocks may supply the four fields missing from B's protocol.
-        val originalRaw = payload?.opt(if (isKoreanSamsung) "sams_pop_data" else "comm_pop_data")
-        val originalPop = when (originalRaw) {
-            is JSONObject -> originalRaw
-            is String -> runCatching { JSONObject(originalRaw) }.getOrNull()
-            else -> null
+        // 韩国三星优先读 samsung_acpop_config（与 A 的 sams_pop_data 行为对齐），缺块回退 acpop_config。
+        val pop = if (isKoreanSamsung) {
+            asObject(payload?.opt("samsung_acpop_config")) ?: asObject(payload?.opt("acpop_config"))
+        } else {
+            asObject(payload?.opt("acpop_config"))
         }
         fun number(key: String): Int? {
             val value = pop?.opt(key) ?: return null
@@ -38,10 +37,10 @@ object UserPopBridge {
             coaCount = number("ac_a_limit") ?: count,
             freeTimeOne = number("nopop_start") ?: 23,
             freeTimeTwo = number("nopop_end") ?: 6,
-            isVoice = originalPop?.optInt("is_voice", 0) ?: 0,
-            rpCount = originalPop?.optInt("rp_count", 0) ?: 0,
-            rpVoiceCt = originalPop?.optInt("rp_voice_ct", 1) ?: 1,
-            delayTm = originalPop?.optInt("delay_tm", 0) ?: 0,
+            isVoice = 0,
+            rpCount = 0,
+            rpVoiceCt = 1,
+            delayTm = 0,
         )
     }
 }

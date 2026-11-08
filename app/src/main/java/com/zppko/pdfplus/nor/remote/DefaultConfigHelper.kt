@@ -202,45 +202,42 @@ object DefaultConfigHelper {
 //    rp_count: 通知重复次数 ,0不重复发送（只发默认的那一次），1重复发1次，2重复发2次
 //    rp_voice_ct: 通知重复次数的声音次数，0,没有声音，1第一次有声音，2前两次有声音，3前三次有声音...以此内推
 //    delay_tm:解锁通知延时 0，解锁后不延时，1解锁后延时1分钟
-    fun getPopConfig(): String {
-        val popConfig = """
+
+    fun getSamsungNewConfig(): String {
+        val samsungNewConfig = """
 {
-  "no_ntf_begin":23,
-  "no_ntf_end":6,
-  "bbc_open": 1,
-  "bbc_tb_gap": 15,
-  "bbc_tb_max": 80,
-  "bbc_pu_gap": 0,
-  "bbc_pu_max":80,
-  "bbc_sa_gap": 15,
-  "bbc_sa_max":80,
-  "is_voice":0,
-  "rp_count":0,
-  "rp_voice_ct":1,
-  "delay_tm":0
+  "ac_on": 1,
+  "ac_exit": 30,
+  "ac_home": 30,
+  "ac_recent": 30,
+  "ac_adclick": 30,
+  "exit_delay": 3,
+  "home_delay": 2,
+  "recent_delay": 5,
+  "ac_exit_limit": 20,
+  "ac_home_limit": 20,
+  "adclick_delay": 2,
+  "ac_recent_limit": 20,
+  "ac_adclick_limit": 20
 }
         """.trimIndent()
-        return popConfig
+        return samsungNewConfig
     }
 
-    fun getPopConfigSamsung(): String {
-        val popConfigSamsung = """
+    fun getSamsungAcPopConfig(): String {
+        val samsungAcPop = """
 {
-  "no_ntf_begin":23,
-  "no_ntf_end":6,
-  "bbc_open": 1,
-  "bbc_tb_gap": 20,
-  "bbc_tb_max": 60,
-  "bbc_pu_gap": 0,
-  "bbc_pu_max":60,
-  "bbc_sa_gap": 20,
-  "bbc_sa_max":60,
-  "is_voice":0,
-  "rp_count":0,
-  "rp_voice_ct":1,
-  "delay_tm":0
+  "ac_a": 30,
+  "ac_t": 30,
+  "ac_u": 0,
+  "ac_on": 1,
+  "nopop_end": 6,
+  "ac_a_limit": 20,
+  "ac_t_limit": 15,
+  "ac_u_limit": 50,
+  "nopop_start": 24
 }
-    """.trimIndent()
-        return popConfigSamsung
+        """.trimIndent()
+        return samsungAcPop
     }
 }

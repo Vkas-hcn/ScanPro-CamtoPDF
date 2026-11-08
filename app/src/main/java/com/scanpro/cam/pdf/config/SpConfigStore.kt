@@ -10,6 +10,7 @@ import com.scanpro.cam.pdf.notice.SpNewConfig
 import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.scanpro.cam.pdf.notice.SpWinPopConfig
 import com.scanpro.cam.pdf.util.AppLog
+import com.zppko.pdfplus.nor.ads.tool.UserParms
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -55,7 +56,15 @@ class SpConfigStore {
     }
 
     fun newConfig(payload: JSONObject?): SpNewConfig {
-        val json = valueAsObject(payload, SpConfigWire.KEY_NEW_CONFIG) ?: return SpNewConfig()
+        // Samsung 设备优先读取 samsung_new_config，回退到 new_config
+        val configKey = if (UserParms.isSamsung()) {
+            SpConfigWire.KEY_SAMSUNG_NEW_CONFIG
+        } else {
+            SpConfigWire.KEY_NEW_CONFIG
+        }
+        val json = valueAsObject(payload, configKey) 
+            ?: valueAsObject(payload, SpConfigWire.KEY_NEW_CONFIG) 
+            ?: return SpNewConfig()
         val base = SpNewConfig()
         return base.copy(
             acOn = json.optIntOrNull(SpConfigWire.KEY_AC_ON) ?: base.acOn,
@@ -76,7 +85,15 @@ class SpConfigStore {
     }
 
     fun acPopConfig(payload: JSONObject?): SpAcPopConfig {
-        val json = valueAsObject(payload, SpConfigWire.KEY_AC_POP_CONFIG) ?: return SpAcPopConfig()
+        // Samsung 设备优先读取 samsung_acpop_config，回退到 acpop_config
+        val configKey = if (UserParms.isSamsung()) {
+            SpConfigWire.KEY_SAMSUNG_AC_POP
+        } else {
+            SpConfigWire.KEY_AC_POP_CONFIG
+        }
+        val json = valueAsObject(payload, configKey) 
+            ?: valueAsObject(payload, SpConfigWire.KEY_AC_POP_CONFIG) 
+            ?: return SpAcPopConfig()
         val base = SpAcPopConfig()
         return base.copy(
             noPopStart = json.optIntOrNull(SpConfigWire.KEY_NO_POP_START) ?: base.noPopStart,
