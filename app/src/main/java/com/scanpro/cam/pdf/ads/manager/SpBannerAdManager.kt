@@ -15,7 +15,6 @@ import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.ads.SpUmpGate
 import com.scanpro.cam.pdf.analytics.AdTrackLife
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpTracker
@@ -59,8 +58,8 @@ class SpBannerAdManager(
             AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=管理器已释放")
             return
         }
-        if (!SpUmpGate.canRequestAds(appContext)) {
-            AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=用户同意尚未就绪")
+        if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true) {
+            AppLog.ads.i("跳过广告加载 类型=banner 位置=$position 原因=UMP流程未完成")
             return
         }
         if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {

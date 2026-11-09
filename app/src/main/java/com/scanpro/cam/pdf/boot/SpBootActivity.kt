@@ -21,7 +21,6 @@ import com.scanpro.cam.pdf.ads.SpAdPosition
 import com.scanpro.cam.pdf.ads.SpAdShowConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpHotStartGate
-import com.scanpro.cam.pdf.ads.SpLaunchAdCatchup
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.scanpro.cam.pdf.analytics.SpSceneCode
 import com.scanpro.cam.pdf.analytics.SpTracker
@@ -50,6 +49,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     private var finished = false
     private var openAdStarted = false
     private var adsFlowStarted = false
+    private var bootFinishStarted = false
+    private var bootFlowStartedAt = 0L
     private var maxTimeoutMs = SpBootViewModel.DEFAULT_BOOT_MS
 
     /**
@@ -120,8 +121,6 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         handleNotificationEntry()
 
-        // 开屏广告的唯一加载入口：启动页。配置晚到时由 preloadLaunchAdForBoot 在页面存活期间补一次。
-        preloadLaunchAdForBoot()
         SpTracker.log(
             this,
             SpTracker.SHARK_AD_CHANCE,
@@ -130,17 +129,10 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 putString(KEY_TYPE, entrySceneType)
             },
         )
-        lifecycleScope.launch {
-            val hub = SpAdsHub.getOrNull()
-            hub?.requestStartupConsent(this@SpBootActivity)
-            // consent 结束后由启动页补一次；页面已经销毁时不再发请求。
-            if (!isFinishing && !isDestroyed) {
-                hub?.preloadLaunchAd("boot-consent")
-            }
-            if (!isFinishing && !isDestroyed) {
-                notifyPermissionFlow.checkAndRequest()
-            }
-        }
+
+        // PDF26 顺序：通知权限 → UMP → 加载 → 等待/展示。
+        // 权限回答后由 onNotifyPermissionAnswered() 先跑 UMP，再进入 beginBootAdsFlow()。
+        notifyPermissionFlow.checkAndRequest()
     }
 
     /**
@@ -241,46 +233,38 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     override fun observeData() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    viewModel.progress.collect { value ->
-                        binding.bootProgress.setProgressCompat(
-                            value.coerceIn(0, binding.bootProgress.max),
-                            true,
-                        )
-                    }
-                }
-                launch {
-                    viewModel.finished.collect { done ->
-                        if (done) onBootTimeout()
-                    }
+                viewModel.progress.collect { value ->
+                    binding.bootProgress.setProgressCompat(
+                        value.coerceIn(0, binding.bootProgress.max),
+                        true,
+                    )
                 }
             }
         }
     }
 
     /**
-     * 开屏时序：最短停留 `launchMinMs` → 最多等 `launchWaitMs` 等广告就绪 → 命中即展示。
+     * 开屏时序（对齐 PDF26）：
+     * 启动进度 → UMP（仅欧盟）→ 加载 → 最多等 `launchWaitMs`（默认 15s）→ 就绪立即展示
+     * → 关闭后至少停留 200ms → 500ms 补满进度 → 跳转。
      *
-     * 旧实现是固定 `delay(3000)` 后只看一眼缓存：而实测填充耗时 p50 约 3.7 秒，
-     * 大部分填充都晚于这个时间点，等于「加载成功了但永远不展示」。
-     *
-     * `launchWaitMs` 不设上限，所以这里的兜底总时长跟着配置放大——否则远端填 15 秒，
-     * 也会被本地的 10 秒进度条提前截断。
+     * 进度条只负责视觉，不再作为导航依据（PDF26 的进度也不触发导航）。
+     * 无广告超时后直接进入收尾，不再 arm 首页补展示。
      */
     private fun beginBootAdsFlow() {
         if (adsFlowStarted || finished || isFinishing) return
         adsFlowStarted = true
+        bootFlowStartedAt = SystemClock.elapsedRealtime()
 
         val hub = SpAdsHub.getOrNull()
         val showConfig = hub?.showConfig() ?: SpAdShowConfig()
-        // 热启动是「每次回前台」都会走一遍的路径，不能按冷启的十几秒去等，
-        // 否则用户每次切回来都要盯着进度条。
+        // 热启动是「每次回前台」都会走一遍的路径，不能按冷启的十几秒去等。
         maxTimeoutMs = if (isHotStart) {
-            showConfig.launchMinMs + HOT_START_MAX_WAIT_MS + BOOT_SLACK_MS
+            HOT_START_MAX_WAIT_MS + BOOT_SLACK_MS
         } else {
             maxOf(
                 SpBootViewModel.DEFAULT_BOOT_MS,
-                showConfig.launchMinMs + showConfig.launchWaitMs + BOOT_SLACK_MS,
+                showConfig.launchWaitMs + BOOT_SLACK_MS,
             )
         }
         binding.bootProgress.max = maxTimeoutMs.toInt().coerceAtLeast(1)
@@ -288,36 +272,46 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         lifecycleScope.launch {
             if (hub == null) {
-                continueToShell()
+                onLoadingFinished()
                 return@launch
             }
-            val startedAt = SystemClock.elapsedRealtime()
-            delay(showConfig.launchMinMs.coerceAtLeast(0L))
+            // PDF26：进度已启动，UMP 之后才 load。
+            hub.requestStartupConsent(this@SpBootActivity)
+            if (finished || isFinishing || isDestroyed) return@launch
+            preloadLaunchAdForBoot()
 
-            val elapsed = SystemClock.elapsedRealtime() - startedAt
-            val remaining = (maxTimeoutMs - elapsed).coerceAtLeast(0L)
+            val waitStartedAt = SystemClock.elapsedRealtime()
             val waitLimit = if (isHotStart) {
                 minOf(showConfig.launchWaitMs, HOT_START_MAX_WAIT_MS)
             } else {
                 showConfig.launchWaitMs
             }
-            val waitMs = minOf(waitLimit, remaining)
-            val ready = hub.awaitOpenAd(waitMs)
-
+            val ready = hub.awaitOpenAd(waitLimit)
             if (ready) {
                 tryPresentOpenIfReady()
                 return@launch
             }
-            // 规范 E13：到了展示点、等兜底广告超时后放行。这是「失去展示机会」唯一合规口径。
+            // 规范 E13：等兜底广告超时后放行，这是「失去展示机会」唯一合规口径。
             SpTrackEvents.adShowTimeout(
                 AdTrackingHelper.AdType.OPEN,
                 SpAdPosition.AC_LAUNCH,
-                SystemClock.elapsedRealtime() - startedAt,
+                SystemClock.elapsedRealtime() - waitStartedAt,
             )
-            // 热启动不 arm 补展示：这一路不会创建 CamShellActivity，arm 了也没人展示
-            if (showConfig.catchupEnabled && !isHotStart) {
-                SpLaunchAdCatchup.arm(showConfig.catchupMs)
-            }
+            onLoadingFinished()
+        }
+    }
+
+    /**
+     * PDF26 `SplashActivity.onLoadingFinished`：至少停留 200ms，再用 500ms 补满进度，最后跳转。
+     */
+    private fun onLoadingFinished() {
+        if (bootFinishStarted || finished || isFinishing) return
+        bootFinishStarted = true
+        val elapsed = SystemClock.elapsedRealtime() - bootFlowStartedAt
+        val remainMin = (MIN_SHOW_MS - elapsed).coerceAtLeast(0L)
+        lifecycleScope.launch {
+            if (remainMin > 0L) delay(remainMin)
+            viewModel.finishBootProgress(FILL_DURATION_MS)
             continueToShell()
         }
     }
@@ -331,9 +325,9 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
      */
     private fun tryPresentOpenIfReady() {
         if (finished || openAdStarted || isFinishing) return
-        val hub = SpAdsHub.getOrNull() ?: run { continueToShell(); return }
+        val hub = SpAdsHub.getOrNull() ?: run { onLoadingFinished(); return }
         openAdStarted = true
-        hub.presentLaunchAd(this, entrySceneCode) { continueToShell() }
+        hub.presentLaunchAd(this, entrySceneCode) { onLoadingFinished() }
     }
 
     // region Notification permission
@@ -342,19 +336,14 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
      * 两处问的第一处（启动页），由 [SpNotifyPermissionFlow] 发起；`showGuide = false`，
      * 系统不再弹框时这里不打扰用户，交给 [CamShellActivity] 的二次引导。
      *
-     * 与 Apollo `SplashActivity.checkNotifyPermission` 一致：**它管的是开屏广告什么时候开始计时**，
-     * 系统授权框没回答之前不计时，回答之后（或无需询问时）才走 [beginBootAdsFlow]。
-     * 授权成功时流程内部会补点一次前台服务（[com.scanpro.cam.pdf.CamPdfApp.onNotificationPermissionReady]）。
+     * 与 PDF26 `SplashActivity` 一致：通知权限回答之后进入 [beginBootAdsFlow]，
+     * 由它先启动进度，再跑 UMP（仅欧盟、无超时、失败也继续），UMP 结束才加载/等待/展示。
+     * 系统授权框没回答之前不做任何 UMP 或广告请求。
      */
     private fun onNotifyPermissionAnswered() {
         beginBootAdsFlow()
     }
     // endregion
-
-    private fun onBootTimeout() {
-        if (finished || !adsFlowStarted || openAdStarted) return
-        continueToShell()
-    }
 
     /**
      * 开屏结束（展示完 / 超时）后的下一页。对照 Apollo `SplashActivity.nextPage`：
@@ -408,8 +397,14 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         /** 热启动等开屏广告的上限。每次回前台都要走一遍，不能按冷启的等待时长来。 */
         private const val HOT_START_MAX_WAIT_MS = 3_000L
 
-        /** 开屏兜底总时长在「最短停留 + 等待」之外的余量。 */
+        /** 开屏兜底总时长在「等待」之外的余量。 */
         private const val BOOT_SLACK_MS = 1_000L
+
+        /** PDF26 `MIN_WAIT_MS`：开屏页至少停留 200ms。 */
+        private const val MIN_SHOW_MS = 200L
+
+        /** PDF26 `FILL_DURATION_MS`：最后 500ms 把进度补满。 */
+        private const val FILL_DURATION_MS = 500L
 
         /** Apollo `scene_type` 缺省值。 */
         private const val DEFAULT_SCENE_TYPE = "start"

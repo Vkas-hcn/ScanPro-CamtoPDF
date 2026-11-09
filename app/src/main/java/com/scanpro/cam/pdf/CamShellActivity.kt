@@ -12,9 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
-import androidx.lifecycle.lifecycleScope
 import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.ads.SpLaunchAdCatchup
 import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
@@ -33,7 +31,6 @@ import com.scanpro.cam.pdf.scan.CamCaptureActivity
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
 import com.scanpro.cam.pdf.leave.SpUnInstall01Activity
 import com.scanpro.cam.pdf.util.SpLocale
-import kotlinx.coroutines.launch
 
 class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
 
@@ -81,13 +78,6 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         loadHomeAds()
         // 通知权限：启动页问过一次，这里再问一次；系统框还能弹就继续弹系统框，弹不出来才走自定义引导。
         notifyPermissionFlow?.checkAndRequest()
-        // 开屏没等到广告时，在首页继续等一小段；仍在首页且前台才补展示。
-        lifecycleScope.launch {
-            SpLaunchAdCatchup.awaitAndShow(
-                activity = this@CamShellActivity,
-                canShow = { currentTab == Tab.HOME && !isFinishing && !isDestroyed },
-            )
-        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -112,7 +102,6 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             "b_recents" -> switchShellTab(Tab.RECENT)
             "b_scan" -> {
                 switchShellTab(Tab.HOME)
-                SpLaunchAdCatchup.cancel()
                 binding.root.post {
                     if (!isFinishing && !isDestroyed) {
                         SpPageAdTriggers.showFileIntThen(this) {
@@ -196,7 +185,6 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
 
     private fun onBottomTabClicked(tab: Tab) {
         if (currentTab == tab) return
-        if (tab != Tab.HOME) SpLaunchAdCatchup.cancel()
         switchShellTab(tab)
         SpPageAdTriggers.checkLoadAdByTab(this, SpAdPosition.AC_FILE_INT)
     }

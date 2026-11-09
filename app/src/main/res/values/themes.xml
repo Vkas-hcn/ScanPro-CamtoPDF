@@ -27,12 +27,4 @@
         <item name="android:windowEnterAnimation">@anim/slide_in_bottom</item>
         <item name="android:windowExitAnimation">@anim/slide_out_bottom</item>
     </style>
-
-    <!-- 全屏广告前的假加载遮罩。Apollo `R.style.FullScreenLoadingDialog` 的等价。 -->
-    <style name="SpFullScreenLoadingDialog" parent="Theme.CamPdf.Dialog">
-        <item name="android:windowBackground">@color/white</item>
-        <item name="android:windowIsFloating">false</item>
-        <item name="android:backgroundDimEnabled">false</item>
-        <item name="android:windowAnimationStyle">@null</item>
-    </style>
 </resources>

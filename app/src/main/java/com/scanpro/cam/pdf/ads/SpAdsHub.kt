@@ -24,22 +24,24 @@ import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.scanpro.cam.pdf.notice.SpWinPopConfig
 import com.scanpro.cam.pdf.util.AppLog
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
+import com.zppko.pdfplus.nor.ads.tool.UserParms
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONObject
+import kotlin.coroutines.resume
 
 /**
  * 广告总入口。
- * 配置链（api/dispatch → SpConfigStore）与页面时序（开屏 launch_min/wait/catchup、热启动、
- * UMP、预加载触发点）保持 B 原样；广告「加载-缓存-展示」内核切换为 PDF260713_p01 的
- * ImpressionUtils 池（OpenAdsLoad/IntAdsLoad/NatAdsLoad + BaseAdsLoad TTL/降级链）。
+ * 配置链（api/dispatch → SpConfigStore）与页面时序（开屏 launch_wait、热启动、
+ * 预加载触发点）保持 B 原样；UMP 时序已改为 PDF260713_p01 的
+ * 「通知权限后 → UMP（仅欧盟、无超时、失败继续）→ 加载」，广告「加载-缓存-展示」内核
+ * 使用 PDF260713_p01 的 ImpressionUtils 池（OpenAdsLoad/IntAdsLoad/NatAdsLoad +
+ * BaseAdsLoad TTL/降级链）。
  */
 class SpAdsHub private constructor(
     private val app: Application,
@@ -79,12 +81,19 @@ class SpAdsHub private constructor(
     @Volatile
     private var remotePayloadReady = false
 
-    /** 启动页发起、但 SDK/consent 未就绪被推迟的开屏预加载；条件满足后补一次。 */
+    /** 启动页发起、但 SDK/UMP 未就绪被推迟的开屏预加载；条件满足后补一次。 */
     @Volatile
     private var pendingLaunchPreload = false
 
-    /** 开屏 UMP 结束（或超时）后完成；预加载只做短等待，不再按 2.5 秒阻塞。 */
-    private val umpGate = CompletableDeferred<Unit>()
+    /**
+     * UMP 流程是否已结束。
+     *
+     * 对齐 PDF26：非欧盟无需 UMP，直接视为完成；欧盟在 `ImpressionUtils.init` 的表单/失败回调
+     * 之后才置 true。广告加载/展示只等这个「流程完成」信号，不再检查 `canRequestAds()`，
+     * 因此 UMP 失败后仍会继续加载（PDF26 的 fail-open 语义）。
+     */
+    @Volatile
+    private var consentFlowDone: Boolean = !UserParms.isOm()
 
     /** 无页面宿主的预加载接线层（开屏位）。 */
     private val preloadFacade by lazy { SpFullScreenAdManager(app, null) }
@@ -99,18 +108,27 @@ class SpAdsHub private constructor(
         }
     }
 
+    /**
+     * PDF26 `SplashActivity.initAds()` 的 `ImpressionUtils.init(this) { ... }` 等价物。
+     *
+     * 调用时机必须与 PDF26 一致：
+     * 1. 通知权限回调之后；
+     * 2. 任何开屏广告加载之前；
+     * 3. 仅欧盟执行 UMP，非欧盟直接完成；
+     * 4. 无超时，表单/请求回调返回后才继续（失败也继续）。
+     */
     suspend fun requestStartupConsent(activity: Activity) {
-        if (umpGate.isCompleted) return
-        try {
-            SpUmpGate(app).requestUmpConsent(activity)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
-            Log.w(TAG, "requestStartupConsent failed", error)
-        } finally {
-            if (!umpGate.isCompleted) umpGate.complete(Unit)
+        if (consentFlowDone) return
+        suspendCancellableCoroutine<Unit> { continuation ->
+            ImpressionUtils.init(activity) {
+                consentFlowDone = true
+                if (continuation.isActive) continuation.resume(Unit)
+            }
         }
     }
+
+    /** 广告链路使用：UMP 流程（欧盟）是否已经结束；结束后不再做 `canRequestAds` 拦截。 */
+    fun isConsentFlowDone(): Boolean = consentFlowDone
 
     val configApplied: StateFlow<Boolean> get() = bootstrapper.configApplied
 
@@ -205,7 +223,7 @@ class SpAdsHub private constructor(
 
     /**
      * 用 `ac_launch` 预加载开屏广告。
-     * 触发点保持 B 原样（启动页、退后台、SDK/consent 回调）；加载走池。
+     * PDF26 的触发点是 UMP 之后；这里保留 SDK 就绪等待，但 UMP 未完成前不再发请求。
      */
     fun preloadLaunchAd(reason: String = "auto") {
         scope.launch(Dispatchers.Main) {
@@ -214,10 +232,9 @@ class SpAdsHub private constructor(
                 Log.i(TAG, "preloadLaunchAd deferred: sdk not ready reason=$reason")
                 return@launch
             }
-            awaitConsentBriefly()
-            if (!isConsentReady()) {
+            if (!consentFlowDone) {
                 pendingLaunchPreload = true
-                Log.i(TAG, "preloadLaunchAd deferred: consent not ready reason=$reason")
+                Log.i(TAG, "preloadLaunchAd deferred: ump not finished reason=$reason")
                 return@launch
             }
             pendingLaunchPreload = false
@@ -226,14 +243,6 @@ class SpAdsHub private constructor(
             }.onFailure { Log.w(TAG, "preloadLaunchAd failed reason=$reason", it) }
         }
     }
-
-    private suspend fun awaitConsentBriefly() {
-        if (umpGate.isCompleted) return
-        withTimeoutOrNull(CONSENT_WAIT_MS) { umpGate.await() }
-    }
-
-    private fun isConsentReady(): Boolean =
-        runCatching { SpUmpGate(app).adsEligible() }.getOrDefault(true)
 
     /**
      * SDK 初始化完成后由 [SpAdMobInit] 回调。
@@ -263,7 +272,7 @@ class SpAdsHub private constructor(
     }
 
     /**
-     * 展示开屏广告：就绪则走 500ms 遮罩 + 池展示；关闭/失败回调 [onDone]。
+     * 展示开屏广告：就绪立即走池展示（无遮罩）；关闭/失败回调 [onDone]。
      */
     fun presentLaunchAd(
         activity: Activity,
@@ -305,11 +314,8 @@ class SpAdsHub private constructor(
         /** E05 `ad_request` 用 `scene` 标预加载（规范 §4E05）。 */
         const val SCENE_PRELOAD = "preload"
 
-        /** 预加载最多等 consent 这么久，超时也继续（非 EEA 场景 UMP 基本秒回）。 */
-        private const val CONSENT_WAIT_MS = 800L
-
-        /** 等待开屏广告就绪时的轮询间隔。 */
-        private const val OPEN_AD_POLL_MS = 50L
+        /** 等待开屏广告就绪时的轮询间隔（PDF26 为 500ms）。 */
+        private const val OPEN_AD_POLL_MS = 500L
 
         @Volatile
         private var instance: SpAdsHub? = null

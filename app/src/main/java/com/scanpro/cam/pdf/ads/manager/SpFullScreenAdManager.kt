@@ -3,21 +3,19 @@ package com.scanpro.cam.pdf.ads.manager
 import android.app.Activity
 import android.content.Context
 import com.mymy.mymy.ads.count.AdCountInter
-import com.mymy.mymy.ads.count.AdCountOpen
 import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpAdShowGate
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
-import com.scanpro.cam.pdf.ads.SpFullScreenMask
-import com.scanpro.cam.pdf.ads.SpUmpGate
 import com.scanpro.cam.pdf.util.AppLog
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
 
 /**
  * 全屏广告（开屏 + 插屏）的加载/展示接线层。
- * 加载内核 = PDF260713_p01 的 ImpressionUtils 池（每位置一个 Loader，TTL + 失败降级链），
- * 展示时序 = B 原行为（500ms 遮罩、SpAdShowGate 互斥、60 秒节流在 SpPageAdTriggers）。
- * 埋点对齐 PDF26：不再发 Shark_* 事件；收入走 OnPaidEventListener -> Price.qqq。
+ * 加载内核 = PDF260713_p01 的 ImpressionUtils 池（每位置一个 Loader，TTL + 失败降级链）。
+ * 展示对齐 PDF26：就绪后立即 show，不再有 500ms 遮罩。
+ * 开屏按 PDF26 去掉频控与展示互斥；插屏仍保留 AdCountInter + SpAdShowGate。
+ * 收入走 OnPaidEventListener -> Price.qqq。
  */
 class SpFullScreenAdManager(
     context: Context,
@@ -32,27 +30,24 @@ class SpFullScreenAdManager(
     private fun adTypeOf(position: String): String =
         SpAdsHub.getOrNull()?.config()?.adInfoList(position)?.firstOrNull()?.adType ?: ""
 
+    /** 开屏按 PDF26 不做频控；插屏保留 AdCountInter。 */
     private fun adCountCanShow(position: String): Boolean = when (adTypeOf(position)) {
-        "op" -> AdCountOpen.openCanShow()
         "int" -> AdCountInter.interCanShow()
         else -> true
     }
 
     private fun countShow(position: String) {
-        when (adTypeOf(position)) {
-            "op" -> AdCountOpen.open_addShowCount()
-            "int" -> AdCountInter.inter_addShowCount()
-        }
+        if (adTypeOf(position) == "int") AdCountInter.inter_addShowCount()
     }
 
     /**
      * 预加载。B 原时序的触发点不变（进页/开屏/退后台/配置就绪），内部改为池 load。
      */
     fun checkAndLoadAd(position: String, scene: String = position, index: Int = 0) {
-        if (!SpUmpGate.canRequestAds(appContext)) {
-            AppLog.ads.i("跳过广告加载 位置=$position 原因=用户同意尚未就绪")
-            return
-        }
+//        if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true) {
+//            AppLog.ads.i("跳过广告加载 位置=$position 原因=UMP流程未完成")
+//            return
+//        }
         if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
             AppLog.ads.i("跳过广告加载 位置=$position 原因=广告SDK未初始化")
             return
@@ -80,52 +75,57 @@ class SpFullScreenAdManager(
     fun hasReadyAd(position: String): Boolean = ImpressionUtils.loadSuccess(position)
 
     /**
-     * 展示：gating -> 互斥 -> 就绪检查 -> 500ms 遮罩 -> 池 show。
+     * 展示：gating -> (插屏)互斥 -> 就绪检查 -> 池 show。
+     * 开屏按 PDF26 不做展示互斥；插屏仍走 SpAdShowGate。
      * onResult(showed, dismissed)：展示失败(false,false)；展示成功且已关闭(true,true)。
      */
-    fun showFullScreenAd(position: String, scene: String, onResult: (showed: Boolean, dismissed: Boolean) -> Unit) {
+    fun showFullScreenAd(
+        position: String,
+        scene: String,
+        whenOnVisible: Boolean = false,
+        onResult: (showed: Boolean, dismissed: Boolean) -> Unit,
+    ) {
         val host = activity
         if (host == null || host.isFinishing || host.isDestroyed) {
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=页面已销毁")
             onResult(false, false)
             return
         }
-        if (!SpUmpGate.canRequestAds(appContext) || blocking.isShowPartialAdsOnly(position) ||
+        val adType = adTypeOf(position)
+        val useShowGate = adType != "op"
+        fun releaseShowGate() {
+            if (useShowGate) SpAdShowGate.exit()
+        }
+        if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true ||
+            blocking.isShowPartialAdsOnly(position) ||
             blocking.isVPNBlock() || !blocking.canShowAllAd()
         ) {
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=总闸拦截")
             onResult(false, false)
             return
         }
-        if (!SpAdShowGate.tryEnter()) {
+        if (useShowGate && !SpAdShowGate.tryEnter()) {
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=已有广告正在展示")
             onResult(false, false)
             return
         }
         if (!ImpressionUtils.loadSuccess(position)) {
-            SpAdShowGate.exit()
+            releaseShowGate()
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=广告尚未就绪")
             onResult(false, false)
             return
         }
-        countShow(position)
+        if (useShowGate) countShow(position)
+        if (host.isFinishing || host.isDestroyed) {
+            releaseShowGate()
+            onResult(false, false)
+            return
+        }
         AppLog.ads.i("开始展示广告 位置=$scene")
-        SpFullScreenMask.show(host) {
-            if (host.isFinishing || host.isDestroyed) {
-                SpAdShowGate.exit()
-                onResult(false, false)
-                return@show
-            }
-            if (!ImpressionUtils.loadSuccess(position)) {
-                SpAdShowGate.exit()
-                onResult(false, false)
-                return@show
-            }
-            // whenOnVisible=false：关闭/失败即刻回调（B 原语义，PDF26 池内 zDismiss 分支）
-            ImpressionUtils.show(host, position, scene, whenOnVisible = false) {
-                SpAdShowGate.exit()
-                onResult(true, true)
-            }
+        // PDF26：就绪即 show，无 500ms 遮罩；开屏 whenOnVisible=true，等 onResume 再回调。
+        ImpressionUtils.show(host, position, scene, whenOnVisible = whenOnVisible) {
+            releaseShowGate()
+            onResult(true, true)
         }
     }
 
@@ -134,9 +134,9 @@ class SpFullScreenAdManager(
         showFullScreenAd(position, position) { _, _ -> onDone() }
     }
 
-    /** 开屏展示：失败立刻放行，成功等关闭（B 原 `presentLaunchAd` 语义）。 */
+    /** 开屏展示：失败立刻放行，成功等关闭；PDF26 语义 whenOnVisible=true。 */
     fun showOpenAd(position: String, scene: String, onDone: () -> Unit) {
-        showFullScreenAd(position, scene) { showed, dismissed ->
+        showFullScreenAd(position, scene, whenOnVisible = true) { showed, dismissed ->
             if (!showed || dismissed) onDone()
         }
     }

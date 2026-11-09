@@ -38,6 +38,9 @@ class CamPdfApp : Application() {
         camPdfApp = this
         // Attribution callbacks may arrive before background cleanup completes.
         Zppkoo.ii = this
+        // PDF26 initializes SpUtil in Application.onCreate; UserParms.isOm() (UMP 欧盟判断)
+        // may run on the splash before the deferred Zppkoo.onCreate(), so initialize it here.
+        com.zppko.pdfplus.nor.ads.tool.SpUtil.init(this)
         SpLocale.resetCompatLocalesIfNeeded(this)
         ensureWorkManager()
         // 广告频控（A 家族 AdCount*）：恢复当日计数/跨天重置，随启动执行。

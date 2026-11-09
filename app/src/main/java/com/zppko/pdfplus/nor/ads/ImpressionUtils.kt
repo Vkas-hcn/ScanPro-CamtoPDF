@@ -73,12 +73,12 @@ object ImpressionUtils {
 
     fun init(context: Context, finish: (() ->Unit)? = null) {
         if (UserParms.isOm()) {
-//            Log.e("hhhh广告", "欧盟用户UMP")
+            Log.e("spLog", "欧盟用户UMP")
             OmUtil.start(context as Activity) {
                 finish?.invoke()
             }
         } else {
-//            Log.e("hhhh广告", "不是欧盟用户跳过UMP")
+            Log.e("spLog", "不是欧盟用户跳过UMP")
             finish?.invoke()
         }
     }

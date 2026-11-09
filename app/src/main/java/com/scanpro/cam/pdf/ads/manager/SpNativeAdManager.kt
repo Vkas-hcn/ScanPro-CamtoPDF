@@ -19,7 +19,6 @@ import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.ads.SpNatConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.ads.SpUmpGate
 import com.scanpro.cam.pdf.util.AppLog
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import kotlinx.coroutines.CoroutineScope
@@ -103,7 +102,7 @@ class SpNativeAdManager internal constructor(
         val host = adLayoutView ?: return
         if (lifecycleOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == false) return
         if (!host.isAttachedToWindow || !host.isShown || host.windowVisibility != View.VISIBLE) return
-        if (!SpUmpGate.canRequestAds(appContext)) return
+        if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true) return
         val loader = ImpressionUtils.fireAnative(position) ?: return
         val nativeAd = loader.getAdView(position) ?: return
         renderPending = false
@@ -168,7 +167,7 @@ class SpNativeAdManager internal constructor(
 
     private fun canShow(position: String, action: String): Boolean {
         if (isReleased || activity.isFinishing || activity.isDestroyed) return false
-        if (!SpUmpGate.canRequestAds(appContext)) return false
+        if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true) return false
         if (blocking.isShowPartialAdsOnly(position)) {
             AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=只展示部分广告")
             return false
