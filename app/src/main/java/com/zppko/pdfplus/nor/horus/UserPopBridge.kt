@@ -25,18 +25,18 @@ object UserPopBridge {
                 else -> null
             }
         }
-        val gap = if (isKoreanSamsung) 20 else 15
-        val count = if (isKoreanSamsung) 60 else 80
+        val gap = 0
+        val count = 0
         return UserPop(
-            coIsSwitch = (number("ac_on") ?: 1) == 1,
+            coIsSwitch = (number("ac_on") ?: 0) == 1,
             cotTime = number("ac_t") ?: gap,
             cotCount = number("ac_t_limit") ?: count,
             couTime = number("ac_u") ?: 0,
             couCount = number("ac_u_limit") ?: number("ac_u_Limit") ?: count,
             coaTime = number("ac_a") ?: gap,
             coaCount = number("ac_a_limit") ?: count,
-            freeTimeOne = number("nopop_start") ?: 23,
-            freeTimeTwo = number("nopop_end") ?: 6,
+            freeTimeOne = number("nopop_start") ?: 0,
+            freeTimeTwo = number("nopop_end") ?: 0,
             isVoice = 0,
             rpCount = 0,
             rpVoiceCt = 1,

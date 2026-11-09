@@ -10,6 +10,8 @@ import kotlin.time.Duration.Companion.seconds
 enum class SpConfigOrigin {
     REMOTE,
     CACHE,
+    /** 接口无数据且无缓存时使用的本地 default_config.json。 */
+    DEFAULT,
 }
 
 sealed interface SpConfigLoadResult {

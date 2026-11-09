@@ -16,14 +16,24 @@ import androidx.core.graphics.createBitmap
 import com.bockcock.adjust.Pin
 import com.bockcock.adjust.Pt
 import com.scanpro.cam.pdf.R
+import com.scanpro.cam.pdf.ads.SpAdsHub
+import com.scanpro.cam.pdf.notice.SpNotifyUtils
+import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.smart.pdf.scanner.util.LocaleHelper
 import com.zppko.pdfplus.nor.horus.HintUtil.coIntance
 import com.zppko.pdfplus.nor.horus.HintUtil.createIntent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object HintMt {
 
     private val CO_MEDIA_NOTFIY_ID = 8562
     private val CO_S_TYPE_MEDIA = 4
+    private var mediaJob: Job? = null
 
     private fun getManager(): NotificationManager {
         return coIntance().getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -32,10 +42,10 @@ object HintMt {
 
 
 
-//    fun stopCalling(){
-//        mediaJob?.cancel()
-//    }
-//    private var mediaJob: Job?=null
+    fun stopCalling() {
+        mediaJob?.cancel()
+        mediaJob = null
+    }
 
     fun coJustSendMt(popSetting: CallingSetting) {
         runCatching {
@@ -43,21 +53,35 @@ object HintMt {
 //            Pin.event(Pin.trigger_media_ntf)
             Pin.event(Pin.notification_trigger, Pt("pos_id","type_media").put("trigger_source","type_media"))
 
+            val context = coIntance()
             val notification = createMtNt(popSetting, CO_S_TYPE_MEDIA)
             val manager = getManager()
-//            if (RemoteConfigHelper.mediaRepeatIsOn()){
-//                mediaJob?.cancel()
-//                mediaJob = CoroutineScope(Dispatchers.IO).launch {
-//                    repeat(30){
-//                        withContext(Dispatchers.Main){
-//                            manager.notify(CO_MEDIA_NOTFIY_ID, notification)
-//                        }
-//                        delay(2000)
-//                    }
-//                }
-//            }else{
-            manager.notify(CO_MEDIA_NOTFIY_ID, notification)
-//            }
+            // 恢复 pop_refresh 重发：同一 ID 按 interval 秒重发 times 次；熄屏/回前台停止。
+            val popRefresh = SpAdsHub.getOrNull()?.popRefreshOf() ?: SpPopRefresh()
+            val refreshEnabled = SpAdsHub.getOrNull()?.hasRemotePayload() == true &&
+                SpAdsHub.getOrNull()?.hasPopRefreshConfig() == true &&
+                popRefresh.popRefreshSwitch == 1 &&
+                SpNotifyUtils.isInteractive(context)
+            mediaJob?.cancel()
+            mediaJob = null
+            if (!refreshEnabled) {
+                manager.notify(CO_MEDIA_NOTFIY_ID, notification)
+                return@runCatching
+            }
+            if (popRefresh.times <= 0) return@runCatching
+            val intervalMs = popRefresh.interval.coerceAtLeast(1) * 1000L
+            mediaJob = CoroutineScope(Dispatchers.IO).launch {
+                for (index in 0 until popRefresh.times) {
+                    if (HintExt02.isForeground) return@launch
+                    withContext(Dispatchers.Main) {
+                        manager.notify(CO_MEDIA_NOTFIY_ID, notification)
+                    }
+                    delay(intervalMs)
+                    if (!SpNotifyUtils.isInteractive(context) || HintExt02.isForeground) {
+                        return@launch
+                    }
+                }
+            }
         }
     }
 
@@ -122,6 +146,7 @@ object HintMt {
 
 
     fun removeNOtify() {
+        stopCalling()
         val manager = getManager()
         manager.cancel(CO_MEDIA_NOTFIY_ID)
     }

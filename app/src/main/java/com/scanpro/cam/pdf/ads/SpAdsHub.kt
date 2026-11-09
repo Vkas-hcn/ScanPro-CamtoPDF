@@ -17,6 +17,7 @@ import com.scanpro.cam.pdf.config.SpConfigLoadResult
 import com.scanpro.cam.pdf.config.SpConfigRemoteSource
 import com.scanpro.cam.pdf.config.SpConfigRepository
 import com.scanpro.cam.pdf.config.SpConfigStore
+import com.scanpro.cam.pdf.config.SpConfigWire
 import com.scanpro.cam.pdf.notice.SpAcPopConfig
 import com.scanpro.cam.pdf.notice.SpMediaConfig
 import com.scanpro.cam.pdf.notice.SpNewConfig
@@ -80,6 +81,10 @@ class SpAdsHub private constructor(
 
     @Volatile
     private var remotePayloadReady = false
+
+    /** 本次 payload 是否显式下发了 `pop_refresh`；缺块时不启用重发，避免默认值误开。 */
+    @Volatile
+    private var popRefreshConfigured = false
 
     /** 启动页发起、但 SDK/UMP 未就绪被推迟的开屏预加载；条件满足后补一次。 */
     @Volatile
@@ -150,6 +155,9 @@ class SpAdsHub private constructor(
     /** 远端配置是否已到过一次（Apollo `remoteConfig.newConfig != null`）。 */
     fun hasRemotePayload(): Boolean = remotePayloadReady
 
+    /** 是否显式下发过 `pop_refresh`；未下发时不启用通知重发循环。 */
+    fun hasPopRefreshConfig(): Boolean = popRefreshConfigured
+
     /** 冷启动 / 回前台拉一次配置；未到 3 小时直接读缓存，零网络开销。 */
     fun refreshConfig() {
         bootstrapper.refresh()
@@ -164,6 +172,7 @@ class SpAdsHub private constructor(
 
     private fun applyPayload(payload: JSONObject) {
         remotePayloadReady = true
+        popRefreshConfigured = payload.has(SpConfigWire.KEY_POP_REFRESH)
         adConfig = configStore.adConfig(payload)
         adShowConfig = configStore.adShowConfig(payload)
         natConfig = configStore.natConfig(payload)
@@ -185,6 +194,7 @@ class SpAdsHub private constructor(
 
     private fun applyUnavailable(reason: String) {
         adConfig = SpAdConfig()
+        popRefreshConfigured = false
         AppLog.network.w("配置不可用，停止新广告请求；已加载广告保留到过期 原因=$reason")
         _configGeneration.value += 1
     }

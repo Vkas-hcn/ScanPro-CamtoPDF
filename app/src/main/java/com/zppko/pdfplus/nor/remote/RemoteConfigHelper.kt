@@ -1,7 +1,6 @@
 package com.zppko.pdfplus.nor.remote
 
 import com.bockcock.adjust.Pin
-import com.buncead.common.util.Util
 import com.mymy.mymy.rece.HomeRecentsHelp
 import com.scanpro.cam.pdf.config.SpConfigRemoteSource
 import com.scanpro.cam.pdf.config.SpConfigRepository
@@ -57,13 +56,16 @@ object RemoteConfigHelper {
 
     fun getRecentData(key: String): String {
         if (key == KEY_ADS_CONFIG) {
-            // B keeps its AdMob data/IDs. Never return A's TradPlus account defaults.
-            return dispatchPayload?.opt("ac_ad_config")?.toString()
-                ?: DefaultConfigHelper.getDefAds()
+            // 只认接口/本地 default_config.json 的 payload；不再回落到代码里的 A 默认广告。
+            return dispatchPayload?.opt("ac_ad_config")?.toString().orEmpty()
         }
         if (key == KEY_REFERRER_CONFIG) {
-            val json = runCatching { JSONObject(SpUtil.get(key, "")) }.getOrNull()
-                ?: JSONObject(DefaultConfigHelper.dfReferrer)
+            val raw = dispatchPayload?.opt(key) ?: SpUtil.get(key, "")
+            val json = when (raw) {
+                is JSONObject -> JSONObject(raw.toString())
+                is String -> runCatching { JSONObject(raw) }.getOrNull()
+                else -> null
+            } ?: JSONObject()
             // Only bridge the documented B acquired-user field. Do not infer Adjust state.
             json.put("volxo", if (SpConfigStore().dispatchMeta(dispatchPayload).isAcquiredUser) 1 else 0)
             return json.toString()
@@ -72,27 +74,6 @@ object RemoteConfigHelper {
         return if (data == "") "" else data
     }
 
-    fun getReceiveConfig(): UserPop {
-        runCatching {
-            return UserPopBridge.fromDispatch(dispatchPayload, UserParms.isKo2Samsung())
-        }.onFailure { it.printStackTrace() }
-        // Fallback to hardcoded defaults matching UserPopBridge
-        val gap = if (UserParms.isKo2Samsung()) 20 else 15
-        val count = if (UserParms.isKo2Samsung()) 60 else 80
-        return UserPop(
-            coIsSwitch = true,
-            cotTime = gap,
-            cotCount = count,
-            couTime = 0,
-            couCount = count,
-            coaTime = gap,
-            coaCount = count,
-            freeTimeOne = 23,
-            freeTimeTwo = 6,
-            isVoice = 0,
-            rpCount = 0,
-            rpVoiceCt = 1,
-            delayTm = 0
-        )
-    }
+    fun getReceiveConfig(): UserPop =
+        UserPopBridge.fromDispatch(dispatchPayload, UserParms.isKo2Samsung())
 }

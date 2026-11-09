@@ -13,12 +13,14 @@ import androidx.core.app.NotificationCompat.DecoratedCustomViewStyle
 import kotlin.random.Random
 import com.bockcock.adjust.Pin
 import com.bockcock.adjust.Pt
-import com.buncead.common.util.Util
 import com.scanpro.cam.pdf.R
+import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.boot.SpBootActivity
 import com.scanpro.cam.pdf.notice.SpJumpType
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
+import com.scanpro.cam.pdf.notice.SpNotifyUtils
+import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.smart.pdf.scanner.util.LocaleHelper
 
 import com.zppko.pdfplus.nor.RAction
@@ -85,48 +87,42 @@ object HintUtil {
         Pin.event(Pin.notification_trigger, Pt("pos_id",event).put("trigger_source",event))
 
         val manager = getManager()
-
-        if (ConfigHelper.canShowAdsss_a2()){
-            val rpCount = config.rpCount
-            if (rpCount==0){
-             Util.iii { "ntf_a01 rpCount=${rpCount}, isVoice=${config.isVoice}" }
-                val isShowVoice = config.isVoice == 0
-                val notification = createOnceNt(isShowVoice, popSetting,ntf_id, showType)
-                manager.notify(ntf_id, notification)
-            }else{
-                val rpVoiceCt = config.rpVoiceCt // 通知重复次数的声音次数
-
-                val ntfSoundYes = createOnceNt(true, popSetting,ntf_id, showType)
-                val ntfSoundNo = createOnceNt(false, popSetting,ntf_id, showType)
-				Util.iii { "ntf_a02 rpCount=${rpCount}, rpVoiceCt=${rpVoiceCt}" }
-                var sendCount = 0
-                rpJob?.cancel()
-                rpJob = CoroutineScope(Dispatchers.IO).launch {
-                    repeat(rpCount){
-                        Util.iii { "ntf_a04 ${rpCount} rp++" }
-                        if (HintExt02.isForeground){
-                            rpJob?.cancel()
-                        }
-                        withContext(Dispatchers.Main){
-                            if (sendCount>=rpVoiceCt){
-                                manager.notify(ntf_id, ntfSoundNo)
-                            }else{
-                                manager.notify(ntf_id, ntfSoundYes)
-                            }
-                        }
-                        sendCount++
-                        delay(2000)
-                    }
-                }
-
-            }
-        }else{
-            val isShowVoice = config.isVoice == 0
-            val notification = createOnceNt(isShowVoice, popSetting,ntf_id, showType)
-            manager.notify(ntf_id, notification)
+        val isShowVoice = config.isVoice == 0
+        // 恢复被 784583c 删除的 pop_refresh 重发循环：
+        // pop_refresh_switch==1 且亮屏时，先发响铃版，再按 interval 秒重发静音版，直到 times 次；
+        // 熄屏/回前台立即停止。开关关闭或非亮屏时退回单次发送。
+        val popRefresh = SpAdsHub.getOrNull()?.popRefreshOf() ?: SpPopRefresh()
+        val refreshEnabled = SpAdsHub.getOrNull()?.hasRemotePayload() == true &&
+            SpAdsHub.getOrNull()?.hasPopRefreshConfig() == true &&
+            ConfigHelper.canShowAdsss_a2() &&
+            popRefresh.popRefreshSwitch == 1 &&
+            SpNotifyUtils.isInteractive(coIntance())
+        if (!refreshEnabled) {
+            manager.notify(ntf_id, createOnceNt(isShowVoice, popSetting, ntf_id, showType))
+            return
         }
+        // 与 Apollo 一致：开关打开但 times=0 时本轮不发送。
+        if (popRefresh.times <= 0) return
 
-
+        val ntfSoundYes = createOnceNt(true, popSetting, ntf_id, showType)
+        val ntfSoundNo = createOnceNt(false, popSetting, ntf_id, showType)
+        val intervalMs = popRefresh.interval.coerceAtLeast(1) * 1000L
+        rpJob?.cancel()
+        rpJob = CoroutineScope(Dispatchers.IO).launch {
+            for (index in 0 until popRefresh.times) {
+                if (HintExt02.isForeground) return@launch
+                withContext(Dispatchers.Main) {
+                    manager.notify(
+                        ntf_id,
+                        if (index < config.rpVoiceCt) ntfSoundYes else ntfSoundNo,
+                    )
+                }
+                delay(intervalMs)
+                if (!SpNotifyUtils.isInteractive(coIntance()) || HintExt02.isForeground) {
+                    return@launch
+                }
+            }
+        }
 //        Log.e("通知弹窗", "开始弹窗")
     }
 

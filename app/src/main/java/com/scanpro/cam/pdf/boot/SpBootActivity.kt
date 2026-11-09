@@ -216,7 +216,10 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             SpTrackEvents.reactivationLanding("notification", entryJumpType ?: "home", posId)
         }
         // 冷启动时停止通知发送方的重复发送任务。
-        if (!isHotStart) HintUtil.stopCalling()
+        if (!isHotStart) {
+            HintUtil.stopCalling()
+            HintMt.stopCalling()
+        }
     }
 
     /** Apollo `SplashActivity.fromTypeToSceneCode`：认不出来的 `from_type` 一律按自然打开算。 */

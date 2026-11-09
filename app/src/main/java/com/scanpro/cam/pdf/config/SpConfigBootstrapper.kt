@@ -68,7 +68,13 @@ class SpConfigBootstrapper(
         if (wire == null) {
             AppLog.network.w("跳过配置接口 原因=接口未配置 触发=$trigger")
             deferAfterFailure()
-            dispatch(SpConfigLoadResult.Unavailable("配置接口未配置"))
+            val cached = repository.loadCache()
+            if (cached != null) {
+                AppLog.network.i("接口未配置，使用本地接口缓存 触发=$trigger")
+                dispatch(cached)
+            } else {
+                dispatchDefault("配置接口未配置")
+            }
             return
         }
         var refreshRemoteAfterCache = false
@@ -93,7 +99,7 @@ class SpConfigBootstrapper(
                         "距上次成功=${sinceText(now, lastRequestedAt)} " +
                         "还需等待=${durationText(waitMillis)}",
                 )
-                dispatch(SpConfigLoadResult.Unavailable("配置请求失败退避中"))
+                dispatchDefault("配置请求失败退避中")
                 return@withLock
             }
             fetchRemote(wire, cached = null, trigger = trigger)
@@ -120,7 +126,7 @@ class SpConfigBootstrapper(
         } catch (error: Throwable) {
             deferAfterFailure()
             AppLog.network.w("配置请求异常，稍后重试 触发=$trigger", error)
-            if (cached == null) dispatch(SpConfigLoadResult.Unavailable("配置请求异常"))
+            if (cached == null) dispatchDefault("配置请求异常")
         }
     }
 
@@ -141,7 +147,7 @@ class SpConfigBootstrapper(
             AppLog.network.w("跳过配置请求 原因=Distinct ID 为空 触发=$trigger")
             deferAfterFailure()
             if (cached == null) {
-                dispatch(SpConfigLoadResult.Unavailable("BI Distinct ID 不可用"))
+                dispatchDefault("BI Distinct ID 不可用")
             }
             return
         }
@@ -174,10 +180,30 @@ class SpConfigBootstrapper(
                             "耗时=${cost}ms 触发=$trigger",
                     )
                 } else {
-                    dispatch(remoteResult)
+                    dispatchDefault(remoteResult.reason)
                 }
             }
         }
+    }
+
+    /**
+     * 接口无数据、且本地没有接口缓存时，才使用 assets/default_config.json。
+     * 这里再查一次缓存，确保「有缓存就绝不用默认 JSON」。
+     */
+    private suspend fun dispatchDefault(reason: String) {
+        val cached = repository.loadCache()
+        if (cached != null) {
+            AppLog.network.i("使用本地接口缓存，跳过默认配置 原因=$reason")
+            dispatch(cached)
+            return
+        }
+        val payload = SpDefaultConfig.load(app)
+        if (payload == null) {
+            dispatch(SpConfigLoadResult.Unavailable(reason))
+            return
+        }
+        AppLog.network.i("使用本地默认配置 原因=$reason 字段数=${payload.length()}")
+        dispatch(SpConfigLoadResult.Available(payload, SpConfigOrigin.DEFAULT))
     }
 
     private suspend fun buildDispatchRequest(): SpConfigRequest = coroutineScope {

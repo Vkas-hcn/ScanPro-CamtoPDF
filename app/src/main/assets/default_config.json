@@ -1,0 +1,197 @@
+{
+  "code": 200,
+  "msg": "local default test config",
+  "data": {
+    "facebook_app_id": "",
+    "client_token": "",
+    "isAcquiredUser": true,
+
+    "ads_limit": {
+      "ac_ads_limit": 50
+    },
+    "global_block": {
+      "global_block_switch": 1
+    },
+    "google_play_block": {
+      "google_play_block": 0
+    },
+    "vpn_config_switch": {
+      "vpn_config_switch": 0
+    },
+
+    "ac_nat_config": {
+      "switch_open": 1
+    },
+    "ad_show_config": {
+      "launch_wait_ms": 15000,
+      "preload_on_background": true
+    },
+    "pop_refresh": {
+      "pop_refresh_switch": 1,
+      "times": 30,
+      "interval": 2
+    },
+
+    "acpop_config": {
+      "ac_on": 1,
+      "ac_t": 30,
+      "ac_t_limit": 30,
+      "ac_u": 5,
+      "ac_u_limit": 40,
+      "ac_a": 30,
+      "ac_a_limit": 40,
+      "nopop_start": 24,
+      "nopop_end": 6
+    },
+    "samsung_acpop_config": {
+      "ac_on": 1,
+      "ac_t": 30,
+      "ac_t_limit": 15,
+      "ac_u": 0,
+      "ac_u_limit": 50,
+      "ac_a": 30,
+      "ac_a_limit": 20,
+      "nopop_start": 24,
+      "nopop_end": 6
+    },
+
+    "ac_ad_config": {
+      "ac_launch": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/9257395921",
+          "ad_paltfrom": "admob",
+          "ad_type": "op",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_language_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_language_nat": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
+          "ad_paltfrom": "admob",
+          "ad_type": "nat",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_guide_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_guide_nat": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
+          "ad_paltfrom": "admob",
+          "ad_type": "nat",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_file_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_top_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_check_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_mainback_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_uninstall1_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_uninstall1_nat": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
+          "ad_paltfrom": "admob",
+          "ad_type": "nat",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_uninstall2_int": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
+          "ad_paltfrom": "admob",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_uninstall2_nat": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
+          "ad_paltfrom": "admob",
+          "ad_type": "nat",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_main_nat": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
+          "ad_paltfrom": "admob",
+          "ad_type": "nat",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_recent_nat": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
+          "ad_paltfrom": "admob",
+          "ad_type": "nat",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_recent_banner": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/6300978111",
+          "ad_paltfrom": "admob",
+          "ad_type": "banner",
+          "ad_timelimit": 3000
+        }
+      ],
+      "ac_setting_nat": [
+        {
+          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
+          "ad_paltfrom": "admob",
+          "ad_type": "nat",
+          "ad_timelimit": 3000
+        }
+      ]
+    }
+  }
+}

@@ -15,7 +15,6 @@ import com.zppko.pdfplus.nor.ads.mob.IntAdsLoad
 import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
 import com.zppko.pdfplus.nor.ads.tool.OmUtil
 import com.zppko.pdfplus.nor.ads.tool.UserParms
-import com.zppko.pdfplus.nor.remote.DefaultConfigHelper
 import com.zppko.pdfplus.nor.remote.RemoteConfigHelper
 import org.json.JSONObject
 
@@ -118,10 +117,7 @@ object ImpressionUtils {
 
     fun getNewLoadConfig(place: String, weight: Int): AdsSetting? {
         val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
-        var list = loadAdsSettingList(data)
-        if (list.isEmpty()) {
-            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
-        }
+        val list = loadAdsSettingList(data)
         return list.filter { it.zPlace == place && it.zWeight < weight }.maxByOrNull { it.zWeight }
     }
 
@@ -144,10 +140,7 @@ object ImpressionUtils {
         }
 
         val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
-        var list = loadAdsSettingList(data)
-        if (list.isEmpty()) {
-            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
-        }
+        val list = loadAdsSettingList(data)
         Log.e("hhhh广告", "获取最新广告配置")
         list.forEach {
             Log.e("hhhh广告", "配置：${it}")
