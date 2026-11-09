@@ -152,4 +152,10 @@
     <string name="nt_alarm_6">Votre présentation n\'a pas encore été revue</string>
     <string name="nt_alarm_7">Rappel PDF</string>
     <string name="nt_alarm_8">Lisez votre PDF aujourd\'hui</string>
+
+    <!-- 通知权限二次引导 -->
+    <string name="sp_notify_perm_title">Ne manquez aucune notification utile !</string>
+    <string name="sp_notify_perm_message">Activez les notifications pour être informé de vos PDF et fichiers numérisés.</string>
+    <string name="sp_notify_perm_open_settings">Ouvrir les paramètres</string>
+    <string name="sp_notify_perm_not_now">Plus tard</string>
 </resources>

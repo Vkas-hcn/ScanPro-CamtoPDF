@@ -152,4 +152,10 @@
     <string name="nt_alarm_6">आपकी प्रस्तुति की समीक्षा अभी तक नहीं हुई है</string>
     <string name="nt_alarm_7">PDF का रिमाइंडर</string>
     <string name="nt_alarm_8">आज अपनी PDF पढ़ें</string>
+
+    <!-- 通知权限二次引导 -->
+    <string name="sp_notify_perm_title">कोई उपयोगी सूचना न छूटे!</string>
+    <string name="sp_notify_perm_message">सूचनाएं चालू करें ताकि हम आपको स्कैन की गई PDF और फ़ाइलों की याद दिला सकें।</string>
+    <string name="sp_notify_perm_open_settings">सेटिंग्स खोलें</string>
+    <string name="sp_notify_perm_not_now">अभी नहीं</string>
 </resources>

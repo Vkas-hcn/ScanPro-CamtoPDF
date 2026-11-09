@@ -1,12 +1,10 @@
 package com.scanpro.cam.pdf.boot
 
-import android.Manifest
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
 import android.view.LayoutInflater
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.NotificationManagerCompat
@@ -22,7 +20,6 @@ import com.scanpro.cam.pdf.databinding.ActivitySpBootBinding
 import com.scanpro.cam.pdf.ads.SpAdPosition
 import com.scanpro.cam.pdf.ads.SpAdShowConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.ads.SpHotStartGate
 import com.scanpro.cam.pdf.ads.SpLaunchAdCatchup
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
@@ -32,14 +29,13 @@ import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.guide.SpFirstLaunch
 import com.scanpro.cam.pdf.guide.SpGuideLanguageActivity
 import com.scanpro.cam.pdf.notice.SpNotificationEntry
+import com.scanpro.cam.pdf.notice.SpNotifyPermissionFlow
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
 import com.scanpro.cam.pdf.leave.SpUnInstall01Activity
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
-import com.scanpro.cam.pdf.notice.SpNotifyPermit
 import com.zppko.pdfplus.nor.horus.HintMt
 import com.zppko.pdfplus.nor.horus.HintUtil
-import com.scanpro.cam.pdf.CamPdfApp
 import com.scanpro.cam.pdf.notice.notificationTriggerSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -71,6 +67,9 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     /** 本次开屏的场景码（Apollo `sceneCode`），由 `from_type` 推出来。 */
     private var entrySceneCode: String = SpSceneCode.AC_LAUNCH_OPEN
 
+    /** 第一处通知权限申请（第二处在 [CamShellActivity]，那边还带二次引导）。 */
+    private lateinit var notifyPermissionFlow: SpNotifyPermissionFlow
+
     override val applySystemBarsPadding: Boolean = false
 
     override fun inflateBinding(inflater: LayoutInflater): ActivitySpBootBinding {
@@ -79,6 +78,10 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         SpHotStartGate.onSplashCreated()
+        notifyPermissionFlow = SpNotifyPermissionFlow(this, showGuide = false) {
+            // 启动页只负责「问一次」：无论允许/拒绝，都继续开屏流程（与 Apollo 一致）。
+            onNotifyPermissionAnswered()
+        }
         isHotStart = intent?.getBooleanExtra(EXTRA_HOT_START, false) == true ||
             SpNotificationEntry.isHotStart(intent)
         // Apollo `SplashActivity.onCreate`：通知进来时带的 flags 是 NEW_TASK|CLEAR_TASK，
@@ -134,7 +137,9 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             if (!isFinishing && !isDestroyed) {
                 hub?.preloadLaunchAd("boot-consent")
             }
-            checkNotifyPermission()
+            if (!isFinishing && !isDestroyed) {
+                notifyPermissionFlow.checkAndRequest()
+            }
         }
     }
 
@@ -331,60 +336,17 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         hub.presentLaunchAd(this, entrySceneCode) { continueToShell() }
     }
 
-    // region Notification permission (Apollo `SplashActivity.checkNotifyPermission`)
-
-    /** Apollo `Constants.notify_permission_count`：最多问 2 次。 */
-    private val notifyPermitPrefs by lazy { getSharedPreferences(PREFS_NOTIFY_PERMIT, MODE_PRIVATE) }
-
-    private val notifyPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            onNotifyPermissionAnswered()
-        }
+    // region Notification permission
 
     /**
-     * Apollo `SplashActivity.checkNotifyPermission`（`onCreate` 里调的那次）。
+     * 两处问的第一处（启动页），由 [SpNotifyPermissionFlow] 发起；`showGuide = false`，
+     * 系统不再弹框时这里不打扰用户，交给 [CamShellActivity] 的二次引导。
      *
-     * **它管的是开屏广告什么时候开始计时**，不是「进主界面前补一次授权」：
-     * 系统授权框没回答之前 `showAdTimer()` 不会跑，回答之后（或无需询问时）才跑。
-     *
-     * - 总闸不放行（[SpBlockingLogic.canRequestNotificationPermission]）、已有权限、
-     *   或者已经问过 2 次 → 直接 [onNotifyPermissionAnswered]
-     * - 否则弹系统授权框、计数 +1、报一次 `system_notification_popup_view`；
-     *   用户点完由 [notifyPermissionLauncher] 走 [onNotifyPermissionAnswered]
-     *
-     * 与 Apollo 的差别只有一处：Apollo 在 `isStop()` 时既不弹也不继续（启动就停在那了），
-     * 这里只判 `isFinishing / isDestroyed`。
-     */
-    private fun checkNotifyPermission() {
-        var askedNow = false
-        runCatching {
-            if (!SpBlockingLogic.get(this).canRequestNotificationPermission()) return@runCatching
-            val asked = notifyPermitPrefs.getInt(KEY_NOTIFY_PERMIT_COUNT, 0)
-            if (SpNotifyPermit.isHaveNotifyPermission(this) || asked >= MAX_NOTIFY_PERMIT_ASK) {
-                return@runCatching
-            }
-            if (isFinishing || isDestroyed) return
-            notifyPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            notifyPermitPrefs.edit().putInt(KEY_NOTIFY_PERMIT_COUNT, asked + 1).apply()
-            SpTracker.log(this, SpTracker.SYSTEM_NOTIFICATION_POPUP_VIEW)
-            askedNow = true
-        }.onFailure { Log.w(TAG, "checkNotifyPermission failed", it) }
-        // 没弹框 = 被拦 / 已有权限 / 问满 2 次：Apollo 走的是 lambda1 那条
-        if (!askedNow) onNotifyPermissionAnswered()
-    }
-
-    /**
-     * Apollo `onCreate$lambda$0` / `onCreate$lambda$1` 的共同部分：开计时；
-     * 并且「已拿到通知权限」时补点一次前台服务。
-     *
-     * Apollo 这里还显式报一次 `SYSTEM_NOTIFICATION_ALLOW`；我们的
-     * [SpNotifyPermit.isHaveNotifyPermission] 内部已经就报一次（带「只报一次」的落库标记），
-     * 所以这里不重复报，净效果和 Apollo 一样是一次。
+     * 与 Apollo `SplashActivity.checkNotifyPermission` 一致：**它管的是开屏广告什么时候开始计时**，
+     * 系统授权框没回答之前不计时，回答之后（或无需询问时）才走 [beginBootAdsFlow]。
+     * 授权成功时流程内部会补点一次前台服务（[com.scanpro.cam.pdf.CamPdfApp.onNotificationPermissionReady]）。
      */
     private fun onNotifyPermissionAnswered() {
-        if (SpNotifyPermit.isHaveNotifyPermission(this)) {
-            CamPdfApp.get().onNotificationPermissionReady()
-        }
         beginBootAdsFlow()
     }
     // endregion
@@ -430,6 +392,13 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         SpHotStartGate.onSplashDestroyed()
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (::notifyPermissionFlow.isInitialized) {
+            notifyPermissionFlow.onWindowFocusChanged(hasFocus)
+        }
+    }
+
     companion object {
         private const val TAG = "SpBootGate"
 
@@ -441,13 +410,6 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         /** 开屏兜底总时长在「最短停留 + 等待」之外的余量。 */
         private const val BOOT_SLACK_MS = 1_000L
-
-        private const val PREFS_NOTIFY_PERMIT = "sp_notify_permit_ask"
-
-        private const val KEY_NOTIFY_PERMIT_COUNT = "notify_permission_count"
-
-        /** Apollo `Constants.notify_permission_count` 的上限。 */
-        private const val MAX_NOTIFY_PERMIT_ASK = 2
 
         /** Apollo `scene_type` 缺省值。 */
         private const val DEFAULT_SCENE_TYPE = "start"

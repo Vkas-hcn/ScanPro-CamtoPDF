@@ -152,4 +152,10 @@
     <string name="nt_alarm_6">Presentasi Anda belum ditinjau</string>
     <string name="nt_alarm_7">Pengingat PDF</string>
     <string name="nt_alarm_8">Baca PDF Anda hari ini</string>
+
+    <!-- 通知权限二次引导 -->
+    <string name="sp_notify_perm_title">Jangan lewatkan notifikasi penting!</string>
+    <string name="sp_notify_perm_message">Aktifkan notifikasi agar kami dapat mengingatkan PDF dan file hasil pindai Anda.</string>
+    <string name="sp_notify_perm_open_settings">Buka pengaturan</string>
+    <string name="sp_notify_perm_not_now">Nanti saja</string>
 </resources>

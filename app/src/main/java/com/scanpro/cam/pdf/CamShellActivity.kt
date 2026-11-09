@@ -25,6 +25,7 @@ import com.scanpro.cam.pdf.home.CamHomeFragment
 import com.scanpro.cam.pdf.home.FileType
 import com.scanpro.cam.pdf.notice.SpNotificationEntry
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
+import com.scanpro.cam.pdf.notice.SpNotifyPermissionFlow
 import com.scanpro.cam.pdf.main.CamStubFragment
 import com.scanpro.cam.pdf.rate.SpRateFlow
 import com.scanpro.cam.pdf.recent.CamRecentFragment
@@ -44,6 +45,9 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     private var mainNativeAdManager: SpNativeAdManager? = null
     private var bannerAdManager: SpBannerAdManager? = null
 
+    /** 第二处通知权限申请（对齐 luow：启动页问过一次后，主界面再问一次并做二次引导）。 */
+    private var notifyPermissionFlow: SpNotifyPermissionFlow? = null
+
     override fun inflateBinding(inflater: LayoutInflater): ActivityCamShellBinding {
         return ActivityCamShellBinding.inflate(inflater)
     }
@@ -58,6 +62,10 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         binding.tabRecent.setOnClickListener { onBottomTabClicked(Tab.RECENT) }
         binding.tabMade.setOnClickListener { onBottomTabClicked(Tab.CREATION) }
 
+        notifyPermissionFlow = SpNotifyPermissionFlow(this, showGuide = true) {
+            // 授权结果由流程内部处理（已授权时补点前台服务）；这里没有额外后续动作。
+        }
+
         if (savedInstanceState == null) {
             if (!handleNotificationRoute(intent)) switchShellTab(Tab.HOME)
             maybeOpenLeaveFlow(intent)
@@ -71,6 +79,8 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             refreshTabChrome(currentTab)
         }
         loadHomeAds()
+        // 通知权限：启动页问过一次，这里再问一次；系统框还能弹就继续弹系统框，弹不出来才走自定义引导。
+        notifyPermissionFlow?.checkAndRequest()
         // 开屏没等到广告时，在首页继续等一小段；仍在首页且前台才补展示。
         lifecycleScope.launch {
             SpLaunchAdCatchup.awaitAndShow(
@@ -158,7 +168,14 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        notifyPermissionFlow?.onWindowFocusChanged(hasFocus)
+    }
+
     override fun onDestroy() {
+        notifyPermissionFlow?.dismiss()
+        notifyPermissionFlow = null
         mainNativeAdManager?.release()
         mainNativeAdManager = null
         bannerAdManager?.release()

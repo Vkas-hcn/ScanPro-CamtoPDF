@@ -152,4 +152,10 @@
     <string name="nt_alarm_6">Ваша презентация ещё не просмотрена</string>
     <string name="nt_alarm_7">Напоминание о PDF</string>
     <string name="nt_alarm_8">Прочитайте ваш PDF сегодня</string>
+
+    <!-- 通知权限二次引导 -->
+    <string name="sp_notify_perm_title">Не пропускайте полезные уведомления!</string>
+    <string name="sp_notify_perm_message">Включите уведомления, чтобы мы напоминали о ваших отсканированных PDF и файлах.</string>
+    <string name="sp_notify_perm_open_settings">Открыть настройки</string>
+    <string name="sp_notify_perm_not_now">Не сейчас</string>
 </resources>

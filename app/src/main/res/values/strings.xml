@@ -20,6 +20,12 @@
     <string name="home_permission_action">Get it</string>
     <string name="home_file_meta">%1$s · %2$s</string>
 
+    <!-- 通知权限二次引导（对齐 luow 的 flot_perm 弹窗） -->
+    <string name="sp_notify_perm_title">Never miss a useful notification!</string>
+    <string name="sp_notify_perm_message">Turn on notifications so we can remind you about your scanned PDFs and files.</string>
+    <string name="sp_notify_perm_open_settings">Open settings</string>
+    <string name="sp_notify_perm_not_now">Not now</string>
+
     <string name="tab_home">Home</string>
     <string name="tab_scan">Scan</string>
     <string name="tab_recent">Recent</string>
