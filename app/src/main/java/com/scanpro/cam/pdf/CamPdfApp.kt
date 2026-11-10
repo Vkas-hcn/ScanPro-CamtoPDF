@@ -14,7 +14,6 @@ import com.flux.tracksdk.model.TrackPolicy
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.mymy.mymy.ads.count.ADManagerMy
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
-import com.scanpro.cam.pdf.keepalive.LegacyBackgroundCleanup
 import com.zppko.pdfplus.nor.Zppkoo
 import com.zppko.pdfplus.nor.remote.ConfigHelper
 import com.zppko.pdfplus.nor.horus.HintExt01
@@ -22,23 +21,18 @@ import com.scanpro.cam.pdf.util.SpLocale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 class CamPdfApp : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private var backgroundInitialized = false
-    private var backgroundInitializationAttempted = false
-    private var notificationPermissionReadyPending = false
 
     override fun onCreate() {
         super.onCreate()
         camPdfApp = this
-        // Attribution callbacks may arrive before background cleanup completes.
+        // 提前赋值：归因回调 / UserParms 可能在 Zppkoo().onCreate() 之前用到。
         Zppkoo.ii = this
-        // PDF26 initializes SpUtil in Application.onCreate; UserParms.isOm() (UMP 欧盟判断)
-        // may run on the splash before the deferred Zppkoo.onCreate(), so initialize it here.
+        // PDF26 在 Application.onCreate 初始化 SpUtil；UserParms.isOm()（UMP 欧盟判断）
+        // 可能在开屏页提前用到，所以这里先初始化。
         com.zppko.pdfplus.nor.ads.tool.SpUtil.init(this)
         SpLocale.resetCompatLocalesIfNeeded(this)
         ensureWorkManager()
@@ -49,53 +43,11 @@ class CamPdfApp : Application() {
         // app_open_cold 由 SpBootActivity（isHotStart 守卫）在冷启时上报一次，
         // 这里不再上报，避免同一冷启重复计数。
         SpAdsHub.get(this, applicationScope).initialize()
-        startReplacementAfterCleanup()
-    }
-
-    private fun startReplacementAfterCleanup() {
-        // Register lifecycle observers before the first Activity starts. Network topic cleanup
-        // is independent: an offline device must still initialize its local background work.
-        fun cleanLocalAndStart(): LegacyBackgroundCleanup.Result? {
-            val result = runCatching { LegacyBackgroundCleanup.runBeforeNewWork(this) }
-                .onFailure { Log.w(TAG, "legacy cleanup failed", it) }
-                .getOrNull()
-            if (result?.localComplete == true) startReplacementBackground()
-            return result
-        }
-        val initial = cleanLocalAndStart()
-        if (backgroundInitialized && initial?.topicComplete == true) return
-        applicationScope.launch {
-            repeat(12) { attempt ->
-                delay(5_000L)
-                val result = cleanLocalAndStart()
-                if (backgroundInitialized && result?.topicComplete == true) return@launch
-                Log.w(TAG, "legacy cleanup pending (attempt ${attempt + 1}): ${result?.errors}")
-            }
-            Log.w(TAG, "legacy topic cleanup continues in Firebase and retries on next process start")
-        }
-    }
-
-    private fun startReplacementBackground(): Boolean {
-        if (backgroundInitialized) return true
-        if (backgroundInitializationAttempted) return false
-        backgroundInitializationAttempted = true
-        return runCatching {
-            Zppkoo().onCreate(this)
-            backgroundInitialized = true
-            if (notificationPermissionReadyPending) {
-                notificationPermissionReadyPending = false
-                startForegroundAfterPermission()
-            }
-            true
-        }.onFailure { Log.e(TAG, "A background initialization incomplete", it) }
-            .getOrDefault(false)
+        // 对齐 SmartPdfScan_luow：直接装配后台保活，不再走 LegacyBackgroundCleanup 迁移清理。
+        Zppkoo().onCreate(this)
     }
 
     fun onNotificationPermissionReady() {
-        if (!backgroundInitialized) {
-            notificationPermissionReadyPending = true
-            return
-        }
         startForegroundAfterPermission()
     }
 
