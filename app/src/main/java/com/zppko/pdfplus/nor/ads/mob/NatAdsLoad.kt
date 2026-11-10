@@ -1,59 +1,65 @@
 package com.zppko.pdfplus.nor.ads.mob
 
 import android.app.Activity
-import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdLoader
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.nativead.NativeAd
-import com.google.android.gms.ads.nativead.NativeAdOptions
-import com.zppko.pdfplus.nor.Zppkoo
+import com.scanpro.cam.pdf.ads.SpAdSession
+import com.scanpro.cam.pdf.analytics.AdTrackingHelper
+import com.tradplus.ads.open.nativead.TPNative
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
-
+import com.zppko.pdfplus.nor.ads.trad.TradAdNative
+import com.zppko.pdfplus.nor.ads.trad.TradLoadCallback
+import com.zppko.pdfplus.nor.ads.trad.TradShowCallback
 
 /**
- * 原生。骨架照 SmartPdfScan NatAdsLoad（childLoad + getAdView + childShow 空实现），
- * SDK 用 GMA AdLoader；收入照 PDF26 模式在填充成功后挂 OnPaidEventListener。
- * 渲染由 B 现有版式层（big/small + 关闭键）负责，经 ImpressionUtils.fireAnative 取用。
+ * 原生。骨架照 SmartPdfScan_luow NatAdsLoad（childLoad + getAdView + childShow 空实现），
+ * SDK 用 TradPlus TPNative；渲染由 B 现有 SpNativeAdManager 负责。
+ * 展示计数：AdCountNati.nati_addShowCount() 由 SpNativeAdManager 在展示前完成，这里不重复。
  */
 class NatAdsLoad(
     setting: AdsSetting
 ) : BaseAdsLoad(setting) {
 
-    private var nativeAd: NativeAd? = null
+    private var lastPoin = ""
+
+    private val trad = TradAdNative()
 
     override fun childLoad() {
         if (setting.zId.isEmpty()) {
             zmyAdsLoadFFFF("")
             return
         }
-        AdLoader.Builder(Zppkoo.ii, setting.zId)
-            .forNativeAd { ad ->
-                nativeAd?.destroy()
-                nativeAd = ad
-                ad.setOnPaidEventListener { value ->
-                    val adSourceName = ad.responseInfo?.adapterResponses?.firstOrNull()?.adSourceName
-                    sendValueToServer(value, adSourceName)
-                }
-                zmyAdsLoadSSSS(ad.responseInfo)
+        trad.initSplashAd(setting.zId, object : TradLoadCallback() {
+            override fun onAdLoaded() {
+                zmyAdsLoadSSSS(trad.mTPAdInfo?.adSourceName)
             }
-            .withAdListener(object : AdListener() {
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    zmyAdsLoadFFFF(error.message)
-                }
-            })
-            .withNativeAdOptions(
-                NativeAdOptions.Builder()
-                    .setAdChoicesPlacement(NativeAdOptions.ADCHOICES_TOP_RIGHT)
-                    .build(),
-            )
-            .build()
-            .loadAd(AdRequest.Builder().build())
+
+            override fun onAdFailedToLoad(code: Int, message: String) {
+                zmyAdsLoadFFFF(message)
+            }
+        })
+
+        // A 原样：原生在 load 时就挂 show 回调（展示由页面触发）。
+        trad.setShowCallback(object : TradShowCallback() {
+            override fun onAdShowed() {
+                // 展示起点由 SpNativeAdManager.trackNativeImpression 记录。
+            }
+
+            override fun onAdClicked() {
+                SpAdSession.markAdClicked()
+                trackLife?.let { AdTrackingHelper.click(it) }
+            }
+
+            override fun onAdDismissed() {
+            }
+
+            override fun onAdFailedToShow() {
+            }
+        })
     }
 
-    fun getAdView(point: String): NativeAd? {
-        return nativeAd
+    fun getAdView(point: String): TPNative? {
+        lastPoin = point
+        return trad.getAD()
     }
 
     override fun childShow(act: Activity, event: String, whenOnVisible: Boolean, finish: () -> Unit) {
@@ -61,12 +67,10 @@ class NatAdsLoad(
     }
 
     override fun zcanUsable(): Boolean {
-        return nativeAd != null
+        return trad.getAD()?.isReady == true
     }
 
     override fun zAdsDestory() {
-        nativeAd?.destroy()
-        nativeAd = null
+        trad.getAD()?.onDestroy()
     }
-
 }

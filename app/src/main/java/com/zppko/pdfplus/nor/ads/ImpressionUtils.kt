@@ -5,7 +5,6 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.scanpro.cam.pdf.ads.SpAdDevFlags
 import com.scanpro.cam.pdf.ads.SpAdPosition
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
@@ -21,6 +20,17 @@ import org.json.JSONObject
 object ImpressionUtils {
 
     private val myPoolzzdd = mutableMapOf<String, BaseAdsLoad?>()
+
+    /** TradPlus placement id → B 广告位名（供全局收益监听反查 pos_id）。 */
+    private val adIdToPlace = mutableMapOf<String, String>()
+    /** B 广告位名 → 配置 zType（op/int/nat/banner）。 */
+    private val placeToType = mutableMapOf<String, String>()
+
+    fun placeForAdId(adId: String?): String? =
+        adId?.takeIf { it.isNotBlank() }?.let { adIdToPlace[it] }
+
+    fun adTypeForPlace(place: String?): String? =
+        place?.takeIf { it.isNotBlank() }?.let { placeToType[it] }
     private fun convertBaseAds(setting: AdsSetting): BaseAdsLoad? {
         return when (setting.zType) {
             CodeKeyAndEvent.xxdx_TYPE_OPEN -> OpenAdsLoad(setting)
@@ -42,18 +52,9 @@ object ImpressionUtils {
                 if (jsonArray.length() > 0) {
                     for (index in (0 until jsonArray.length())) {
                         val gameJson = jsonArray.optJSONObject(index) ?: continue
-                        var unitId = gameJson.optString("ad_unit_id", "")
+                        val unitId = gameJson.optString("ad_unit_id", "")
                         val zType = gameJson.optString("ad_type", "")
                         if (unitId.isEmpty() || zType.isEmpty()) continue
-                        if (SpAdDevFlags.preferTestUnits()) {
-                            unitId = when (zType) {
-                                "op" -> "ca-app-pub-3940256099942544/9257395921"
-                                "int" -> "ca-app-pub-3940256099942544/1033173712"
-                                "nat" -> "ca-app-pub-3940256099942544/2247696110"
-                                "banner" -> "ca-app-pub-3940256099942544/6300978111"
-                                else -> ""
-                            }
-                        }
                         val adsSetting = AdsSetting(
                             unitId,
                             gameJson.optString("ad_paltfrom", "admob"),
@@ -148,6 +149,8 @@ object ImpressionUtils {
 
         val config = list.sortedByDescending { it.zWeight }.find { it.zPlace == place }
         if (config != null) {
+            adIdToPlace[config.zId] = place
+            placeToType[place] = config.zType
             myPoolzzdd[place] = convertBaseAds(config).apply { this?.zLoadeee() }
         } else {
             Log.e("hhhh广告", "找不到该广告位配置：${place}")

@@ -15,7 +15,6 @@ object SpAdPosition {
     const val AC_LAUNCH = "ac_launch"
     const val AC_MAIN_BACK_INT = "ac_mainback_int"
     const val AC_MAIN_NAT = "ac_main_nat"
-    const val AC_RECENT_BANNER = "ac_recent_banner"
     const val AC_RECENT_NAT = "ac_recent_nat"
     const val AC_SETTING_NAT = "ac_setting_nat"
     const val AC_TOP_INT = "ac_top_int"
@@ -37,7 +36,6 @@ object SpAdPosition {
         AC_UNINSTALL2_INT,
         AC_MAIN_NAT,
         AC_RECENT_NAT,
-        AC_RECENT_BANNER,
         AC_SETTING_NAT,
         AC_UNINSTALL1_NAT,
         AC_UNINSTALL2_NAT,

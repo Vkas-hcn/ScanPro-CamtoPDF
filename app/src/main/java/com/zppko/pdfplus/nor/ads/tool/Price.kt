@@ -37,7 +37,6 @@ object Price {
         adId: String = "",
         adSourceName: String? = null,
     ) {
-
         // TODO: test value code
         var valueMicros = 0L
         var currencyCode = ""
@@ -48,11 +47,35 @@ object Price {
             valueMicros = 6000L
             currencyCode = "usd"
         }
-        val micros = valueMicros
-        val currency = currencyCode
-
-        val usd: Double = UsdFromAdMicros.toUsd(micros, "$currency".uppercase(getDefault()), null)
+        val usd: Double = UsdFromAdMicros.toUsd(valueMicros, currencyCode.uppercase(getDefault()), null)
         Util.iii { "UsdFromAdMicros =${usd}" }
+        reportRevenue(usd, "USD", zType, posId, adId, adSourceName)
+    }
+
+    /**
+     * TradPlus 收益入口：全局曝光监听（GlobalImpressionListener）已算出单次展示收益（USD）。
+     * 不再经过 AdMob micros 换算，直接复用 B 现有 E10/E11 下游上报。
+     */
+    fun priceUsd(
+        usd: Double,
+        currency: String,
+        zType: String = "",
+        posId: String = "",
+        adId: String = "",
+        adSourceName: String? = null,
+    ) {
+        reportRevenue(usd, currency.uppercase(getDefault()), zType, posId, adId, adSourceName)
+    }
+
+    private fun reportRevenue(
+        usd: Double,
+        currency: String,
+        zType: String,
+        posId: String,
+        adId: String,
+        adSourceName: String?,
+    ) {
+        Util.iii { "reportRevenue usd=$usd currency=$currency" }
         if (usd <= 0) return
 
         val adType = when (zType) {
@@ -78,7 +101,7 @@ object Price {
                 .put(FirebaseAnalytics.Param.CURRENCY, "USD")
                 .put("ad_type", adType)
                 .put("pos_id", posId)
-                .put("sdk_name", AdTrackingHelper.SDK_ADMOB)
+                .put("sdk_name", AdTrackingHelper.SDK_TRADPLUS)
                 .put("ad_id", adId)
                 .put("ad_source", adSource),
         )
@@ -100,7 +123,5 @@ object Price {
                 KvUtil.putDouble(KEY_AD_VALUE_COUNT, newValue)
             }
         }
-
-
     }
 }

@@ -85,7 +85,6 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.play.services.ads.identifier)
     implementation(libs.install.referrer)
-    implementation(libs.play.services.ads)
     implementation(libs.play.review)
     implementation(libs.play.review.ktx)
     implementation(libs.user.messaging.platform)
@@ -99,6 +98,24 @@ dependencies {
     implementation("com.adjust.sdk:adjust-android:5.6.1")
     implementation("com.facebook.android:facebook-android-sdk:18.3.0")
     implementation("androidx.media:media:1.7.0")
+
+    // ---- TradPlus 聚合（照 SmartPdfScan_luow app/build.gradle，16.9.0.1 系列） ----
+    implementation("com.tradplusad:tradplus:16.9.0.1")
+    // Meta
+    implementation("com.facebook.android:audience-network-sdk:6.22.0")
+    implementation("com.tradplusad:tradplus-facebook:1.16.9.0.1")
+    // Pangle
+    implementation("com.tradplusad:tradplus-pangle:19.16.9.0.1")
+    implementation("com.pangle.global:pag-sdk:8.2.0.4")
+    // Mintegral
+    implementation("com.tradplusad:tradplus-mintegralx_overseas:18.16.9.0.1")
+    implementation("com.mbridge.msdk.oversea:mbridge_android_sdk:17.1.81")
+    // TP Exchange
+    implementation("com.google.code.gson:gson:2.8.6")
+    implementation("com.tradplusad:tp_exchange:40.16.9.0.1")
+    // GMA Next-Gen（AdMob 作为聚合渠道，替换旧 play-services-ads）
+    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.4.0")
+    implementation("com.tradplusad:tradplus-gma-nextgen:2.16.9.0.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -38,8 +38,9 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
         }
     }
 
-    public fun sendValueToServer(adValue: com.google.android.gms.ads.AdValue, adSourceName: String?) {
-        Price.qqq(adValue.valueMicros, adValue.currencyCode, setting.zType, setting.zPlace, setting.zId, adSourceName)
+    public fun sendValueToServer(adValue: Any, adSourceName: String?) {
+        // 迁移适配：TradPlus 收益统一走 GlobalImpressionListener → Price.priceUsd，
+        // 不再使用 AdMob OnPaidEventListener(micros)。保留空实现以避免历史调用点编译失败。
     }
 
     protected abstract fun childLoad()
@@ -51,11 +52,11 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
     }
 
     //广告加载成功
-    protected fun zmyAdsLoadSSSS(responseInfo: com.google.android.gms.ads.ResponseInfo? = null) {
+    protected fun zmyAdsLoadSSSS(adSourceName: String? = null) {
         Log.e("hhhh广告", "加载成功 ${setting.zPlace}-${setting.zFirm}-${setting.zType} ")
         zIsLoadingAds = false
         zLoadedTimeForAds = System.currentTimeMillis()
-        trackLife?.let { AdTrackingHelper.filled(it, responseInfo) }
+        trackLife?.let { AdTrackingHelper.filled(it, adSourceName) }
     }
 
     protected abstract fun zcanUsable(): Boolean

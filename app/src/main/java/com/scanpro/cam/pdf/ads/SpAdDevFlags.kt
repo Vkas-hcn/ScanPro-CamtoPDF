@@ -1,7 +1,5 @@
 package com.scanpro.cam.pdf.ads
 
-import com.scanpro.cam.pdf.BuildConfig
-
 /** Local switches for development / QA. */
 object SpAdDevFlags {
 
@@ -9,5 +7,6 @@ object SpAdDevFlags {
     @Deprecated("Ad safety follows BuildConfig.DEBUG and cannot be overridden")
     var FORCE_USE_TEST_ADS: Boolean? = null
 
-    fun preferTestUnits(): Boolean = BuildConfig.DEBUG
+    /** TradPlus 测试位走 TradPlus 后台测试模式，不再用 AdMob 测试单元覆盖，故恒返回 false。 */
+    fun preferTestUnits(): Boolean = false
 }

@@ -6,7 +6,6 @@ import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import android.view.ViewGroup
-import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpFullScreenAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.analytics.SpFacebookInit
@@ -307,9 +306,6 @@ class SpAdsHub private constructor(
 
     fun native(activity: Activity, container: ViewGroup): SpNativeAdManager =
         SpNativeAdManager(activity, container)
-
-    fun banner(activity: Activity, container: ViewGroup): SpBannerAdManager =
-        SpBannerAdManager(activity, container)
     // endregion
 
     /** 逻辑同 `ApoApplication.isForeground()`。 */

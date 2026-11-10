@@ -129,7 +129,6 @@ class SpBlockingLogic private constructor(context: Context) {
             SpAdPosition.AC_CHECK_INT,
             SpAdPosition.AC_MAIN_BACK_INT,
             SpAdPosition.AC_RECENT_NAT,
-            SpAdPosition.AC_RECENT_BANNER,
             SpAdPosition.AC_SETTING_NAT,
             SpAdPosition.AC_UNINSTALL1_INT,
             SpAdPosition.AC_UNINSTALL1_NAT,

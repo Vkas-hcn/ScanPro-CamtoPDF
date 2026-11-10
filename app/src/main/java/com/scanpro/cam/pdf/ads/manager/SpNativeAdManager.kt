@@ -5,14 +5,12 @@ import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
-import android.widget.ImageView
-import android.widget.TextView
-import com.google.android.gms.ads.nativead.MediaView
-import com.google.android.gms.ads.nativead.NativeAd
-import com.google.android.gms.ads.nativead.NativeAdView
 import com.mymy.mymy.ads.count.AdCountNati
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.ads.SpAdMobInit
@@ -20,6 +18,10 @@ import com.scanpro.cam.pdf.ads.SpBlockingLogic
 import com.scanpro.cam.pdf.ads.SpNatConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.util.AppLog
+import com.tradplus.ads.base.adapter.nativead.TPNativeAdView
+import com.tradplus.ads.base.common.TPImageLoader
+import com.tradplus.ads.open.nativead.TPNative
+import com.tradplus.ads.open.nativead.TPNativeAdRender
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
 import kotlinx.coroutines.CoroutineScope
@@ -32,8 +34,9 @@ import kotlinx.coroutines.launch
 /**
  * 原生广告接线层。
  * 加载 = PDF260713_p01 池（ImpressionUtils.load + fireAnative），
- * 展示时机/版式/关闭键 = B 原行为（200ms 轮询等待、big/small 版式、switch_open 关闭键）。
- * 埋点对齐 PDF26：无 Shark_* / ad_* 事件；收入由 NatAdsLoad 的 OnPaidEvent 走 Price.qqq。
+ * 展示时机/关闭键 = B 原行为（200ms 轮询等待、switch_open 关闭键）。
+ * SDK 由 AdMob GMA 换成 TradPlus TPNative（模板渲染 R.layout.tp_native_ad_list_item，照 A）。
+ * 埋点对齐 B：trackNativeImpression/trackNativeClose + AdCountNati 计数；收入走全局 Impression。
  */
 class SpNativeAdManager internal constructor(
     private val activity: Activity,
@@ -48,7 +51,7 @@ class SpNativeAdManager internal constructor(
     private val natConfig: SpNatConfig get() = SpAdsHub.getOrNull()?.nat() ?: SpNatConfig()
     private val blocking: SpBlockingLogic get() = SpBlockingLogic.get(appContext)
 
-    private var currentNativeAd: NativeAd? = null
+    private var currentTpNative: TPNative? = null
     /** 当前展示的原生加载器，用于关闭键上报 ad_close。 */
     private var currentLoader: NatAdsLoad? = null
     private var pollJob: Job? = null
@@ -107,10 +110,10 @@ class SpNativeAdManager internal constructor(
         if (!host.isAttachedToWindow || !host.isShown || host.windowVisibility != View.VISIBLE) return
         if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true) return
         val loader = ImpressionUtils.fireAnative(position) ?: return
-        val nativeAd = loader.getAdView(position) ?: return
+        val tpNative = loader.getAdView(position) ?: return
         renderPending = false
         pollJob?.cancel()
-        showAd(nativeAd, style, loader)
+        showAd(tpNative, style, loader)
     }
 
     private companion object {
@@ -123,7 +126,6 @@ class SpNativeAdManager internal constructor(
      */
     fun checkLoadAndShowAd(position: String, style: SpNativeAdStyle) {
         if (adLayoutView == null) {
-            // 没有容器就没有展示位，先发请求只会造成「有填充、无展示」。
             AppLog.ads.i("跳过广告加载 类型=native 位置=$position 原因=没有广告容器")
             return
         }
@@ -145,10 +147,6 @@ class SpNativeAdManager internal constructor(
         startCheckShowAd(position)
     }
 
-    /**
-     * 每 200ms 看一次池是否就绪。池（PDF26）没有加载完成回调，晚到填充只能靠轮询/页面
-     * 可见性事件触发渲染；因此不再像旧实现那样 3 秒截断，持续轮询直到渲染完成或页面销毁。
-     */
     private fun startCheckShowAd(position: String) {
         pollJob?.cancel()
         pollJob = scope.launch {
@@ -190,96 +188,102 @@ class SpNativeAdManager internal constructor(
         return true
     }
 
-    /** 绑定数据 + 关闭键 + 记数（B 原渲染层）。 */
-    private fun showAd(nativeAd: NativeAd, style: SpNativeAdStyle, loader: NatAdsLoad? = null) {
-        currentNativeAd?.destroy()
+    /** 绑定 TradPlus 模板渲染 + 关闭键 + 记数（B 原渲染层）。 */
+    private fun showAd(tpNative: TPNative, style: SpNativeAdStyle, loader: NatAdsLoad? = null) {
+        currentTpNative?.onDestroy()
         adLayoutView?.visibility = View.GONE
         AppLog.ads.i("开始展示广告 类型=native 位置=${displayTarget?.first}")
-        currentNativeAd = nativeAd
+        currentTpNative = tpNative
         currentLoader = loader
         loader?.trackNativeImpression()
         AdCountNati.nati_addShowCount()
-        bindAndShow(nativeAd, style)
+        bindAndShow(tpNative, style)
     }
 
-    private fun bindAndShow(nativeAd: NativeAd, style: SpNativeAdStyle) {
+    /**
+     * 自渲染：用 B 的 big/small 版式承载 TradPlus 返回的素材（恢复迁移前紧凑样式）。
+     * 原 AdMob 走 NativeAdView 绑定；TradPlus 走 TPNativeAdRender 自渲染 + 素材填充。
+     */
+    private fun bindAndShow(tpNative: TPNative, style: SpNativeAdStyle) {
         val host = adLayoutView ?: return
         host.removeAllViews()
-        val view = when (style) {
-            SpNativeAdStyle.big -> bindBig(host, nativeAd)
-            SpNativeAdStyle.small -> bindSmall(host, nativeAd)
+        val layoutRes = when (style) {
+            SpNativeAdStyle.big -> R.layout.sp_custom_native_ad_big_layout
+            SpNativeAdStyle.small -> R.layout.sp_custom_native_ad_small_layout
         }
+        tpNative.showAd(host, object : TPNativeAdRender() {
+            override fun createAdLayoutView(): ViewGroup =
+                activity.layoutInflater.inflate(layoutRes, host, false) as ViewGroup
+
+            override fun renderAdView(adView: TPNativeAdView): ViewGroup {
+                val v = createAdLayoutView()
+                val title = v.findViewById<TextView>(R.id.adHeadline)
+                val body = v.findViewById<TextView>(R.id.adBody)
+                val cta = v.findViewById<TextView>(R.id.adCallToAction)
+                val advertiser = v.findViewById<TextView>(R.id.adAdvertiser)
+                val icon = v.findViewById<ImageView>(R.id.adAppIcon)
+
+                title?.text = adView.title.orEmpty()
+                body?.text = adView.subTitle.orEmpty()
+                cta?.text = adView.callToAction.orEmpty()
+                advertiser?.text = adView.advertiserName.orEmpty()
+
+                // 图标：优先直接 Drawable，否则按 URL 异步加载。
+                if (icon != null) {
+                    val drawable = adView.iconImage
+                    if (drawable != null) {
+                        icon.setImageDrawable(drawable)
+                    } else {
+                        val url = adView.iconImageUrl
+                        if (!url.isNullOrBlank()) TPImageLoader.getInstance().loadImage(icon, url)
+                    }
+                }
+
+                // 大版：主图/视频容器。
+                if (layoutRes == R.layout.sp_custom_native_ad_big_layout) {
+                    val mediaHost = v.findViewById<FrameLayout>(R.id.media)
+                    val mediaView = adView.mediaView
+                    if (mediaHost != null && mediaView != null) {
+                        mediaHost.addView(mediaView)
+                        getClickViews().add(mediaView)
+                    } else if (mediaHost != null) {
+                        val main = adView.mainImage
+                        if (main != null) {
+                            val iv = ImageView(activity).apply {
+                                setImageDrawable(main)
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                            }
+                            mediaHost.addView(
+                                iv,
+                                FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                // 注册可点击区域，TradPlus 据此计曝光/点击。
+                title?.let { setTitleView(it, true) }
+                body?.let { setSubTitleView(it, true) }
+                cta?.let { setCallToActionView(it, true) }
+                advertiser?.let { setAdvertiserView(it, true) }
+                icon?.let { setIconView(it, true) }
+
+                // 素材缺失时隐藏，避免空白占位。
+                advertiser?.visibility = if (adView.advertiserName.isNullOrBlank()) View.GONE else View.VISIBLE
+                body?.visibility = if (adView.subTitle.isNullOrBlank()) View.GONE else View.VISIBLE
+                cta?.visibility = if (adView.callToAction.isNullOrBlank()) View.GONE else View.VISIBLE
+                icon?.visibility = if (adView.iconImage == null && adView.iconImageUrl.isNullOrBlank()) View.GONE else View.VISIBLE
+
+                // B 的关闭键（switch_open）。
+                v.findViewById<ImageView>(R.id.imageClose)?.let { applyCloseButton(it) }
+
+                return v
+            }
+        }, "")
         host.visibility = View.VISIBLE
-        host.addView(view)
-    }
-
-    private fun bindBig(host: ViewGroup, nativeAd: NativeAd): View {
-        val view = activity.layoutInflater.inflate(R.layout.sp_custom_native_ad_big_layout, host, false)
-        val adView = view.findViewById<NativeAdView>(R.id.nativeAdView)
-        val headline = view.findViewById<TextView>(R.id.adHeadline)
-        val body = view.findViewById<TextView>(R.id.adBody)
-        val cta = view.findViewById<TextView>(R.id.adCallToAction)
-        val icon = view.findViewById<ImageView>(R.id.adAppIcon)
-        val advertiser = view.findViewById<TextView>(R.id.adAdvertiser)
-        val media = view.findViewById<MediaView>(R.id.media)
-        val close = view.findViewById<ImageView>(R.id.imageClose)
-
-        adView.mediaView = media
-        media.mediaContent = nativeAd.mediaContent
-        adView.headlineView = headline
-        headline.text = nativeAd.headline
-        adView.bodyView = body
-        body.text = nativeAd.body
-        adView.callToActionView = cta
-        cta.text = nativeAd.callToAction
-        adView.iconView = icon
-        nativeAd.icon?.let { icon.setImageDrawable(it.drawable); icon.visibility = View.VISIBLE }
-            ?: run { icon.visibility = View.GONE }
-        adView.advertiserView = advertiser
-        advertiser.text = nativeAd.advertiser
-
-        advertiser.visibility = assetVisibility(nativeAd.advertiser)
-        body.visibility = assetVisibility(nativeAd.body)
-        cta.visibility = assetVisibility(nativeAd.callToAction)
-        headline.visibility = assetVisibility(nativeAd.headline)
-        icon.visibility = assetVisibility(nativeAd.icon)
-
-        applyCloseButton(close)
-        adView.setNativeAd(nativeAd)
-        return view
-    }
-
-    private fun bindSmall(host: ViewGroup, nativeAd: NativeAd): View {
-        val view = activity.layoutInflater.inflate(R.layout.sp_custom_native_ad_small_layout, host, false)
-        val adView = view.findViewById<NativeAdView>(R.id.nativeAdView)
-        val headline = view.findViewById<TextView>(R.id.adHeadline)
-        val body = view.findViewById<TextView>(R.id.adBody)
-        val cta = view.findViewById<TextView>(R.id.adCallToAction)
-        val icon = view.findViewById<ImageView>(R.id.adAppIcon)
-        val advertiser = view.findViewById<TextView>(R.id.adAdvertiser)
-        val close = view.findViewById<ImageView>(R.id.imageClose)
-
-        adView.headlineView = headline
-        headline.text = nativeAd.headline
-        adView.bodyView = body
-        body.text = nativeAd.body
-        adView.callToActionView = cta
-        cta.text = nativeAd.callToAction
-        adView.iconView = icon
-        nativeAd.icon?.let { icon.setImageDrawable(it.drawable); icon.visibility = View.VISIBLE }
-            ?: run { icon.visibility = View.GONE }
-        adView.advertiserView = advertiser
-        advertiser.text = nativeAd.advertiser
-
-        advertiser.visibility = assetVisibility(nativeAd.advertiser)
-        body.visibility = assetVisibility(nativeAd.body)
-        cta.visibility = assetVisibility(nativeAd.callToAction)
-        headline.visibility = assetVisibility(nativeAd.headline)
-        icon.visibility = assetVisibility(nativeAd.icon)
-
-        applyCloseButton(close)
-        adView.setNativeAd(nativeAd)
-        return view
     }
 
     /**
@@ -288,11 +292,7 @@ class SpNativeAdManager internal constructor(
      */
     private fun applyCloseButton(close: ImageView) {
         val nat = natConfig
-        if (nat.switchOpen != 1) {
-            close.visibility = View.GONE
-            return
-        }
-        if (!blocking.isShowNativeAdCloseButton()) {
+        if (nat.switchOpen != 1 || !blocking.isShowNativeAdCloseButton()) {
             close.visibility = View.GONE
             return
         }
@@ -304,8 +304,6 @@ class SpNativeAdManager internal constructor(
             adLayoutView?.visibility = View.GONE
         }
     }
-
-    private fun assetVisibility(asset: Any?): Int = if (asset == null) View.INVISIBLE else View.VISIBLE
 
     /** Apollo `release()`。 */
     fun release() {
@@ -319,8 +317,8 @@ class SpNativeAdManager internal constructor(
         adLayoutView?.removeOnAttachStateChangeListener(attachListener)
         lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
         adLayoutView?.removeAllViews()
-        currentNativeAd?.destroy()
-        currentNativeAd = null
+        currentTpNative?.onDestroy()
+        currentTpNative = null
         currentLoader = null
     }
 

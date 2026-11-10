@@ -20,7 +20,6 @@ object CodeKeyAndEvent {
     val xxdx_TYPE_OPEN = "op"
     val xxdx_TYPE_INTER = "int"
     val xxdx_TYPE_NATIVE = "nat"
-    val xxdx_TYPE_BANNER = "banner"
     val ddd_FIRM_ADMOB = "admob"
     val ddd_FIRM_TOPON = "topon"
     val ddd_FIRM_TRADPLUS = "tradplus"

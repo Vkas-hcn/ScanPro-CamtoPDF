@@ -14,7 +14,6 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
 import com.scanpro.cam.pdf.ads.SpAdPosition
 import com.scanpro.cam.pdf.ads.SpPageAdTriggers
-import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.made.CamMadeFragment
@@ -40,7 +39,6 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     private var pendingNotificationFileType: FileType? = null
     private var appliedLocaleGeneration = SpLocale.generation
     private var mainNativeAdManager: SpNativeAdManager? = null
-    private var bannerAdManager: SpBannerAdManager? = null
 
     /** 第二处通知权限申请（对齐 luow：启动页问过一次后，主界面再问一次并做二次引导）。 */
     private var notifyPermissionFlow: SpNotifyPermissionFlow? = null
@@ -167,8 +165,6 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         notifyPermissionFlow = null
         mainNativeAdManager?.release()
         mainNativeAdManager = null
-        bannerAdManager?.release()
-        bannerAdManager = null
         super.onDestroy()
     }
 
@@ -192,9 +188,6 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     private fun loadHomeAds() {
         if (mainNativeAdManager == null) {
             mainNativeAdManager = SpPageAdTriggers.bindMainNative(this, binding.nativeAdLayout)
-        }
-        if (bannerAdManager == null) {
-            bannerAdManager = SpPageAdTriggers.bindRecentBanner(this, binding.bannerAdLayout)
         }
     }
 

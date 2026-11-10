@@ -12,7 +12,6 @@ import com.facebook.appevents.AppEventsConstants
 import com.facebook.appevents.AppEventsLogger
 import com.flux.tracksdk.core.TrackSDK
 import com.flux.tracksdk.model.TrackPolicy
-import com.google.android.gms.ads.ResponseInfo
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.scanpro.cam.pdf.CamPdfApp
 import com.scanpro.cam.pdf.util.AppLog
@@ -31,6 +30,7 @@ object AdTrackingHelper {
         const val REWARDED = "rewarded"
     }
     const val SDK_ADMOB = "AdMob"
+    const val SDK_TRADPLUS = "tradplus"
     const val SOURCE_ADMOB = "admob"
 
     private val lives = HashMap<String, AdTrackLife>()
@@ -78,13 +78,13 @@ object AdTrackingHelper {
         lives.remove(sessionId)
     }
 
-    fun filled(life: AdTrackLife, responseInfo: ResponseInfo?) {
-        life.adSource = adSourceOf(responseInfo?.adapterResponses?.firstOrNull()?.adSourceName)
+    fun filled(life: AdTrackLife, adSourceName: String? = null) {
+        life.adSource = adSourceOf(adSourceName)
         trackAdFilledWithSource(
             adType = life.adType,
             posId = life.posId,
             adId = life.adId,
-            sdkName = SDK_ADMOB,
+            sdkName = SDK_TRADPLUS,
             adSource = life.adSource,
             duration = (System.currentTimeMillis() - life.requestStartMs).coerceAtLeast(0L),
         )
@@ -105,7 +105,7 @@ object AdTrackingHelper {
             adType = life.adType,
             posId = life.posId,
             adId = life.adId,
-            sdkName = SDK_ADMOB,
+            sdkName = SDK_TRADPLUS,
             adSource = life.adSource,
         )
     }
@@ -122,7 +122,7 @@ object AdTrackingHelper {
 
     fun trackAdRequestGMA(adType: String, posId: String, adUnitId: String, scene: String = "") {
         report("trackAdRequestGMA") {
-            TrackSDK.trackAdRequest(adType, posId, SDK_ADMOB, adUnitId)
+            TrackSDK.trackAdRequest(adType, posId, SDK_TRADPLUS, adUnitId)
         }
 
         AppLog.tracking.d("埋点已提交 平台=tracksdk 事件=trackAdRequest 参数=adType=$adType, posId=$posId, sdk=$SDK_ADMOB, adId=$adUnitId, scene=$scene")
@@ -153,7 +153,7 @@ object AdTrackingHelper {
     ) {
         val errCodeInt = parseErrCode(errCode)
         report("trackAdFailed") {
-            TrackSDK.trackAdFailed(adType, posId, SDK_ADMOB, adId, errCodeInt, errMsg)
+            TrackSDK.trackAdFailed(adType, posId, SDK_TRADPLUS, adId, errCodeInt, errMsg)
         }
 
         AppLog.tracking.d(
@@ -211,10 +211,10 @@ object AdTrackingHelper {
         usd: Double
     ) {
         runCatching {
-            val adRevenue = AdjustAdRevenue("admob_sdk")
+            val adRevenue = AdjustAdRevenue("tradplus_sdk")
             if (usd < 0) return
             adRevenue.setRevenue(usd, "USD")
-            adRevenue.setAdRevenueNetwork("Admob")
+            adRevenue.setAdRevenueNetwork("TradPlus")
             // 规范 §5.2：AdjustAdRevenue 必须同时声明展示次数，否则收入无法按曝光归因。
             adRevenue.setAdImpressionsCount(1)
             Adjust.trackAdRevenue(adRevenue)

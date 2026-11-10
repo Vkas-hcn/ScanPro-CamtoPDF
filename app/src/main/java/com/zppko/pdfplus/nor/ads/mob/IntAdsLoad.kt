@@ -1,83 +1,68 @@
 package com.zppko.pdfplus.nor.ads.mob
 
 import android.app.Activity
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
-import com.zppko.pdfplus.nor.Zppkoo
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
-
+import com.zppko.pdfplus.nor.ads.trad.TradAdInter
+import com.zppko.pdfplus.nor.ads.trad.TradLoadCallback
+import com.zppko.pdfplus.nor.ads.trad.TradShowCallback
 
 /**
- * 插屏。骨架照 SmartPdfScan IntAdsLoad，SDK 调用照 PDF26 OpenAdsLoad 的 AdMob 模式：
- * 加载成功/失败只走 zmyAdsLoadSSSS/FFFF（含降级链），展示走 FullScreenContentCallback，
- * 收入走 OnPaidEventListener -> sendValueToServer（对齐 PDF26：无 TrackAd/AdCount 调用点）。
+ * 插屏。骨架照 SmartPdfScan_luow IntAdsLoad（TradPlus TPInterstitial），
+ * 埋点对齐 B：trackLife + AdTrackingHelper。展示计数由 SpFullScreenAdManager 在展示前
+ * 调 AdCountInter.inter_addShowCount() 完成，这里不再重复计数。
  */
 class IntAdsLoad(
     setting: AdsSetting
 ) : BaseAdsLoad(setting) {
 
-    private var interAd: InterstitialAd? = null
+    private val trad = TradAdInter()
 
     override fun childLoad() {
         if (setting.zId.isEmpty()) {
-            // PDF26 OpenRequest 对空 ID 静默跳过；此处显式失败以复位加载标志并触发降级链。
             zmyAdsLoadFFFF("")
             return
         }
-        InterstitialAd.load(
-            Zppkoo.ii,
-            setting.zId,
-            AdRequest.Builder().build(),
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: InterstitialAd) {
-                    interAd = ad
-                    zmyAdsLoadSSSS(ad.responseInfo)
-                }
+        trad.initSplashAd(setting.zId, object : TradLoadCallback() {
+            override fun onAdLoaded() {
+                zmyAdsLoadSSSS(trad.mTPAdInfo?.adSourceName)
+            }
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    zmyAdsLoadFFFF(error.message)
-                }
-            },
-        )
+            override fun onAdFailedToLoad(code: Int, message: String) {
+                zmyAdsLoadFFFF(message)
+            }
+        })
     }
 
     override fun childShow(act: Activity, event: String, whenOnVisible: Boolean, finish: () -> Unit) {
-        interAd?.setOnPaidEventListener {
-            val adSourceName = interAd?.responseInfo?.adapterResponses?.firstOrNull()?.adSourceName
-            OpenRequest().sendValueToServer(this, it, adSourceName)
-        }
-        interAd?.let {
-            it.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    zDismiss(act, whenOnVisible, finish)
-                    interAd = null
-                }
-
-                override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                    zDismiss(act, whenOnVisible, finish)
-                    interAd = null
-                }
-
-                override fun onAdClicked() {
-                    trackLife?.let { AdTrackingHelper.click(it) }
-                }
+        val nowAd = trad.getAD() ?: return zDismiss(act, whenOnVisible, finish)
+        trad.setShowCallback(object : TradShowCallback() {
+            override fun onAdShowed() {
+                // 展示起点已由 BaseAdsLoad.zShoweee 记录；计数由 manager 完成。
             }
-            it.show(act)
-        } ?: zDismiss(act, whenOnVisible, finish)
+
+            override fun onAdClicked() {
+                SpAdSession.markAdClicked()
+                trackLife?.let { AdTrackingHelper.click(it) }
+            }
+
+            override fun onAdDismissed() {
+                zDismiss(act, whenOnVisible, finish)
+            }
+
+            override fun onAdFailedToShow() {
+                zDismiss(act, whenOnVisible, finish)
+            }
+        })
+        nowAd.showAd(act, "sceneId")
     }
 
     override fun zcanUsable(): Boolean {
-        return interAd != null
+        return trad.getAD()?.isReady == true
     }
 
     override fun zAdsDestory() {
-
     }
-
 }

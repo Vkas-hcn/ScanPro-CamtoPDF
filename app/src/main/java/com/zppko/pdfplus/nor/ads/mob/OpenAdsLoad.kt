@@ -1,85 +1,71 @@
 package com.zppko.pdfplus.nor.ads.mob
 
-// 迁移适配：com.buncead.common.pdfpro.my.BaseActivity → android.app.Activity
 import android.app.Activity
+import android.view.ViewGroup
+import com.scanpro.cam.pdf.ads.SpAdSession
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.appopen.AppOpenAd
-import com.google.android.gms.ads.appopen.AppOpenAd.AppOpenAdLoadCallback
+import com.zppko.pdfplus.nor.ads.trad.TradAdOpen
+import com.zppko.pdfplus.nor.ads.trad.TradLoadCallback
+import com.zppko.pdfplus.nor.ads.trad.TradShowCallback
 
-
+/**
+ * 开屏。骨架照 SmartPdfScan_luow OpenAdsLoad（TradPlus TPSplash），
+ * 埋点对齐 B：trackLife + AdTrackingHelper（无 A 的 TrackAd/AdCountOpen）。
+ * 展示计数：B 开屏不做频控，仅记录埋点；收益统一走全局 GlobalImpressionListener。
+ */
 class OpenAdsLoad(
     setting: AdsSetting
 ) : BaseAdsLoad(setting) {
-    //开屏广告
-    private var openAd: AppOpenAd? = null
+
+    private val trad = TradAdOpen()
 
     override fun childLoad() {
-        OpenRequest().start(setting.zId,object : AppOpenAdLoadCallback() {
-            override fun onAdLoaded(p0: AppOpenAd) {
-                openAd = p0
-                zmyAdsLoadSSSS(p0.responseInfo)
+        if (setting.zId.isEmpty()) {
+            zmyAdsLoadFFFF("")
+            return
+        }
+        trad.initSplashAd(setting.zId, object : TradLoadCallback() {
+            override fun onAdLoaded() {
+                zmyAdsLoadSSSS(trad.mTPAdInfo?.adSourceName)
             }
 
-            override fun onAdFailedToLoad(p0: LoadAdError) {
-                zmyAdsLoadFFFF(p0.message)
+            override fun onAdFailedToLoad(code: Int, message: String) {
+                zmyAdsLoadFFFF(message)
             }
         })
-
-//        AppOpenAd.load(
-//            Zenlytic.ii,
-//            setting.zId,
-//            AdRequest.Builder().build(),
-//            object : AppOpenAdLoadCallback() {
-//                override fun onAdLoaded(p0: AppOpenAd) {
-//                    openAd = p0
-//                    zmyAdsLoadSSSS()
-//                }
-//
-//                override fun onAdFailedToLoad(p0: LoadAdError) {
-//                    zmyAdsLoadFFFF(p0.message)
-//                }
-//            }
-//        )
     }
 
-    override fun childShow(act: Activity, event: String, whenOnVisible:Boolean, finish: () -> Unit) {
-        openAd?.setOnPaidEventListener {
-            val adSourceName = openAd?.responseInfo?.loadedAdapterResponseInfo?.adSourceName
-//            sendValueToServer(it, adSourceName)
-            OpenRequest().sendValueToServer(this,it,adSourceName)
-        }
-        openAd?.let {
-            it.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    zDismiss(act,whenOnVisible, finish)
-                    openAd = null
-                }
-
-                override fun onAdFailedToShowFullScreenContent(p0: AdError) {
-                    zDismiss(act,whenOnVisible, finish)
-                    openAd = null
-                }
-                override fun onAdImpression() {
-                }
-                override fun onAdClicked() {
-                    trackLife?.let { AdTrackingHelper.click(it) }
-                }
+    override fun childShow(act: Activity, event: String, whenOnVisible: Boolean, finish: () -> Unit) {
+        val splashAd = trad.getAD() ?: return zDismiss(act, whenOnVisible, finish)
+        trad.setShowCallback(object : TradShowCallback() {
+            override fun onAdShowed() {
+                // 展示起点已由 BaseAdsLoad.zShoweee 记录（trackLife），无需重复。
             }
-            it.show(act)
-        } ?: zDismiss(act,whenOnVisible, finish)
+
+            override fun onAdClicked() {
+                SpAdSession.markAdClicked()
+                trackLife?.let { AdTrackingHelper.click(it) }
+            }
+
+            override fun onAdDismissed() {
+                zDismiss(act, whenOnVisible, finish)
+            }
+
+            override fun onAdFailedToShow() {
+                zDismiss(act, whenOnVisible, finish)
+            }
+        })
+        // TradPlus 开屏需要容器：用 Activity 内容根视图作为全屏容器（B 无专用 adCom）。
+        val container = act.findViewById<ViewGroup>(android.R.id.content)
+        splashAd.showAd(act, container, "splash_eve")
     }
 
     override fun zcanUsable(): Boolean {
-        return openAd != null
+        return trad.getAD()?.isReady == true
     }
 
     override fun zAdsDestory() {
-
     }
-
 }

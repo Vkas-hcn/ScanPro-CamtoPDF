@@ -1,24 +1,19 @@
 package com.scanpro.cam.pdf.ads
 
 import android.content.Context
-import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.RequestConfiguration
 import com.scanpro.cam.pdf.analytics.SpTracker
 import com.scanpro.cam.pdf.util.AppLog
+import com.tradplus.ads.open.TradPlusSdk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * MobileAds 初始化。照抄 ApolloPDF `ad/AdMobInit.java`：
- *
- * - 一次性的 `MobileAds.initialize`，成功后置 `isMobileAdsInitialize = true`；
- * - 全栈（加载 / 展示 / 保活）都用这个 flag 当「SDK 是否可用」的前置条件。
- *
- * 出处：`data/apks/apollo/sources/sources/com/zj/apollopdf/ad/AdMobInit.java`
- *
- * 差异：Apollo 在 `RequestConfiguration` 里硬编码了测试机 ID，这里改用 [SpAdDevFlags]
- * 控制是否走官方测试单元，不在源码里留设备 ID。
+ * 广告 SDK 就绪判定。SDK 内核由 AdMob MobileAds 换成 TradPlus：
+ * - TradPlus 初始化在 `Zppkoo.onCreate` 的 IO 协程里执行（TradPlusSdk.initSdk + 收益监听）；
+ * - 本类只负责「等 TradPlus 初始化完成」并回调 onReady，供开屏预加载补拉使用。
+ * 类名保留 SpAdMobInit 以最小化调用点改动。
  */
 class SpAdMobInit private constructor(private val appContext: Context) {
 
@@ -28,31 +23,30 @@ class SpAdMobInit private constructor(private val appContext: Context) {
     fun isMobileAdsInitialize(): Boolean = initialized
 
     /**
-     * @param onReady SDK 初始化完成回调。旧实现在这里只打日志，导致「配置先到、SDK 后到」
-     *   时首轮预加载被跳过后再也不会重试。
+     * @param onReady SDK 初始化完成回调（用于补拉因 SDK 未就绪被推迟的开屏预加载）。
      */
     fun init(scope: CoroutineScope, onReady: () -> Unit = {}) {
         scope.launch(Dispatchers.IO) {
-            runCatching {
-                MobileAds.setRequestConfiguration(
-                    RequestConfiguration.Builder()
-                        .setTestDeviceIds(if (SpAdDevFlags.preferTestUnits()) TEST_DEVICE_IDS else emptyList())
-                        .build(),
-                )
-                MobileAds.initialize(appContext) {
-                    initialized = true
-                    AppLog.ads.i("广告SDK初始化完成")
-                    SpTracker.log(appContext, SpTracker.AD_SDK_READY)
-                    runCatching { onReady() }
-                        .onFailure { AppLog.ads.w("广告SDK就绪回调失败", it) }
-                }
-            }.onFailure { AppLog.ads.w("广告SDK初始化失败", it) }
+            var attempts = 0
+            while (!TradPlusSdk.getIsInit() && attempts < INIT_WAIT_ATTEMPTS) {
+                delay(INIT_POLL_MS)
+                attempts++
+            }
+            initialized = TradPlusSdk.getIsInit()
+            if (initialized) {
+                AppLog.ads.i("广告SDK初始化完成")
+                SpTracker.log(appContext, SpTracker.AD_SDK_READY)
+                runCatching { onReady() }
+                    .onFailure { AppLog.ads.w("广告SDK就绪回调失败", it) }
+            } else {
+                AppLog.ads.w("广告SDK初始化未就绪（TradPlus 未初始化）")
+            }
         }
     }
 
     companion object {
-        /** 官方文档给的通用测试机 ID。仅在 [SpAdDevFlags] 打开时下发。 */
-        private val TEST_DEVICE_IDS = listOf("B3EEABB8EE11C2BE770B684D95219ECB")
+        private const val INIT_POLL_MS = 100L
+        private const val INIT_WAIT_ATTEMPTS = 100
 
         @Volatile
         private var instance: SpAdMobInit? = null

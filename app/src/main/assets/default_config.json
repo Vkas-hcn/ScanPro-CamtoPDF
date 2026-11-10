@@ -58,136 +58,128 @@
     "ac_ad_config": {
       "ac_launch": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/9257395921",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "D9118E91DD06DF6D322369455CAED618",
+          "ad_paltfrom": "tradplus",
           "ad_type": "op",
           "ad_timelimit": 3000
         }
       ],
       "ac_language_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_language_nat": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "DDBF26FBDA47FBE2765F1A089F1356BF",
+          "ad_paltfrom": "tradplus",
           "ad_type": "nat",
           "ad_timelimit": 3000
         }
       ],
       "ac_guide_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_guide_nat": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "DDBF26FBDA47FBE2765F1A089F1356BF",
+          "ad_paltfrom": "tradplus",
           "ad_type": "nat",
           "ad_timelimit": 3000
         }
       ],
       "ac_file_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_top_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_check_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_mainback_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_uninstall1_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_uninstall1_nat": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "DDBF26FBDA47FBE2765F1A089F1356BF",
+          "ad_paltfrom": "tradplus",
           "ad_type": "nat",
           "ad_timelimit": 3000
         }
       ],
       "ac_uninstall2_int": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/1033173712",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
           "ad_type": "int",
           "ad_timelimit": 3000
         }
       ],
       "ac_uninstall2_nat": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "DDBF26FBDA47FBE2765F1A089F1356BF",
+          "ad_paltfrom": "tradplus",
           "ad_type": "nat",
           "ad_timelimit": 3000
         }
       ],
       "ac_main_nat": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "DDBF26FBDA47FBE2765F1A089F1356BF",
+          "ad_paltfrom": "tradplus",
           "ad_type": "nat",
           "ad_timelimit": 3000
         }
       ],
       "ac_recent_nat": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "DDBF26FBDA47FBE2765F1A089F1356BF",
+          "ad_paltfrom": "tradplus",
           "ad_type": "nat",
-          "ad_timelimit": 3000
-        }
-      ],
-      "ac_recent_banner": [
-        {
-          "ad_unit_id": "ca-app-pub-3940256099942544/6300978111",
-          "ad_paltfrom": "admob",
-          "ad_type": "banner",
           "ad_timelimit": 3000
         }
       ],
       "ac_setting_nat": [
         {
-          "ad_unit_id": "ca-app-pub-3940256099942544/2247696110",
-          "ad_paltfrom": "admob",
+          "ad_unit_id": "DDBF26FBDA47FBE2765F1A089F1356BF",
+          "ad_paltfrom": "tradplus",
           "ad_type": "nat",
           "ad_timelimit": 3000
         }

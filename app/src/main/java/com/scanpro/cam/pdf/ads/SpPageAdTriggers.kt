@@ -2,7 +2,6 @@ package com.scanpro.cam.pdf.ads
 
 import android.app.Activity
 import android.view.ViewGroup
-import com.scanpro.cam.pdf.ads.manager.SpBannerAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
 import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
 import com.scanpro.cam.pdf.util.AppLog
@@ -126,13 +125,6 @@ object SpPageAdTriggers {
         val hub = SpAdsHub.getOrNull() ?: return null
         return hub.native(activity, container).also {
             it.checkLoadAndShowAd(SpAdPosition.AC_MAIN_NAT, SpNativeAdStyle.small)
-        }
-    }
-
-    fun bindRecentBanner(activity: Activity, container: ViewGroup): SpBannerAdManager? {
-        val hub = SpAdsHub.getOrNull() ?: return null
-        return hub.banner(activity, container).also {
-            it.loadBannerAd(SpAdPosition.AC_RECENT_BANNER)
         }
     }
 

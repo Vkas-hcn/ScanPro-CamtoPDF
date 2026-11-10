@@ -12,7 +12,7 @@ data class SpAdInfo(
     val adUnitId: String,
     /** `ad_paltfrom`。Apollo 拼错了（paltfrom），原样保留 key 名。 */
     val adPlatform: String,
-    /** `ad_type`：`op` 开屏 / `int` 插屏 / `nat` 原生 / `banner` banner。 */
+    /** `ad_type`：`op` 开屏 / `int` 插屏 / `nat` 原生。 */
     val adType: String,
     /** `ad_timelimit`：缓存有效期（秒）。超时视为已失效。 */
     val adTimeLimit: Int,
@@ -20,26 +20,14 @@ data class SpAdInfo(
     val isOpen: Boolean get() = adType == TYPE_OPEN
     val isInterstitial: Boolean get() = adType == TYPE_INTERSTITIAL
     val isNative: Boolean get() = adType == TYPE_NATIVE
-    val isBanner: Boolean get() = adType == TYPE_BANNER
 
-    /** Resolve at the request boundary so remote IDs cannot send debug traffic to production. */
+    /** TradPlus：ad_unit_id 即 TradPlus placement id，直接透传（不再用 AdMob 测试单元覆盖）。 */
     val requestUnitId: String
-        get() = if (SpAdDevFlags.preferTestUnits()) {
-            when (adType) {
-                TYPE_OPEN -> "ca-app-pub-3940256099942544/9257395921"
-                TYPE_INTERSTITIAL -> "ca-app-pub-3940256099942544/1033173712"
-                TYPE_NATIVE -> "ca-app-pub-3940256099942544/2247696110"
-                TYPE_BANNER -> "ca-app-pub-3940256099942544/6300978111"
-                else -> ""
-            }
-        } else {
-            adUnitId
-        }
+        get() = adUnitId
 
     companion object {
         const val TYPE_OPEN = "op"
         const val TYPE_INTERSTITIAL = "int"
         const val TYPE_NATIVE = "nat"
-        const val TYPE_BANNER = "banner"
     }
 }
