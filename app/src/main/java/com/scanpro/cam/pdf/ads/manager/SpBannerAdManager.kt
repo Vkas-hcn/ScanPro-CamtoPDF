@@ -113,7 +113,7 @@ class SpBannerAdManager(
         bannerLife = life
         // 收益对齐 PDF26：统一走 Price.qqq（OnPaidEvent → USD 换算 + 三路 + 累积）
         banner.setOnPaidEventListener { value ->
-            Price.qqq(value.valueMicros, value.currencyCode)
+            Price.qqq(value.valueMicros, value.currencyCode, AdTrackingHelper.AdType.BANNER, position, life.adId, life.adSource)
         }
         banner.adListener = object : AdListener() {
             override fun onAdLoaded() {

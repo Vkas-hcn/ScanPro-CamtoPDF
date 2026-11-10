@@ -2,6 +2,7 @@ package com.zppko.pdfplus.nor.ads.mob
 
 // 迁移适配：com.buncead.common.pdfpro.my.BaseActivity → android.app.Activity
 import android.app.Activity
+import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
 import com.google.android.gms.ads.AdError
@@ -21,7 +22,7 @@ class OpenAdsLoad(
         OpenRequest().start(setting.zId,object : AppOpenAdLoadCallback() {
             override fun onAdLoaded(p0: AppOpenAd) {
                 openAd = p0
-                zmyAdsLoadSSSS()
+                zmyAdsLoadSSSS(p0.responseInfo)
             }
 
             override fun onAdFailedToLoad(p0: LoadAdError) {
@@ -66,6 +67,7 @@ class OpenAdsLoad(
                 override fun onAdImpression() {
                 }
                 override fun onAdClicked() {
+                    trackLife?.let { AdTrackingHelper.click(it) }
                 }
             }
             it.show(act)

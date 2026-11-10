@@ -7,6 +7,8 @@ import com.scanpro.cam.pdf.ads.SpAdMobInit
 import com.scanpro.cam.pdf.ads.SpAdShowGate
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.ads.SpBlockingLogic
+import com.scanpro.cam.pdf.analytics.AdTrackingHelper
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.util.AppLog
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
 
@@ -29,6 +31,15 @@ class SpFullScreenAdManager(
     /** 该位置配置的广告类型（op/int/...），用于分类型频控计数。 */
     private fun adTypeOf(position: String): String =
         SpAdsHub.getOrNull()?.config()?.adInfoList(position)?.firstOrNull()?.adType ?: ""
+
+    /** 规范 §2.3 的 `ad_type`（open/interstitial/native/banner），用于 ad_blocked 上报。 */
+    private fun specAdType(position: String): String = when (adTypeOf(position)) {
+        "op" -> AdTrackingHelper.AdType.OPEN
+        "int" -> AdTrackingHelper.AdType.INTERSTITIAL
+        "nat" -> AdTrackingHelper.AdType.NATIVE
+        "banner" -> AdTrackingHelper.AdType.BANNER
+        else -> adTypeOf(position)
+    }
 
     /** 开屏按 PDF26 不做频控；插屏保留 AdCountInter。 */
     private fun adCountCanShow(position: String): Boolean = when (adTypeOf(position)) {
@@ -54,18 +65,22 @@ class SpFullScreenAdManager(
         }
         if (blocking.isShowPartialAdsOnly(position)) {
             AppLog.ads.i("跳过广告加载 位置=$position 原因=只展示部分广告")
+            SpTrackEvents.adBlocked(specAdType(position), position, "disabled")
             return
         }
         if (blocking.isVPNBlock()) {
             AppLog.ads.i("跳过广告加载 位置=$position 原因=VPN拦截")
+            SpTrackEvents.adBlocked(specAdType(position), position, "disabled")
             return
         }
         if (!blocking.canShowAllAd()) {
             AppLog.ads.i("跳过广告加载 位置=$position 原因=总闸拦截")
+            SpTrackEvents.adBlocked(specAdType(position), position, "disabled")
             return
         }
         if (!adCountCanShow(position)) {
             AppLog.ads.i("跳过广告加载 位置=$position 原因=达到当日展示上限")
+            SpTrackEvents.adBlocked(specAdType(position), position, "daily_cap")
             return
         }
         ImpressionUtils.load(position)
@@ -106,6 +121,7 @@ class SpFullScreenAdManager(
         }
         if (useShowGate && !SpAdShowGate.tryEnter()) {
             AppLog.ads.i("跳过广告展示 位置=$scene 原因=已有广告正在展示")
+            SpTrackEvents.adBlocked(specAdType(position), position, "another_fullscreen")
             onResult(false, false)
             return
         }

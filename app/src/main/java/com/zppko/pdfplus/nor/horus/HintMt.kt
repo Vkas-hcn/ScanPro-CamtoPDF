@@ -17,6 +17,7 @@ import com.bockcock.adjust.Pin
 import com.bockcock.adjust.Pt
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.ads.SpAdsHub
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.notice.SpNotifyUtils
 import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.smart.pdf.scanner.util.LocaleHelper
@@ -51,7 +52,7 @@ object HintMt {
         runCatching {
 //            EVEtnUploader.mine("trigger_media_notify")
 //            Pin.event(Pin.trigger_media_ntf)
-            Pin.event(Pin.notification_trigger, Pt("pos_id","type_media").put("trigger_source","type_media"))
+            Pin.event(Pin.notification_trigger, Pt("pos_id", "media").put("trigger_source", "resident"))
 
             val context = coIntance()
             val notification = createMtNt(popSetting, CO_S_TYPE_MEDIA)
@@ -66,6 +67,7 @@ object HintMt {
             mediaJob = null
             if (!refreshEnabled) {
                 manager.notify(CO_MEDIA_NOTFIY_ID, notification)
+                SpTrackEvents.notificationShow(context, "media", "resident")
                 return@runCatching
             }
             if (popRefresh.times <= 0) return@runCatching
@@ -75,6 +77,7 @@ object HintMt {
                     if (HintExt02.isForeground) return@launch
                     withContext(Dispatchers.Main) {
                         manager.notify(CO_MEDIA_NOTFIY_ID, notification)
+                        if (index == 0) SpTrackEvents.notificationShow(context, "media", "resident")
                     }
                     delay(intervalMs)
                     if (!SpNotifyUtils.isInteractive(context) || HintExt02.isForeground) {

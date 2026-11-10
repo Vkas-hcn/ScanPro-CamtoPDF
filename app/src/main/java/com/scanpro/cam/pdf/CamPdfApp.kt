@@ -12,7 +12,6 @@ import com.flux.tracksdk.core.TrackConfig
 import com.flux.tracksdk.core.TrackSDK
 import com.flux.tracksdk.model.TrackPolicy
 import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.analytics.SpTracker
 import com.mymy.mymy.ads.count.ADManagerMy
 import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.keepalive.LegacyBackgroundCleanup
@@ -47,7 +46,8 @@ class CamPdfApp : Application() {
         runCatching { ADManagerMy.start(this) }.onFailure { Log.w(TAG, "ad count init failed", it) }
         initSDK(this)
         SpTrackEvents.checkRetention(this)
-        SpTracker.log(this, SpTracker.APP_COLD_BOOT)
+        // app_open_cold 由 SpBootActivity（isHotStart 守卫）在冷启时上报一次，
+        // 这里不再上报，避免同一冷启重复计数。
         SpAdsHub.get(this, applicationScope).initialize()
         startReplacementAfterCleanup()
     }

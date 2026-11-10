@@ -9,7 +9,7 @@ object UserParms {
     //是否是欧盟国家
     fun isOm():Boolean{
         val country = CT()
-        val codes= listOf("SG","RO", "IE", "BG", "NO", "ES", "PL", "DE", "CZ",
+        val codes= listOf("RO", "IE", "BG", "NO", "ES", "PL", "DE", "CZ",
             "GR", "IT", "FR", "CY", "SE", "DK", "HU", "SI",
             "CH", "BE", "FI", "GB", "IS", "AT", "PT", "SK",
             "HR", "LT", "MT", "LV", "NL", "LU", "EE", "LI")

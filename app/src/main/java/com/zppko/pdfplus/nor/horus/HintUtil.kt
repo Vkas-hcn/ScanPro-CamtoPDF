@@ -15,12 +15,14 @@ import com.bockcock.adjust.Pin
 import com.bockcock.adjust.Pt
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.ads.SpAdsHub
+import com.scanpro.cam.pdf.analytics.SpTrackEvents
 import com.scanpro.cam.pdf.boot.SpBootActivity
 import com.scanpro.cam.pdf.notice.SpJumpType
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.scanpro.cam.pdf.notice.SpNotifyUtils
 import com.scanpro.cam.pdf.notice.SpPopRefresh
+import com.scanpro.cam.pdf.notice.notificationTriggerSource
 import com.smart.pdf.scanner.util.LocaleHelper
 
 import com.zppko.pdfplus.nor.RAction
@@ -74,17 +76,17 @@ object HintUtil {
 
 
     fun coJustSend(config: UserPop,popSetting: CallingSetting, showType: Int) {
-        val event = when (showType) {
-            CO_S_TYPE_UNLOCK -> "type_unlock"
-            CO_S_TYPE_ALARM -> "type_alarm"
-            CO_S_TYPE_INTERVAL -> "type_time"
-            else -> "type_recents"
+        val sceneType = when (showType) {
+            CO_S_TYPE_UNLOCK -> "unlock"
+            CO_S_TYPE_ALARM -> "alarm"
+            CO_S_TYPE_INTERVAL -> "time"
+            else -> "recent"
         }
-//        EVEtnUploader.mine("trigger_inexact_notify", mapOf("type" to event))
+        val triggerSource = notificationTriggerSource(sceneType)
 
         val ntf_id: Int = popSetting.id
 //        Pin.event(fsk(ntf_id))
-        Pin.event(Pin.notification_trigger, Pt("pos_id",event).put("trigger_source",event))
+        Pin.event(Pin.notification_trigger, Pt("pos_id", sceneType).put("trigger_source", triggerSource))
 
         val manager = getManager()
         val isShowVoice = config.isVoice == 0
@@ -99,6 +101,7 @@ object HintUtil {
             SpNotifyUtils.isInteractive(coIntance())
         if (!refreshEnabled) {
             manager.notify(ntf_id, createOnceNt(isShowVoice, popSetting, ntf_id, showType))
+            SpTrackEvents.notificationShow(coIntance(), sceneType, triggerSource)
             return
         }
         // 与 Apollo 一致：开关打开但 times=0 时本轮不发送。
@@ -116,6 +119,7 @@ object HintUtil {
                         ntf_id,
                         if (index < config.rpVoiceCt) ntfSoundYes else ntfSoundNo,
                     )
+                    if (index == 0) SpTrackEvents.notificationShow(coIntance(), sceneType, triggerSource)
                 }
                 delay(intervalMs)
                 if (!SpNotifyUtils.isInteractive(coIntance()) || HintExt02.isForeground) {

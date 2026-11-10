@@ -36,7 +36,7 @@ class NatAdsLoad(
                     val adSourceName = ad.responseInfo?.adapterResponses?.firstOrNull()?.adSourceName
                     sendValueToServer(value, adSourceName)
                 }
-                zmyAdsLoadSSSS()
+                zmyAdsLoadSSSS(ad.responseInfo)
             }
             .withAdListener(object : AdListener() {
                 override fun onAdFailedToLoad(error: LoadAdError) {

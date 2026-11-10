@@ -21,6 +21,7 @@ import com.scanpro.cam.pdf.ads.SpNatConfig
 import com.scanpro.cam.pdf.ads.SpAdsHub
 import com.scanpro.cam.pdf.util.AppLog
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
+import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,6 +49,8 @@ class SpNativeAdManager internal constructor(
     private val blocking: SpBlockingLogic get() = SpBlockingLogic.get(appContext)
 
     private var currentNativeAd: NativeAd? = null
+    /** 当前展示的原生加载器，用于关闭键上报 ad_close。 */
+    private var currentLoader: NatAdsLoad? = null
     private var pollJob: Job? = null
     private var isReleased = false
     private var displayTarget: Pair<String, SpNativeAdStyle>? = null
@@ -107,7 +110,7 @@ class SpNativeAdManager internal constructor(
         val nativeAd = loader.getAdView(position) ?: return
         renderPending = false
         pollJob?.cancel()
-        showAd(nativeAd, style)
+        showAd(nativeAd, style, loader)
     }
 
     private companion object {
@@ -188,11 +191,13 @@ class SpNativeAdManager internal constructor(
     }
 
     /** 绑定数据 + 关闭键 + 记数（B 原渲染层）。 */
-    private fun showAd(nativeAd: NativeAd, style: SpNativeAdStyle) {
+    private fun showAd(nativeAd: NativeAd, style: SpNativeAdStyle, loader: NatAdsLoad? = null) {
         currentNativeAd?.destroy()
         adLayoutView?.visibility = View.GONE
         AppLog.ads.i("开始展示广告 类型=native 位置=${displayTarget?.first}")
         currentNativeAd = nativeAd
+        currentLoader = loader
+        loader?.trackNativeImpression()
         AdCountNati.nati_addShowCount()
         bindAndShow(nativeAd, style)
     }
@@ -294,6 +299,8 @@ class SpNativeAdManager internal constructor(
         close.visibility = View.VISIBLE
         close.setOnClickListener {
             AppLog.ads.i("广告已关闭 类型=native")
+            currentLoader?.trackNativeClose()
+            currentLoader = null
             adLayoutView?.visibility = View.GONE
         }
     }
@@ -314,6 +321,7 @@ class SpNativeAdManager internal constructor(
         adLayoutView?.removeAllViews()
         currentNativeAd?.destroy()
         currentNativeAd = null
+        currentLoader = null
     }
 
 }

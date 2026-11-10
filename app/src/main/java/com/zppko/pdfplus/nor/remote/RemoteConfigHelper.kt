@@ -1,6 +1,5 @@
 package com.zppko.pdfplus.nor.remote
 
-import com.bockcock.adjust.Pin
 import com.mymy.mymy.rece.HomeRecentsHelp
 import com.scanpro.cam.pdf.config.SpConfigRemoteSource
 import com.scanpro.cam.pdf.config.SpConfigRepository
@@ -51,7 +50,6 @@ object RemoteConfigHelper {
         runCatching {
             HomeRecentsHelp().registerHomeRecentsReceiver(Zppkoo.ii)
         }.onFailure { it.printStackTrace() }
-        runCatching { Pin.anaMUSer2() }.onFailure { it.printStackTrace() }
     }
 
     fun getRecentData(key: String): String {

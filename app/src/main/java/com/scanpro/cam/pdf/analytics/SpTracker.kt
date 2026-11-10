@@ -215,11 +215,7 @@ object SpTracker {
     // endregion
 
     // region 通用埋点规范 §3 事件名（补齐 / 归并用）
-    const val AD_REQUEST = "ad_request"
-    const val AD_FILLED = "ad_filled"
-    const val AD_FAILED = "ad_failed"
-    const val AD_CLICK = "ad_click"
-    const val AD_CLOSE = "ad_close"
+
     const val AD_BLOCKED = "ad_blocked"
     const val AD_SHOW_TIMEOUT = "ad_show_timeout"
     const val NOTIFICATION_TRIGGER = "notification_trigger"

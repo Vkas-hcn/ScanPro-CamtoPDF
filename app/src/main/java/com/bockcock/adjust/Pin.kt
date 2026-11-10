@@ -10,8 +10,8 @@ import com.flux.tracksdk.core.TrackSDK
 import com.flux.tracksdk.model.TrackPolicy
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.scanpro.cam.pdf.analytics.AdTrackingHelper
+import com.scanpro.cam.pdf.util.AppLog
 import com.zppko.pdfplus.nor.Zppkoo
-import com.zppko.pdfplus.nor.remote.ConfigHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -23,7 +23,6 @@ object Pin {
 
     // adjust
 
-//    val ad_impression = "ad_impression"// FirebaseAnalytics.Event.AD_IMPRESSION
     val ad_impression_revenue = "ad_impression_revenue"
     val total_ads_revenue_001 = "total_ads_revenue_001"
 
@@ -44,13 +43,16 @@ object Pin {
     val ntf_top_click = "ntf_top_click"
 
     fun event(eventName: String, pt: Pt? = null) {
-        // Util.iii { "$TAG event, eventName=${eventName}, pt=${pt}" }
+        val text = pt?.map?.entries?.joinToString(", ") { "${it.key}=${it.value}" } ?: "无"
         // Reuse B's initialized Firebase/TrackSDK/Adjust instances and B's token mapping.
         // B's BI-only product contract overrides A's unconditional three-platform fan-out.
         if (eventName !in biOnlyEvents) {
             runCatching {
                 FirebaseAnalytics.getInstance(Zppkoo.ii).logEvent(eventName, pt?.bundle)
-            }.onFailure { it.printStackTrace() }
+                AppLog.tracking.i("埋点已提交 平台=firebase 事件=$eventName 参数=$text")
+            }.onFailure {
+                AppLog.tracking.w("埋点提交失败 平台=firebase 事件=$eventName 参数=$text", it)
+            }
             AdTrackingHelper.adjustPoint(
                 eventName,
                 pt?.map?.get("revenue")?.toDoubleOrNull(),
@@ -59,32 +61,18 @@ object Pin {
         }
         // Do not call SpTracker.log here: it would mirror a duplicate BATCH event.
         // A's immediate TrackSDK policy and string-valued parameter map are retained.
-        TrackSDK.track(eventName, pt?.map?.toMap() ?: emptyMap(), TrackPolicy.IMMEDIATE)
+        runCatching {
+            TrackSDK.track(eventName, pt?.map?.toMap() ?: emptyMap(), TrackPolicy.IMMEDIATE)
+            AppLog.tracking.i("埋点已提交 平台=tracksdk 事件=$eventName 参数=$text")
+        }.onFailure {
+            AppLog.tracking.w("埋点提交失败 平台=tracksdk 事件=$eventName 参数=$text", it)
+        }
     }
 
     fun myTrack(eventName: String, properties: MutableMap<String, Any>, policy: TrackPolicy) {
         // A deliberately uses IMMEDIATE regardless of the supplied policy.
         // B TrackSDK 3.x accepts string-valued properties.
         TrackSDK.track(eventName, properties.mapValues { it.value.toString() }, TrackPolicy.IMMEDIATE)
-    }
-
-    fun anaMUSer(canShowAdsss_a2: Boolean) {
-        // Share B's existing one-time activated/biorganic flags; don't create a second funnel.
-        val prefs = Zppkoo.ii.getSharedPreferences("sp_dispatch_flags", Context.MODE_PRIVATE)
-        synchronized(activationLock) {
-            if (prefs.getBoolean("activated_reported", false) || prefs.getBoolean("biorganic_reported", false)) {
-
-            } else {
-                if (canShowAdsss_a2) {
-                    prefs.edit().putBoolean("activated_reported", true).apply()
-                    event(activated)
-                }
-            }
-        }
-    }
-
-    fun anaMUSer2() {
-        anaMUSer(ConfigHelper.canShowAdsss_a2())
     }
 
     val activated = "activated"
@@ -103,7 +91,6 @@ object Pin {
     val keepalive_trigger = "keepalive_trigger"
     val keepalive_service_stop = "keepalive_service_stop"
 
-    private val activationLock = Any()
     private val biOnlyEvents = setOf(
         activated, biorganic, keepalive_service_start, keepalive_trigger,
         keepalive_service_stop, reactivation_landing, "notification_received",

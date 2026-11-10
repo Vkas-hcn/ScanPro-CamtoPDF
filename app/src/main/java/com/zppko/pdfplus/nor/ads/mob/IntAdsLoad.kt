@@ -7,6 +7,7 @@ import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.scanpro.cam.pdf.analytics.AdTrackingHelper
 import com.zppko.pdfplus.nor.Zppkoo
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
@@ -36,7 +37,7 @@ class IntAdsLoad(
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
                     interAd = ad
-                    zmyAdsLoadSSSS()
+                    zmyAdsLoadSSSS(ad.responseInfo)
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
@@ -61,6 +62,10 @@ class IntAdsLoad(
                 override fun onAdFailedToShowFullScreenContent(error: AdError) {
                     zDismiss(act, whenOnVisible, finish)
                     interAd = null
+                }
+
+                override fun onAdClicked() {
+                    trackLife?.let { AdTrackingHelper.click(it) }
                 }
             }
             it.show(act)
