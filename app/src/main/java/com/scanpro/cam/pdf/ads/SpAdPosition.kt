@@ -13,6 +13,7 @@ object SpAdPosition {
     const val AC_LANGUAGE_INT = "ac_language_int"
     const val AC_LANGUAGE_NAT = "ac_language_nat"
     const val AC_LAUNCH = "ac_launch"
+    const val AC_LAUNCH_INT = "ac_launch_int"
     const val AC_MAIN_BACK_INT = "ac_mainback_int"
     const val AC_MAIN_NAT = "ac_main_nat"
     const val AC_RECENT_NAT = "ac_recent_nat"
@@ -26,6 +27,7 @@ object SpAdPosition {
     /** 同 Apollo `AdConfig` 的 17 个字段，顺序一致。 */
     val ALL: List<String> = listOf(
         AC_LAUNCH,
+        AC_LAUNCH_INT,
         AC_LANGUAGE_INT,
         AC_GUIDE_INT,
         AC_FILE_INT,

@@ -117,6 +117,9 @@ dependencies {
     implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.4.0")
     implementation("com.tradplusad:tradplus-gma-nextgen:2.16.9.0.1")
 
+    // ---- TradPlus 比价 SDK（compare_price-release.aar，本地 AAR） ----
+    implementation(files("libs/compare_price-release.aar"))
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

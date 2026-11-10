@@ -6,6 +6,8 @@ import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.scanpro.cam.pdf.ads.SpAdPosition
+// TradPlus 比价 SDK：查某 placement 的真实 eCPM（USD，两位小数）。
+import com.tp.compareprice.ComparePriceUtil.recursiveComparePrice
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
@@ -86,6 +88,36 @@ object ImpressionUtils {
 
     fun loadSuccess(place: String): Boolean {
         return (myPoolzzdd[place] != null && myPoolzzdd[place]?.zIsShowAds() == true)
+    }
+
+    /** 开屏比价：取某位就绪广告的 eCPM（解析失败/未就绪返回 0.0）。 */
+    fun getEcpm(place: String): Double {
+        val unit = myPoolzzdd[place]
+        return if (unit != null && unit.zIsShowAds()) parseEcpm(unit.getEcpm()) else 0.0
+    }
+
+    /**
+     * TradPlus 比价 SDK 价格：取某位就绪广告对应 placement 的真实 eCPM（USD，两位小数）。
+     * 底层走 com.tp.compareprice.ComparePriceUtil.recursiveComparePrice(placementId)；
+     * 广告未就绪 / placement 为空 / 探测失败时返回 0.0（调用方应回退到 [getEcpm]）。
+     */
+    fun getComparePrice(place: String): Double {
+        val unit = myPoolzzdd[place] ?: return 0.0
+        if (!unit.zIsShowAds()) return 0.0
+        val placementId = unit.setting.zId
+        if (placementId.isEmpty()) return 0.0
+        return try {
+            recursiveComparePrice(placementId)
+        } catch (t: Throwable) {
+            0.0
+        }
+    }
+
+    /** 只保留数字和小数点，解析成 Double；空/异常返回 0.0（照 SmartPdfScan_luow）。 */
+    fun parseEcpm(rawStr: String?): Double {
+        if (rawStr.isNullOrBlank()) return 0.0
+        val cleanedStr = rawStr.replace(Regex("[^0-9.]"), "")
+        return cleanedStr.toDoubleOrNull() ?: 0.0
     }
 
     fun show(act: Activity?, place: String, point:String, whenOnVisible:Boolean=true, finish: () -> Unit) {

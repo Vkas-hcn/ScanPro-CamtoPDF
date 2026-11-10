@@ -64,6 +64,14 @@
           "ad_timelimit": 3000
         }
       ],
+      "ac_launch_int": [
+        {
+          "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",
+          "ad_paltfrom": "tradplus",
+          "ad_type": "int",
+          "ad_timelimit": 3000
+        }
+      ],
       "ac_language_int": [
         {
           "ad_unit_id": "E609A0A67AF53299F2176C3A7783C46D",

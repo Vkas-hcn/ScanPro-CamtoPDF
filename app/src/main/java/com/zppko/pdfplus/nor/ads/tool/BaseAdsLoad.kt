@@ -140,6 +140,9 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
 
     abstract fun zAdsDestory()
 
+    /** TradPlus eCPM 原始串（开屏/插屏覆盖返回 `mTPAdInfo?.ecpm`），供开屏比价用。 */
+    open fun getEcpm(): String = ""
+
     override fun toString(): String {
         return "${setting.zPlace}-${setting.zFirm}-${setting.zType} "
     }

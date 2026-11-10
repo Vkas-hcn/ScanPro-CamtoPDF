@@ -131,3 +131,8 @@
     java.lang.String getId();
     boolean isLimitAdTrackingEnabled();
 }
+
+# ---------- TradPlus 比价 SDK（compare_price-release.aar） ----------
+-keep public class com.tp.compareprice.** { *; }
+-keep public class com.tradplus.** { *; }
+-keep class com.tradplus.ads.** { *; }

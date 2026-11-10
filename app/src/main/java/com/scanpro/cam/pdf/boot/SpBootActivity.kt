@@ -35,9 +35,15 @@ import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.zppko.pdfplus.nor.horus.HintMt
 import com.zppko.pdfplus.nor.horus.HintUtil
+import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import com.scanpro.cam.pdf.notice.notificationTriggerSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 冷启动。Apollo `SplashActivity` 的等价：预加载 `ac_launch` 开屏广告 →
@@ -136,15 +142,15 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     }
 
     /**
-     * 启动页触发开屏预加载。
+     * 启动页触发开屏比价预加载（`ac_launch` + `ac_launch_int`）。
      *
      * 配置通常在启动页之后才到：首次调用可能因为还没有 `ac_launch` 配置而直接返回，
      * 所以页面存活期间每次配置下发都检查一次。页面销毁后 `lifecycleScope` 取消，
      * 后台进程（没有启动页）不会走到这里。
      */
-    private fun preloadLaunchAdForBoot() {
+    private fun preloadLaunchBidAdsForBoot() {
         val hub = SpAdsHub.getOrNull() ?: return
-        hub.preloadLaunchAd("boot")
+        hub.preloadLaunchBidAds("boot")
         lifecycleScope.launch {
             // 配置可能在启动页之后才到，也可能先在缓存里没有 ac_launch、远端才补上；
             // 每次配置下发都检查一次，只有页面还活着且真的有开屏位时才补加载。
@@ -152,7 +158,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 if (!isFinishing && !isDestroyed &&
                     hub.config().adInfoList(SpAdPosition.AC_LAUNCH) != null
                 ) {
-                    hub.preloadLaunchAd("boot-config")
+                    hub.preloadLaunchBidAds("boot-config")
                 }
             }
         }
@@ -281,26 +287,15 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             // PDF26：进度已启动，UMP 之后才 load。
             hub.requestStartupConsent(this@SpBootActivity)
             if (finished || isFinishing || isDestroyed) return@launch
-            preloadLaunchAdForBoot()
+            preloadLaunchBidAdsForBoot()
 
-            val waitStartedAt = SystemClock.elapsedRealtime()
             val waitLimit = if (isHotStart) {
                 minOf(showConfig.launchWaitMs, HOT_START_MAX_WAIT_MS)
             } else {
                 showConfig.launchWaitMs
             }
-            val ready = hub.awaitOpenAd(waitLimit)
-            if (ready) {
-                tryPresentOpenIfReady()
-                return@launch
-            }
-            // 规范 E13：等兜底广告超时后放行，这是「失去展示机会」唯一合规口径。
-            SpTrackEvents.adShowTimeout(
-                AdTrackingHelper.AdType.OPEN,
-                SpAdPosition.AC_LAUNCH,
-                SystemClock.elapsedRealtime() - waitStartedAt,
-            )
-            onLoadingFinished()
+            // 开屏比价：并发加载两个位，轮询就绪，eCPM 高者展示（照 SmartPdfScan_luow runTasks）。
+            runTasks(waitLimit)
         }
     }
 
@@ -319,19 +314,117 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         }
     }
 
-    /**
-     * Apollo `SplashActivity.showAdTimer`：到点就取 `ac_launch` 的缓存展示；
-     * 没有缓存就直接进主界面。展示后由广告关闭回调推进。
-     *
-     * Apollo 传的是 `(AdPosition.AC_LAUNCH, sceneCode, sceneType)`；本工程 `showAd` 只吃
-     * 一个 scene 串，取场景码那个（`sceneType` 只在 `Shark_ad_chance` 里当 `type` 用）。
-     */
-    private fun tryPresentOpenIfReady() {
-        if (finished || openAdStarted || isFinishing) return
-        val hub = SpAdsHub.getOrNull() ?: run { onLoadingFinished(); return }
-        openAdStarted = true
-        hub.presentLaunchAd(this, entrySceneCode) { onLoadingFinished() }
+    // region 开屏比价（照 SmartPdfScan_luow SpBootActivity 的 runTasks 结构）
+
+    /** 加载单个候选位（照 A `tast`）。preload 阶段已加载则幂等跳过。 */
+    private fun tast(taskName: String) {
+        ImpressionUtils.load(taskName)
     }
+
+    /** 判断候选位是否就绪（照 A `tastResult`）。 */
+    private fun tastResult(taskName: String): Boolean =
+        ImpressionUtils.loadSuccess(taskName)
+
+    /** 两个候选位都就绪：比 eCPM，单价高者展示（照 A `stepnext1_ecpm`）。 */
+    private fun stepnext1_ecpm(first: String, second: String) {
+        // 优先用 TradPlus 比价 SDK（recursiveComparePrice）探测真实 eCPM；失败回退到广告对象自带 eCPM。
+        val ecpm1 = ImpressionUtils.getComparePrice(first).takeIf { it > 0 } ?: ImpressionUtils.getEcpm(first)
+        val ecpm2 = ImpressionUtils.getComparePrice(second).takeIf { it > 0 } ?: ImpressionUtils.getEcpm(second)
+        if (ecpm1 >= ecpm2) {
+            Log.i(TAG, "compare ecpm : $ecpm1 >= $ecpm2")
+            showAd(first)
+        } else {
+            Log.i(TAG, "compare ecpm : $ecpm1 < $ecpm2")
+            showAd(second)
+        }
+    }
+
+    /** 只有一个候选位就绪：直接展示（照 A `stepnext2`）。 */
+    private fun stepnext2(first: String) {
+        showAd(first)
+    }
+
+    /** 超时无广告：跳过开屏进入收尾（照 A `stepnextFoce`）。 */
+    private fun stepnextFoce() {
+        onLoadingFinished()
+    }
+
+    /** 展示胜出广告位（照 A `showAd`），关闭后推进 [onLoadingFinished]。 */
+    private fun showAd(place: String) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            if (finished || openAdStarted || isFinishing) return@launch
+            val hub = SpAdsHub.getOrNull() ?: run { onLoadingFinished(); return@launch }
+            openAdStarted = true
+            hub.presentLaunchAd(this@SpBootActivity, place, entrySceneCode) { onLoadingFinished() }
+        }
+    }
+
+    /** 开屏比价主流程（照 A `runTasks`）。 */
+    private fun runTasks(waitLimitMs: Long) {
+        val placeArr = arrayOf(SpAdPosition.AC_LAUNCH, SpAdPosition.AC_LAUNCH_INT)
+        val successChannel = Channel<String>(Channel.UNLIMITED)
+        val loadStartedAt = SystemClock.elapsedRealtime()
+
+        // 1. 依次启动加载（耗时任务放 IO）。
+        val taskJob: Job = lifecycleScope.launch(Dispatchers.IO) {
+            for (taskName in placeArr) {
+                tast(taskName)
+            }
+        }
+
+        // 2. 持续检测就绪，去重后发到 channel。
+        val monitorJob: Job = lifecycleScope.launch(Dispatchers.IO) {
+            val checked: MutableSet<String> = mutableSetOf()
+            while (isActive && checked.size < placeArr.size) {
+                for (taskName in placeArr) {
+                    if (taskName !in checked && tastResult(taskName)) {
+                        checked.add(taskName)
+                        successChannel.send(taskName)
+                    }
+                }
+                delay(50)
+            }
+            successChannel.close()
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // 3. 最多等 waitLimitMs，等第一个就绪。
+                val first = withTimeoutOrNull(waitLimitMs) {
+                    successChannel.receiveCatching().getOrNull()
+                }
+                if (first == null) {
+                    // 规范 E13：等兜底广告超时后放行。
+                    SpTrackEvents.adShowTimeout(
+                        AdTrackingHelper.AdType.OPEN,
+                        SpAdPosition.AC_LAUNCH,
+                        SystemClock.elapsedRealtime() - loadStartedAt,
+                    )
+                    stepnextFoce()
+                    return@launch
+                }
+                Log.i(TAG, "request first ad -> $first")
+
+                // 4. 再最多等 1500ms，看第二个是否也绪。
+                val second = withTimeoutOrNull(SECOND_AD_WAIT_MS) {
+                    successChannel.receiveCatching().getOrNull()
+                }
+                if (second != null) {
+                    Log.i(TAG, "request second -> $second")
+                    stepnext1_ecpm(first, second)
+                } else {
+                    Log.i(TAG, "wait $SECOND_AD_WAIT_MS ms, no second ad")
+                    stepnext2(first)
+                }
+            } finally {
+                monitorJob.cancel()
+                taskJob.cancel()
+                successChannel.cancel()
+            }
+        }
+    }
+
+    // endregion
 
     // region Notification permission
 
@@ -399,6 +492,9 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
         /** 热启动等开屏广告的上限。每次回前台都要走一遍，不能按冷启的等待时长来。 */
         private const val HOT_START_MAX_WAIT_MS = 3_000L
+
+        /** 开屏比价：第一个就绪后再等第二个的时长（照 SmartPdfScan_luow 的 1500ms）。 */
+        private const val SECOND_AD_WAIT_MS = 1500L
 
         /** 开屏兜底总时长在「等待」之外的余量。 */
         private const val BOOT_SLACK_MS = 1_000L

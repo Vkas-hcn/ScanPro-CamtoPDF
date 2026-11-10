@@ -102,6 +102,9 @@ class SpAdsHub private constructor(
     /** 无页面宿主的预加载接线层（开屏位）。 */
     private val preloadFacade by lazy { SpFullScreenAdManager(app, null) }
 
+    /** 开屏比价候选位：开屏 + 新加入的插屏位（照 SmartPdfScan_luow 的开屏比价）。 */
+    private val launchBidPlaces = listOf(SpAdPosition.AC_LAUNCH, SpAdPosition.AC_LAUNCH_INT)
+
     fun initialize() {
         if (!booted.compareAndSet(false, true)) return
         SpAdSession.attachLifecycle(app)
@@ -254,6 +257,29 @@ class SpAdsHub private constructor(
     }
 
     /**
+     * 开屏比价预加载：并发加载两个候选位（`ac_launch` + `ac_launch_int`）。
+     * SDK/UMP 未就绪时延后，由 [onAdSdkReady] 补发。
+     */
+    fun preloadLaunchBidAds(reason: String = "auto") {
+        scope.launch(Dispatchers.Main) {
+            if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
+                pendingLaunchPreload = true
+                Log.i(TAG, "preloadLaunchBidAds deferred: sdk not ready reason=$reason")
+                return@launch
+            }
+            if (!consentFlowDone) {
+                pendingLaunchPreload = true
+                Log.i(TAG, "preloadLaunchBidAds deferred: ump not finished reason=$reason")
+                return@launch
+            }
+            pendingLaunchPreload = false
+            runCatching {
+                launchBidPlaces.forEach { preloadFacade.checkAndLoadAd(it, scene = SCENE_PRELOAD) }
+            }.onFailure { Log.w(TAG, "preloadLaunchBidAds failed reason=$reason", it) }
+        }
+    }
+
+    /**
      * SDK 初始化完成后由 [SpAdMobInit] 回调。
      * 只补启动页已经发起、但因 SDK 未就绪被推迟的那一次；后台进程没有启动页，
      * `pendingLaunchPreload` 保持 false，这里不会发出请求。
@@ -261,7 +287,7 @@ class SpAdsHub private constructor(
     internal fun onAdSdkReady() {
         Log.i(TAG, "ad sdk ready, pendingPreload=$pendingLaunchPreload")
         if (pendingLaunchPreload && SpAdSession.isForeground) {
-            preloadLaunchAd("sdk-ready")
+            preloadLaunchBidAds("sdk-ready")
         }
     }
 
@@ -281,20 +307,24 @@ class SpAdsHub private constructor(
     }
 
     /**
-     * 展示开屏广告：就绪立即走池展示（无遮罩）；关闭/失败回调 [onDone]。
+     * 展示开屏（比价）广告：就绪立即走池展示（无遮罩）；关闭/失败回调 [onDone]。
+     * `place` 为比价胜出的广告位（开屏 `ac_launch` 或插屏 `ac_launch_int`）。
      */
     fun presentLaunchAd(
         activity: Activity,
+        place: String = SpAdPosition.AC_LAUNCH,
         scene: String = SpSceneCode.AC_LAUNCH_OPEN,
         onDone: () -> Unit,
     ) {
         val once = java.util.concurrent.atomic.AtomicBoolean(false)
         val finish = { if (once.compareAndSet(false, true)) onDone() else Unit }
-        SpFullScreenAdManager(activity, activity).showOpenAd(
-            position = SpAdPosition.AC_LAUNCH,
+        SpFullScreenAdManager(activity, activity).showFullScreenAd(
+            position = place,
             scene = scene,
-            onDone = finish,
-        )
+            whenOnVisible = place == SpAdPosition.AC_LAUNCH,
+        ) { showed, dismissed ->
+            if (!showed || dismissed) finish()
+        }
     }
     // endregion
 

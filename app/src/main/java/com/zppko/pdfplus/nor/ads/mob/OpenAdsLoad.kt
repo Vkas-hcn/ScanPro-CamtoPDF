@@ -66,6 +66,10 @@ class OpenAdsLoad(
         return trad.getAD()?.isReady == true
     }
 
+    override fun getEcpm(): String {
+        return trad.mTPAdInfo?.ecpm ?: "0.0"
+    }
+
     override fun zAdsDestory() {
     }
 }
