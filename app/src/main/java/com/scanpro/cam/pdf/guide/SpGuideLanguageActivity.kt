@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -161,13 +162,23 @@ class SpGuideLanguageActivity : SpActivity<ActivitySpGuideLanguageBinding>() {
         timer = null
     }
 
+    /**
+     * 状态栏 inset 加到标题的上内边距；导航栏 inset 改成 Next 按钮的**下外边距**。
+     *
+     * 不能用 `updatePadding(bottom = …)`：`tv_next` 是固定 52dp 高，三键导航底部 inset 约 48dp，
+     * 内容区会被压到 4dp，16sp 文字直接被裁掉（看起来就是「按钮没有文字」），而且 padding
+     * 也不会把按钮抬离导航栏。调 margin 才能既上移按钮、又不动文字布局。
+     */
     private fun applyInsets() {
         val titleTop = binding.tvTitle.paddingTop
-        val nextBottom = binding.tvNext.paddingBottom
+        val nextBottomMargin =
+            (binding.tvNext.layoutParams as ViewGroup.MarginLayoutParams).bottomMargin
         ViewCompat.setOnApplyWindowInsetsListener(binding.guideLanguageRoot) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.tvTitle.updatePadding(top = titleTop + bars.top)
-            binding.tvNext.updatePadding(bottom = nextBottom + bars.bottom)
+            binding.tvNext.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = nextBottomMargin + bars.bottom
+            }
             insets
         }
         ViewCompat.requestApplyInsets(binding.guideLanguageRoot)
