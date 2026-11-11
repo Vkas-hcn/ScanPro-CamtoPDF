@@ -23,7 +23,7 @@ class OpenAdsLoad(
 
     override fun childLoad() {
         if (setting.zId.isEmpty()) {
-            zmyAdsLoadFFFF("")
+            zmyAdsLoadFFFF("配置里 placementId 为空")
             return
         }
         trad.initSplashAd(setting.zId, object : TradLoadCallback() {
@@ -32,7 +32,7 @@ class OpenAdsLoad(
             }
 
             override fun onAdFailedToLoad(code: Int, message: String) {
-                zmyAdsLoadFFFF(message)
+                zmyAdsLoadFFFF("code=$code $message")
             }
         })
     }

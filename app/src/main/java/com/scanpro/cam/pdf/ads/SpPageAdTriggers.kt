@@ -25,19 +25,19 @@ object SpPageAdTriggers {
 
     fun checkLoadAdByTab(activity: Activity, position: String) {
         if (activity.isFinishing || activity.isDestroyed) {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=页面已销毁")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=页面已销毁")
             return
         }
         if (System.currentTimeMillis() - lastShowAdTime <= TAB_THROTTLE_MS) {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=距上次展示不足60秒")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=距上次展示不足60秒")
             return
         }
         val manager = SpAdsHub.getOrNull()?.fullScreen(activity) ?: run {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告模块未就绪")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=广告模块未就绪")
             return
         }
         if (!manager.hasReadyAd(position)) {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告尚未就绪")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=广告尚未就绪 已触发加载")
             manager.checkAndLoadAd(position, position)
             return
         }
@@ -54,23 +54,23 @@ object SpPageAdTriggers {
     fun showFileIntThen(activity: Activity, then: () -> Unit) {
         val position = SpAdPosition.AC_FILE_INT
         if (activity.isFinishing || activity.isDestroyed) {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=页面已销毁")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=页面已销毁")
             then()
             return
         }
         if (System.currentTimeMillis() - lastShowAdTime <= TAB_THROTTLE_MS) {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=距上次展示不足60秒")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=距上次展示不足60秒")
             then()
             return
         }
         val manager = SpAdsHub.getOrNull()?.fullScreen(activity)
         if (manager == null) {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告模块未就绪")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=广告模块未就绪")
             then()
             return
         }
         if (!manager.hasReadyAd(position)) {
-            AppLog.ads.i("跳过广告展示 位置=$position 原因=广告尚未就绪")
+            AppLog.ads.w("展示拦截 位置=$position 结果=拦截 原因=广告尚未就绪 已触发加载")
             manager.checkAndLoadAd(position, position)
             then()
             return

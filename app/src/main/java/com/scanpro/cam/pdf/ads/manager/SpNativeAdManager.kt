@@ -126,17 +126,18 @@ class SpNativeAdManager internal constructor(
      */
     fun checkLoadAndShowAd(position: String, style: SpNativeAdStyle) {
         if (adLayoutView == null) {
-            AppLog.ads.i("跳过广告加载 类型=native 位置=$position 原因=没有广告容器")
+            AppLog.ads.w("加载拦截 类型=native 位置=$position 结果=拦截 原因=没有广告容器")
             return
         }
         if (isReleased) return
         displayTarget = position to style
         renderPending = true
         if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
-            AppLog.ads.i("跳过广告展示 类型=native 位置=$position 原因=广告SDK未初始化")
+            AppLog.ads.w("展示拦截 类型=native 位置=$position 结果=拦截 原因=广告SDK未初始化")
             return
         }
         if (!canShow(position, "展示")) return
+        AppLog.ads.i("加载 类型=native 位置=$position 结果=开始")
         ImpressionUtils.load(position)
         renderIfVisible()
         if (!renderPending) return
@@ -144,6 +145,7 @@ class SpNativeAdManager internal constructor(
             renderIfVisible()
             return
         }
+        AppLog.ads.i("展示 类型=native 位置=$position 结果=等待渲染")
         startCheckShowAd(position)
     }
 
@@ -163,6 +165,7 @@ class SpNativeAdManager internal constructor(
     /** Apollo `tryCacheAd(position)`：只预热，不显示。 */
     fun tryCacheAd(position: String) {
         if (isReleased || !canShow(position, "加载")) return
+        AppLog.ads.i("加载 类型=native 位置=$position 结果=开始 仅预热=true")
         ImpressionUtils.load(position)
     }
 
@@ -170,19 +173,19 @@ class SpNativeAdManager internal constructor(
         if (isReleased || activity.isFinishing || activity.isDestroyed) return false
         if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true) return false
         if (blocking.isShowPartialAdsOnly(position)) {
-            AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=只展示部分广告")
+            AppLog.ads.w("${action}拦截 类型=native 位置=$position 结果=拦截 原因=只展示部分广告")
             return false
         }
         if (blocking.isVPNBlock()) {
-            AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=VPN拦截")
+            AppLog.ads.w("${action}拦截 类型=native 位置=$position 结果=拦截 原因=VPN拦截")
             return false
         }
         if (!blocking.canShowAllAd()) {
-            AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=总闸拦截")
+            AppLog.ads.w("${action}拦截 类型=native 位置=$position 结果=拦截 原因=总闸拦截")
             return false
         }
         if (!AdCountNati.natiCanShow()) {
-            AppLog.ads.i("跳过广告$action 类型=native 位置=$position 原因=达到当日展示上限")
+            AppLog.ads.w("${action}拦截 类型=native 位置=$position 结果=拦截 原因=达到当日展示上限")
             return false
         }
         return true
@@ -192,7 +195,7 @@ class SpNativeAdManager internal constructor(
     private fun showAd(tpNative: TPNative, style: SpNativeAdStyle, loader: NatAdsLoad? = null) {
         currentTpNative?.onDestroy()
         adLayoutView?.visibility = View.GONE
-        AppLog.ads.i("开始展示广告 类型=native 位置=${displayTarget?.first}")
+        AppLog.ads.i("展示 类型=native 位置=${displayTarget?.first} 结果=开始")
         currentTpNative = tpNative
         currentLoader = loader
         loader?.trackNativeImpression()
@@ -298,7 +301,7 @@ class SpNativeAdManager internal constructor(
         }
         close.visibility = View.VISIBLE
         close.setOnClickListener {
-            AppLog.ads.i("广告已关闭 类型=native")
+            AppLog.ads.i("展示 类型=native 位置=${displayTarget?.first} 结果=关闭 触发=关闭键")
             currentLoader?.trackNativeClose()
             currentLoader = null
             adLayoutView?.visibility = View.GONE

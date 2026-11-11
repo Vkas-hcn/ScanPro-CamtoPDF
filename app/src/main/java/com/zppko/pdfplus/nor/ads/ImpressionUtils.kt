@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.scanpro.cam.pdf.ads.SpAdPosition
+import com.scanpro.cam.pdf.util.AppLog
 // TradPlus 比价 SDK：查某 placement 的真实 eCPM（USD，两位小数）。
 import com.tp.compareprice.ComparePriceUtil.recursiveComparePrice
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
@@ -122,15 +123,18 @@ object ImpressionUtils {
 
     fun show(act: Activity?, place: String, point:String, whenOnVisible:Boolean=true, finish: () -> Unit) {
         if (act == null) {
+            AppLog.ads.w("展示拦截 位置=$place 场景=$point 结果=拦截 原因=宿主Activity为空")
             finish.invoke()
             return
         }
         val unit = myPoolzzdd[place]
         if (loadSuccess(place)) {
+            AppLog.ads.i("展示 位置=$place 场景=$point 结果=取用缓存 补加载=true")
             myPoolzzdd[place] = null
             load(place)
             unit?.zShoweee(act, point,whenOnVisible, finish)
         } else {
+            AppLog.ads.w("展示拦截 位置=$place 场景=$point 结果=拦截 原因=池内没有就绪广告")
             // 迁移适配：android.app.Activity 无 lifecycle 属性，宿主为 LifecycleOwner 时才走
             // onResume 延迟回调；否则立即 finish。
             val host = act as? LifecycleOwner
@@ -168,25 +172,44 @@ object ImpressionUtils {
         val unit = myPoolzzdd[place]
 
         if (unit != null && !unit.canReloadAds()) {
-            Log.e("hhhh广告", "${place}: 有加载好的，不需要加载")
+            if (unit.zIsLoading()) {
+                AppLog.ads.i("加载 位置=$place 结果=跳过 原因=正在加载中")
+            } else {
+                AppLog.ads.i(
+                    "缓存 位置=$place 结果=命中 剩余=${unit.zCacheLeftMs() / 1000}s " +
+                        "TTL=${unit.zCacheTtlMs() / 1000}s",
+                )
+            }
             return
+        }
+        if (unit != null && unit.zLoadedAt() > 0L) {
+            val ageSec = (System.currentTimeMillis() - unit.zLoadedAt()) / 1000
+            AppLog.ads.i(
+                "缓存 位置=$place 结果=过期 已缓存=${ageSec}s TTL=${unit.zCacheTtlMs() / 1000}s",
+            )
         }
 
         val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
         val list = loadAdsSettingList(data)
-        Log.e("hhhh广告", "获取最新广告配置")
-        list.forEach {
-            Log.e("hhhh广告", "配置：${it}")
-        }
 
         val config = list.sortedByDescending { it.zWeight }.find { it.zPlace == place }
-        if (config != null) {
-            adIdToPlace[config.zId] = place
-            placeToType[place] = config.zType
-            myPoolzzdd[place] = convertBaseAds(config).apply { this?.zLoadeee() }
-        } else {
-            Log.e("hhhh广告", "找不到该广告位配置：${place}")
+        if (config == null) {
+            AppLog.ads.w("加载拦截 位置=$place 结果=拦截 原因=配置里没有该广告位（已解析=${list.size} 条）")
+            return
         }
+        adIdToPlace[config.zId] = place
+        placeToType[place] = config.zType
+        val loader = convertBaseAds(config)
+        if (loader == null) {
+            AppLog.ads.w("加载拦截 位置=$place 类型=${config.zType} 结果=拦截 原因=不支持的广告类型")
+            return
+        }
+        AppLog.ads.i(
+            "加载 位置=$place 厂商=${config.zFirm} 类型=${config.zType} " +
+                "id=${config.zId} 权重=${config.zWeight} 结果=排队",
+        )
+        myPoolzzdd[place] = loader
+        loader.zLoadeee()
     }
 
 

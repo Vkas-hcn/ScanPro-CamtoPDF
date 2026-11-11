@@ -241,18 +241,19 @@ class SpAdsHub private constructor(
         scope.launch(Dispatchers.Main) {
             if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
                 pendingLaunchPreload = true
-                Log.i(TAG, "preloadLaunchAd deferred: sdk not ready reason=$reason")
+                AppLog.ads.w("加载拦截 位置=${SpAdPosition.AC_LAUNCH} 结果=延后 原因=广告SDK未就绪 触发=$reason")
                 return@launch
             }
             if (!consentFlowDone) {
                 pendingLaunchPreload = true
-                Log.i(TAG, "preloadLaunchAd deferred: ump not finished reason=$reason")
+                AppLog.ads.w("加载拦截 位置=${SpAdPosition.AC_LAUNCH} 结果=延后 原因=UMP流程未完成 触发=$reason")
                 return@launch
             }
             pendingLaunchPreload = false
+            AppLog.ads.i("加载 位置=${SpAdPosition.AC_LAUNCH} 结果=开始 触发=$reason")
             runCatching {
                 preloadFacade.checkAndLoadAd(SpAdPosition.AC_LAUNCH, scene = SCENE_PRELOAD)
-            }.onFailure { Log.w(TAG, "preloadLaunchAd failed reason=$reason", it) }
+            }.onFailure { AppLog.ads.w("加载 位置=${SpAdPosition.AC_LAUNCH} 结果=异常 触发=$reason", it) }
         }
     }
 
@@ -264,18 +265,19 @@ class SpAdsHub private constructor(
         scope.launch(Dispatchers.Main) {
             if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
                 pendingLaunchPreload = true
-                Log.i(TAG, "preloadLaunchBidAds deferred: sdk not ready reason=$reason")
+                AppLog.ads.w("加载拦截 位置=${launchBidPlaces.joinToString()} 结果=延后 原因=广告SDK未就绪 触发=$reason")
                 return@launch
             }
             if (!consentFlowDone) {
                 pendingLaunchPreload = true
-                Log.i(TAG, "preloadLaunchBidAds deferred: ump not finished reason=$reason")
+                AppLog.ads.w("加载拦截 位置=${launchBidPlaces.joinToString()} 结果=延后 原因=UMP流程未完成 触发=$reason")
                 return@launch
             }
             pendingLaunchPreload = false
+            AppLog.ads.i("加载 位置=${launchBidPlaces.joinToString()} 结果=开始 触发=$reason")
             runCatching {
                 launchBidPlaces.forEach { preloadFacade.checkAndLoadAd(it, scene = SCENE_PRELOAD) }
-            }.onFailure { Log.w(TAG, "preloadLaunchBidAds failed reason=$reason", it) }
+            }.onFailure { AppLog.ads.w("加载 位置=${launchBidPlaces.joinToString()} 结果=异常 触发=$reason", it) }
         }
     }
 
@@ -285,7 +287,7 @@ class SpAdsHub private constructor(
      * `pendingLaunchPreload` 保持 false，这里不会发出请求。
      */
     internal fun onAdSdkReady() {
-        Log.i(TAG, "ad sdk ready, pendingPreload=$pendingLaunchPreload")
+        AppLog.ads.i("广告SDK就绪 待补拉预加载=$pendingLaunchPreload")
         if (pendingLaunchPreload && SpAdSession.isForeground) {
             preloadLaunchBidAds("sdk-ready")
         }
@@ -301,7 +303,10 @@ class SpAdsHub private constructor(
         val deadline = SystemClock.elapsedRealtime() + timeoutMs.coerceAtLeast(0L)
         while (true) {
             if (ImpressionUtils.loadSuccess(SpAdPosition.AC_LAUNCH)) return true
-            if (SystemClock.elapsedRealtime() >= deadline) return false
+            if (SystemClock.elapsedRealtime() >= deadline) {
+                AppLog.ads.w("加载 位置=${SpAdPosition.AC_LAUNCH} 结果=等待就绪超时 超时=${timeoutMs}ms")
+                return false
+            }
             delay(OPEN_AD_POLL_MS)
         }
     }

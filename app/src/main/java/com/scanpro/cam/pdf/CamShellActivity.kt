@@ -24,7 +24,7 @@ import com.scanpro.cam.pdf.notice.SpNotificationEntry
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
 import com.scanpro.cam.pdf.notice.SpNotifyPermissionFlow
 import com.scanpro.cam.pdf.main.CamStubFragment
-import com.scanpro.cam.pdf.rate.SpRateFlow
+import com.scanpro.cam.pdf.rate.SpPlayReview
 import com.scanpro.cam.pdf.recent.CamRecentFragment
 import com.scanpro.cam.pdf.scan.CamCaptureActivity
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
@@ -64,11 +64,6 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         if (savedInstanceState == null) {
             if (!handleNotificationRoute(intent)) switchShellTab(Tab.HOME)
             maybeOpenLeaveFlow(intent)
-            binding.root.post {
-                if (!isFinishing && !isDestroyed) {
-                    SpRateFlow.maybePromptFirstLaunch(this)
-                }
-            }
         } else {
             currentTab = Tab.entries[savedInstanceState.getInt(KEY_TAB, 0)]
             refreshTabChrome(currentTab)
@@ -151,7 +146,12 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             return
         }
         if (currentTab == Tab.HOME) {
-            SpRateFlow.maybePromptOnHome(this)
+            // 首页直接走 Google Play 应用内评价，不再弹自定义评价框。
+            binding.root.post {
+                if (!isFinishing && !isDestroyed) {
+                    SpPlayReview.launch(this, fallbackToStore = false)
+                }
+            }
         }
     }
 

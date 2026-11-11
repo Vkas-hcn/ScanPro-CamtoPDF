@@ -12,7 +12,19 @@ object SpPlayReview {
 
     private const val TAG = "PlayReview"
 
-    fun launch(activity: Activity, onFinished: () -> Unit = {}) {
+    /**
+     * @param fallbackToStore 请求评价流失败时是否跳商店。首页自动调用必须传 false：
+     *        否则从商店返回会再次触发 onResume，形成「失败→跳商店→返回→再失败」的死循环。
+     */
+    fun launch(
+        activity: Activity,
+        fallbackToStore: Boolean = true,
+        onFinished: () -> Unit = {},
+    ) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            onFinished()
+            return
+        }
         val manager = ReviewManagerFactory.create(activity)
         manager.requestReviewFlow()
             .addOnCompleteListener { task ->
@@ -23,8 +35,8 @@ object SpPlayReview {
                             onFinished()
                         }
                 } else {
-                    Log.w(TAG, "requestReviewFlow failed, fallback to store", task.exception)
-                    openStore(activity)
+                    Log.w(TAG, "requestReviewFlow failed, fallback=$fallbackToStore", task.exception)
+                    if (fallbackToStore) openStore(activity)
                     onFinished()
                 }
             }

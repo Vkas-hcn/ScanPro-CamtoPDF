@@ -60,29 +60,30 @@ class SpFullScreenAdManager(
 //            return
 //        }
         if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) {
-            AppLog.ads.i("跳过广告加载 位置=$position 原因=广告SDK未初始化")
+            AppLog.ads.w("加载拦截 位置=$position 结果=拦截 原因=广告SDK未初始化")
             return
         }
         if (blocking.isShowPartialAdsOnly(position)) {
-            AppLog.ads.i("跳过广告加载 位置=$position 原因=只展示部分广告")
+            AppLog.ads.w("加载拦截 位置=$position 结果=拦截 原因=只展示部分广告")
             SpTrackEvents.adBlocked(specAdType(position), position, "disabled")
             return
         }
         if (blocking.isVPNBlock()) {
-            AppLog.ads.i("跳过广告加载 位置=$position 原因=VPN拦截")
+            AppLog.ads.w("加载拦截 位置=$position 结果=拦截 原因=VPN拦截")
             SpTrackEvents.adBlocked(specAdType(position), position, "disabled")
             return
         }
         if (!blocking.canShowAllAd()) {
-            AppLog.ads.i("跳过广告加载 位置=$position 原因=总闸拦截")
+            AppLog.ads.w("加载拦截 位置=$position 结果=拦截 原因=总闸拦截")
             SpTrackEvents.adBlocked(specAdType(position), position, "disabled")
             return
         }
         if (!adCountCanShow(position)) {
-            AppLog.ads.i("跳过广告加载 位置=$position 原因=达到当日展示上限")
+            AppLog.ads.w("加载拦截 位置=$position 结果=拦截 原因=达到当日展示上限")
             SpTrackEvents.adBlocked(specAdType(position), position, "daily_cap")
             return
         }
+        AppLog.ads.i("加载 位置=$position 类型=${adTypeOf(position)} 结果=请求")
         ImpressionUtils.load(position)
     }
 
@@ -102,7 +103,7 @@ class SpFullScreenAdManager(
     ) {
         val host = activity
         if (host == null || host.isFinishing || host.isDestroyed) {
-            AppLog.ads.i("跳过广告展示 位置=$scene 原因=页面已销毁")
+            AppLog.ads.w("展示拦截 位置=$position 场景=$scene 结果=拦截 原因=页面已销毁或宿主为空")
             onResult(false, false)
             return
         }
@@ -111,36 +112,42 @@ class SpFullScreenAdManager(
         fun releaseShowGate() {
             if (useShowGate) SpAdShowGate.exit()
         }
-        if (SpAdsHub.getOrNull()?.isConsentFlowDone() != true ||
-            blocking.isShowPartialAdsOnly(position) ||
-            blocking.isVPNBlock() || !blocking.canShowAllAd()
-        ) {
-            AppLog.ads.i("跳过广告展示 位置=$scene 原因=总闸拦截")
+        val blockReason = when {
+            SpAdsHub.getOrNull()?.isConsentFlowDone() != true -> "UMP流程未完成"
+            blocking.isShowPartialAdsOnly(position) -> "只展示部分广告"
+            blocking.isVPNBlock() -> "VPN拦截"
+            !blocking.canShowAllAd() -> "总闸拦截"
+            else -> null
+        }
+        if (blockReason != null) {
+            AppLog.ads.w("展示拦截 位置=$position 场景=$scene 结果=拦截 原因=$blockReason")
             onResult(false, false)
             return
         }
         if (useShowGate && !SpAdShowGate.tryEnter()) {
-            AppLog.ads.i("跳过广告展示 位置=$scene 原因=已有广告正在展示")
+            AppLog.ads.w("展示拦截 位置=$position 场景=$scene 结果=拦截 原因=已有全屏广告正在展示")
             SpTrackEvents.adBlocked(specAdType(position), position, "another_fullscreen")
             onResult(false, false)
             return
         }
         if (!ImpressionUtils.loadSuccess(position)) {
             releaseShowGate()
-            AppLog.ads.i("跳过广告展示 位置=$scene 原因=广告尚未就绪")
+            AppLog.ads.w("展示拦截 位置=$position 场景=$scene 结果=拦截 原因=广告尚未就绪")
             onResult(false, false)
             return
         }
         if (useShowGate) countShow(position)
         if (host.isFinishing || host.isDestroyed) {
             releaseShowGate()
+            AppLog.ads.w("展示拦截 位置=$position 场景=$scene 结果=拦截 原因=取用广告时页面已销毁")
             onResult(false, false)
             return
         }
-        AppLog.ads.i("开始展示广告 位置=$scene")
+        AppLog.ads.i("展示 位置=$position 场景=$scene 类型=$adType 结果=请求")
         // PDF26：就绪即 show，无 500ms 遮罩；开屏 whenOnVisible=true，等 onResume 再回调。
         ImpressionUtils.show(host, position, scene, whenOnVisible = whenOnVisible) {
             releaseShowGate()
+            AppLog.ads.i("展示 位置=$position 场景=$scene 结果=关闭")
             onResult(true, true)
         }
     }

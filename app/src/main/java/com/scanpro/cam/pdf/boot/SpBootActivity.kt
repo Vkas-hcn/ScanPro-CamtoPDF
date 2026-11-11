@@ -318,7 +318,14 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
     /** 加载单个候选位（照 A `tast`）。preload 阶段已加载则幂等跳过。 */
     private fun tast(taskName: String) {
-        ImpressionUtils.load(taskName)
+        // 必须走接线层的闸门：直连 ImpressionUtils.load 会在 TradPlus 初始化完成前抢跑，
+        // SDK 会静默丢弃该请求且不回调，池层就会永久卡在“加载中”（ac_launch_int 踩过）。
+        val manager = SpAdsHub.getOrNull()?.fullScreen(this)
+        if (manager != null) {
+            manager.checkAndLoadAd(taskName)
+        } else {
+            ImpressionUtils.load(taskName)
+        }
     }
 
     /** 判断候选位是否就绪（照 A `tastResult`）。 */
