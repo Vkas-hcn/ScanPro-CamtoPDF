@@ -20,6 +20,7 @@ import com.scanpro.cam.pdf.boot.SpBootActivity
 import com.scanpro.cam.pdf.notice.SpJumpType
 import com.scanpro.cam.pdf.notice.SpNotifyCreator
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
+import com.scanpro.cam.pdf.notice.SpNotifyIds
 import com.scanpro.cam.pdf.notice.SpNotifyUtils
 import com.scanpro.cam.pdf.notice.SpPopRefresh
 import com.scanpro.cam.pdf.notice.notificationTriggerSource
@@ -84,7 +85,10 @@ object HintUtil {
         }
         val triggerSource = notificationTriggerSource(sceneType)
 
-        val ntf_id: Int = popSetting.id
+        // 系统通知固定 2 个槽位轮换（70101/70102）：最多同时 2 条，第 3 条顶掉较旧的一条。
+        // 只在这里取一次，下面的刷新循环复用它 —— 刷新是原地更新同一条，不会跳到另一格。
+        // （CallingSetting.id 里的历史值 70101 不再直接使用。）
+        val ntf_id: Int = SpNotifyIds.nextSys()
 //        Pin.event(fsk(ntf_id))
         Pin.event(Pin.notification_trigger, Pt("pos_id", sceneType).put("trigger_source", triggerSource))
 
@@ -186,12 +190,17 @@ object HintUtil {
             setContentTitle(title)
             setContentText(msg)
 //            setLargeIcon(largeIcon)
-            setGroupSummary(false)
-            setGroup("")
+            // 显式 group key 用来**退出系统的自动分组**：同一 App 出现 3~4 条 group 为 null 的通知时，
+            // Android 会生成 AUTOGROUP_SUMMARY 把它们打包成一组（通知栏里看起来是"收到一起"）。
+            // group 非 null 就不参与自动分组；每个槽位用不同 key，两条也永远不会被当成同一组。
+            setGroup("sp_sys_$id")
             setAutoCancel(true)
             setContentIntent(createIntent(action, showType,id, popSetting.jumpType, showType))
             setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            setPriority(NotificationCompat.PRIORITY_HIGH)
+            // 排序权重：CATEGORY_ALARM + PRIORITY_MAX 让 NMS 按"高打断性/闹钟类"给排名，
+            // 在同 importance 的通知里更靠顶部（渠道 importance 已是 MAX，没有更高的可调）。
+            setCategory(NotificationCompat.CATEGORY_ALARM)
+            setPriority(NotificationCompat.PRIORITY_MAX)
             setOngoing(false)
         }
 
