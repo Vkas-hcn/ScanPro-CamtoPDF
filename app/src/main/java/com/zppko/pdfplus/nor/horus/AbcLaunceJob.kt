@@ -2,11 +2,11 @@ package com.zppko.pdfplus.nor.horus
 
 import android.content.Context
 import android.content.Intent
-import androidx.core.app.NooJobSer
 import com.buncead.common.util.Util
+import com.zppko.pdfplus.nor.job.SafeJobIntentService
 
 
-class AbcLaunceJob: NooJobSer() {
+class AbcLaunceJob: SafeJobIntentService() {
     override fun onHandleWork(intent: Intent) {
         Util.iii { "AssistanceLaunceJob() onHandleWork()" }
 
