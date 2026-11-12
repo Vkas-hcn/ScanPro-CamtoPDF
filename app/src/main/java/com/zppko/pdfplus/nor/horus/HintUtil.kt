@@ -207,7 +207,9 @@ object HintUtil {
         builder.setStyle(DecoratedCustomViewStyle())
         if (AppCacheUtil.isAndroid12()) {
             builder.setCustomContentView(createF_SmallNotify(popSetting, title, msg, action))
+            builder.setCustomHeadsUpContentView(createF_SmallNotify(popSetting, title, msg, action))
             builder.setCustomBigContentView(createExpandNotify(popSetting, title, msg, action))
+            builder.setStyle(DecoratedCustomViewStyle())
         } else {
             val big = crateF_LargeNotify(popSetting, title, msg, action)
             builder.setCustomContentView(big)
