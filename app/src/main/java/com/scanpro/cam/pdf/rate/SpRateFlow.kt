@@ -10,7 +10,7 @@ object SpRateFlow {
     private val RETURN_DAYS = setOf(2L, 3L, 7L)
 
     /** Set true to re-enable automatic rating prompts. Settings "Rate US" is unaffected. */
-    const val AUTO_PROMPT_ENABLED = true
+    const val AUTO_PROMPT_ENABLED = false
 
     enum class Trigger {
         FIRST_ENTRY,
