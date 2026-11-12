@@ -28,7 +28,7 @@ class Zppkoo {
         lateinit var ii: Context
 
         /** TradPlus AppId（测试）。 */
-        private const val TRADPLUS_APP_ID = "44273068BFF4D8A8AFF3D5B11CBA3ADE"
+        private const val TRADPLUS_APP_ID = "5B26CB2F679AD608EA4014F72E3F4311"
     }
 
     fun onCreate(app: Application) {

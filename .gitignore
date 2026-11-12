@@ -50,9 +50,4 @@ Thumbs.db
 *~
 
 # Local FCM test tool: dependencies, credentials, device tokens and run output
-tools/fcm-test/node_modules/
-tools/fcm-test/.local/
-tools/fcm-test/*.service-account.json
-tools/fcm-test/*.fcm-token.json
-tools/fcm-test/.env
-tools/fcm-test/.env.*
+tools/
