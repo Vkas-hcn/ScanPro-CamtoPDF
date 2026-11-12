@@ -109,7 +109,6 @@ class SpAdsHub private constructor(
         if (!booted.compareAndSet(false, true)) return
         SpAdSession.attachLifecycle(app)
         scope.launch(Dispatchers.Main.immediate) {
-            SpWebWarmup.awaitWarmupReady(app)
             SpAdMobInit.get(app).init(scope) { onAdSdkReady() }
             bootstrapper.start()
         }
