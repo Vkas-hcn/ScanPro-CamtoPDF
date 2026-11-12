@@ -24,6 +24,9 @@ object ImpressionUtils {
 
     private val myPoolzzdd = mutableMapOf<String, BaseAdsLoad?>()
 
+    /** 池访问锁：保证「读池→判单飞→建 loader→写池→置 loading」原子，防止同一广告位被并发重复加载。 */
+    private val loadLock = Any()
+
     /** TradPlus placement id → B 广告位名（供全局收益监听反查 pos_id）。 */
     private val adIdToPlace = mutableMapOf<String, String>()
     /** B 广告位名 → 配置 zType（op/int/nat/banner）。 */
@@ -130,8 +133,10 @@ object ImpressionUtils {
         val unit = myPoolzzdd[place]
         if (loadSuccess(place)) {
             AppLog.ads.i("展示 位置=$place 场景=$point 结果=取用缓存 补加载=true")
-            myPoolzzdd[place] = null
-            load(place)
+            synchronized(loadLock) {
+                myPoolzzdd[place] = null
+                loadLocked(place)
+            }
             unit?.zShoweee(act, point,whenOnVisible, finish)
         } else {
             AppLog.ads.w("展示拦截 位置=$place 场景=$point 结果=拦截 原因=池内没有就绪广告")
@@ -169,6 +174,10 @@ object ImpressionUtils {
 
 
     fun load(place: String) {
+        synchronized(loadLock) { loadLocked(place) }
+    }
+
+    private fun loadLocked(place: String) {
         val unit = myPoolzzdd[place]
 
         if (unit != null && !unit.canReloadAds()) {
