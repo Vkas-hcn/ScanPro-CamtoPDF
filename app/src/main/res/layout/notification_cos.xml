@@ -8,7 +8,7 @@
     <ImageView
         android:id="@+id/cover"
         android:layout_width="31dp"
-        tools:src="@drawable/sp_ic_notify"
+        tools:src="@mipmap/ntf_small_icon_100"
         android:layout_height="31dp"
         android:importantForAccessibility="no" />
     <!--    <TextView-->
@@ -27,7 +27,7 @@
         android:id="@+id/content"
         android:paddingHorizontal="10dp"
         android:layout_width="0dp"
-        android:textColor="@color/sp_notify_text"
+        android:textColor="@color/ntf_content_color100"
         tools:text="123abc"
         android:layout_height="wrap_content"
         android:layout_weight="1"
@@ -46,7 +46,7 @@
         android:textColor="@color/white"
         android:layout_gravity="center"
         android:gravity="center"
-        android:background="@drawable/sp_shape_notify_btn"
+        android:background="@drawable/ntf_btn_green"
         android:paddingHorizontal="20dp"/>
 
 </LinearLayout>

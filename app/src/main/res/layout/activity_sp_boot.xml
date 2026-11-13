@@ -72,4 +72,17 @@
         app:trackStopIndicatorSize="0dp"
         app:trackThickness="@dimen/splash_progress_thickness" />
 
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:id="@+id/ad_par"
+        android:layout_height="match_parent">
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:id="@+id/ad_com"
+            android:layout_height="match_parent">
+
+        </FrameLayout>
+    </FrameLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -12,10 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import com.scanpro.cam.pdf.CamShellActivity
 import com.scanpro.cam.pdf.R
-import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
+
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivitySpGuideInfoBinding
 import kotlin.math.abs
@@ -37,7 +34,6 @@ class SpGuideInfoActivity : SpActivity<ActivitySpGuideInfoBinding>() {
         R.string.guide_page_3,
     )
 
-    private var nativeAdManager: SpNativeAdManager? = null
     private var jumped = false
     private var downX = 0f
 
@@ -55,30 +51,16 @@ class SpGuideInfoActivity : SpActivity<ActivitySpGuideInfoBinding>() {
             },
         )
 
-        SpAdsHub.getOrNull()?.fullScreen(this)?.checkAndLoadAd(
-            position = SpAdPosition.AC_GUIDE_INT,
-            scene = SpAdPosition.AC_GUIDE_INT,
-        )
         binding.tvSkip.setOnClickListener { showGuideIntThenJump() }
         binding.guideFlipper.setOnTouchListener { _, event -> handleSwipe(event) }
         renderPage(0)
-        loadNativeAd()
     }
 
     override fun onDestroy() {
-        nativeAdManager?.release()
-        nativeAdManager = null
         super.onDestroy()
     }
 
-    private fun loadNativeAd() {
-        if (nativeAdManager != null) return
-        binding.adLayout.visibility = View.GONE
-        val hub = SpAdsHub.getOrNull() ?: return
-        nativeAdManager = hub.native(this, binding.adLayout).also {
-            it.checkLoadAndShowAd(SpAdPosition.AC_GUIDE_NAT, SpNativeAdStyle.big)
-        }
-    }
+
 
     private fun handleSwipe(event: MotionEvent): Boolean {
         when (event.actionMasked) {
@@ -116,12 +98,7 @@ class SpGuideInfoActivity : SpActivity<ActivitySpGuideInfoBinding>() {
     }
 
     private fun showGuideIntThenJump() {
-        val manager = SpAdsHub.getOrNull()?.fullScreen(this)
-        if (manager == null) {
-            jumpPage()
-            return
-        }
-        manager.showInterstitialAdNoWait(SpAdPosition.AC_GUIDE_INT) { jumpPage() }
+        jumpPage()
     }
 
     private fun jumpPage() {

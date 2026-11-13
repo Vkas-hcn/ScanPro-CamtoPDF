@@ -1,75 +1,115 @@
 package com.zppko.pdfplus.nor.ads.mob
 
-import android.app.Activity
-import android.view.ViewGroup
-import com.scanpro.cam.pdf.ads.SpAdSession
-import com.scanpro.cam.pdf.analytics.AdTrackingHelper
+import android.widget.FrameLayout
+import com.buncead.common.ui.BaseActivity
+import com.buncead.common.util.Util
+import com.mymy.mymy.ads.count.AdCountInter
+import com.mymy.mymy.ads.count.AdCountOpen
+import com.mymy.mymy.ads.poi.TrackAd
+import com.mymy.mymy.ads.poi.TrackBean
+import com.tradplus.ads.open.splash.TPSplash
+import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
 import com.zppko.pdfplus.nor.ads.trad.TradAdOpen
 import com.zppko.pdfplus.nor.ads.trad.TradLoadCallback
 import com.zppko.pdfplus.nor.ads.trad.TradShowCallback
 
-/**
- * 开屏。骨架照 SmartPdfScan_luow OpenAdsLoad（TradPlus TPSplash），
- * 埋点对齐 B：trackLife + AdTrackingHelper（无 A 的 TrackAd/AdCountOpen）。
- * 展示计数：B 开屏不做频控，仅记录埋点；收益统一走全局 GlobalImpressionListener。
- */
+
 class OpenAdsLoad(
     setting: AdsSetting
 ) : BaseAdsLoad(setting) {
+    val TAG = "OpenAdsLoad"
+    val trBean: TrackBean = TrackBean.open(setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId)
 
-    private val trad = TradAdOpen()
-
+    val trad = TradAdOpen()
     override fun childLoad() {
-        if (setting.zId.isEmpty()) {
-            zmyAdsLoadFFFF("配置里 placementId 为空")
-            return
-        }
-        trad.initSplashAd(setting.zId, object : TradLoadCallback() {
-            override fun onAdLoaded() {
-                zmyAdsLoadSSSS(trad.mTPAdInfo?.adSourceName)
-            }
+        TrackAd.loadStart(trBean)
 
-            override fun onAdFailedToLoad(code: Int, message: String) {
-                zmyAdsLoadFFFF("code=$code $message")
-            }
-        })
+        val splashAd: TPSplash? = trad.getAD()
+        if (splashAd==null){
+            Util.eee { "$TAG no ad obj, first init, start load=${setting.zId}" }
+            trad.initSplashAd(setting.zId,object : TradLoadCallback() {
+                override fun onAdLoaded() {
+                    zmyAdsLoadSSSS()
+
+                    trBean.adSource = "${trad.mTPAdInfo?.adSourceName}"
+                    TrackAd.loadSuccess(trBean)
+                }
+                override fun onAdFailedToLoad(code: Int, message: String) {
+                    TrackAd.loadFailed(trBean, "${code}", message)
+
+                    zmyAdsLoadFFFF("")
+                }
+            })
+        }else{
+            Util.eee { "use ad obj, start load=${setting.zId}" }
+            splashAd.loadAd(null)
+        }
+
     }
 
-    override fun childShow(act: Activity, event: String, whenOnVisible: Boolean, finish: () -> Unit) {
-        val splashAd = trad.getAD() ?: return zDismiss(act, whenOnVisible, finish)
-        trad.setShowCallback(object : TradShowCallback() {
-            override fun onAdShowed() {
-                // 展示起点已由 BaseAdsLoad.zShoweee 记录（trackLife），无需重复。
-            }
+    override fun childShow(act: BaseActivity, event: String, container: FrameLayout, whenOnVisible:Boolean, finish: () -> Unit) {
+//        openAd?.setOnPaidEventListener {
+//            val adSourceName = openAd?.responseInfo?.loadedAdapterResponseInfo?.adSourceName
+////            sendValueToServer(it, adSourceName)
+//            OpenRequest().sendValueToServer(this,it,adSourceName)
+//        }
 
-            override fun onAdClicked() {
-                SpAdSession.markAdClicked()
-                trackLife?.let { AdTrackingHelper.click(it) }
-            }
+        val splashAd: TPSplash? = trad.getAD()
+        if (splashAd == null) {
+            zDismiss(act,whenOnVisible, finish)
+        }else{
+            trad.setShowCallback(object: TradShowCallback() {
+                override fun onAdDismissed() {
+                    TrackAd.showDismiss(trBean)
 
-            override fun onAdDismissed() {
-                zDismiss(act, whenOnVisible, finish)
-            }
+                    container.removeAllViews()
+                    zDismiss(act,whenOnVisible, finish)
 
-            override fun onAdFailedToShow() {
-                zDismiss(act, whenOnVisible, finish)
-            }
-        })
-        // TradPlus 开屏需要容器：用 Activity 内容根视图作为全屏容器（B 无专用 adCom）。
-        val container = act.findViewById<ViewGroup>(android.R.id.content)
-        splashAd.showAd(act, container, "splash_eve")
+                    if (zcanUsable()){
+                        Util.eee { "$TAG ad close, ad isRead=true, no load" }
+                    }else{
+                        Util.eee { "$TAG ad close, ad isRead=false, start load=${setting.zId}" }
+                        splashAd.loadAd(null)
+                    }
+                }
+                override fun onAdFailedToShow() { // topon open没有show失败的call，下面代码没有意义
+                    zDismiss(act,whenOnVisible, finish)
+
+                }
+                override fun onAdShowed() {
+                    AdCountOpen.open_addShowCount()
+                    TrackAd.showSuccess(trBean)
+
+                    if (zcanUsable()){
+                        Util.eee { "$TAG ad show, ad isRead=true, no load" }
+                    }else{
+                        Util.eee { "$TAG ad show, ad isRead=false, start load=${setting.zId}" }
+                        splashAd.loadAd(null)
+                    }
+                }
+                override fun onAdClicked() {
+                    AdCountOpen.open_addClickCount()
+                    TrackAd.showClick(trBean)
+
+                }
+            })
+
+            splashAd.showAd(act,container,"splash_eve")
+        }
     }
 
     override fun zcanUsable(): Boolean {
-        return trad.getAD()?.isReady == true
+        val splashAd: TPSplash? = trad.getAD()
+        return  splashAd?.isReady ?: false
+    }
+
+    override fun zAdsDestory() {
+
     }
 
     override fun getEcpm(): String {
         return trad.mTPAdInfo?.ecpm ?: "0.0"
-    }
-
-    override fun zAdsDestory() {
     }
 }

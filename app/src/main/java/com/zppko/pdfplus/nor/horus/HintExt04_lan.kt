@@ -44,7 +44,7 @@ object HintExt04_lan {
         val config: UserPop = RemoteConfigHelper.getReceiveConfig()
 
         if (coCanSMT(config, CO_S_TYPE_LAUNCHER)) {
-            val random = HintSup.forType(CO_S_TYPE_LAUNCHER).random()
+            val random = HintSup.text3.random()
             withContext(Dispatchers.Main) {
                 if ( ConfigHelper.canShowAdsss_a2()) {
 //                if (EVenPlusUploader.canShow() && RemoteConfigHelper.canShowAdsss_a2()) {

@@ -14,17 +14,11 @@ import kotlinx.coroutines.withContext
 class PhotoLockRec: BroadcastReceiver() {
     override fun onReceive(p0: Context?, p1: Intent?) {
         p0?.let {
-            // Migration adaptation: keep the delayed work inside the broadcast lifetime.
-            val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    delay(1523)
-                    Util.iii { "PhotoLockRec() p1=${p1}" }
-                    withContext(Dispatchers.Main){
-                        HintExt04.sendTtwo()
-                    }
-                } finally {
-                    pendingResult.finish()
+                delay(1523)
+                Util.iii { "PhotoLockRec() p1=${p1}" }
+                withContext(Dispatchers.Main){
+                    HintExt04.sendTtwo()
                 }
             }
         }

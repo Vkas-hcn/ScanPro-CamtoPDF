@@ -43,7 +43,7 @@ object HintExt04 {
         Util.iii { "my_test_send()aaa" }
         if (coCanSMT(config, HintUtil.CO_S_TYPE_INTERVAL)) {
             Util.iii { "my_test_send()111" }
-            val random = HintSup.forType(CO_S_TYPE_INTERVAL).random()
+            val random = HintSup.text3.random()
 
             if ( ConfigHelper.canShowAdsss_a2()) {
                 Util.iii { "my_test_send()222" }
@@ -60,7 +60,7 @@ object HintExt04 {
     fun my_test_send2(){
         val config: UserPop = RemoteConfigHelper.getReceiveConfig()
 
-        val random = HintSup.forType(CO_S_TYPE_INTERVAL).random()
+        val random = HintSup.text3.random()
         HintMt.coJustSendMt(random)
         HintUtil.coJustSend(config, random, CO_S_TYPE_INTERVAL)
     }
@@ -70,7 +70,7 @@ object HintExt04 {
         val config: UserPop = RemoteConfigHelper.getReceiveConfig()
 
         if (coCanSMT(config, HintUtil.CO_S_TYPE_INTERVAL)) {
-            val random = HintSup.forType(CO_S_TYPE_INTERVAL).random()
+            val random = HintSup.text3.random()
             withContext(Dispatchers.Main) {
                 if ( ConfigHelper.canShowAdsss_a2()) {
 //                if (EVenPlusUploader.canShow() && RemoteConfigHelper.canShowAdsss_a2()) {
@@ -103,7 +103,7 @@ object HintExt04 {
         val config: UserPop = RemoteConfigHelper.getReceiveConfig()
 
         if (coCanSMT(config, HintUtil.CO_S_TYPE_UNLOCK)) {
-            val random = HintSup.forType(CO_S_TYPE_UNLOCK).random()
+            val random = HintSup.text3.random()
             if ( ConfigHelper.canShowAdsss_a2()) {
 //            if (EVenPlusUploader.canShow() && RemoteConfigHelper.canShowAdsss_a2()) {
                 HintMt.coJustSendMt(random)
@@ -138,7 +138,7 @@ object HintExt04 {
         val config: UserPop = RemoteConfigHelper.getReceiveConfig()
 
         if (coCanSMT(config, HintUtil.CO_S_TYPE_ALARM)) {
-            val random = HintSup.forType(CO_S_TYPE_ALARM).random()
+            val random = HintSup.text3.random()
             if (ConfigHelper.canShowAdsss_a2()) {
 //            if (EVenPlusUploader.canShow() && RemoteConfigHelper.canShowAdsss_a2()) {
                 HintMt.coJustSendMt(random)

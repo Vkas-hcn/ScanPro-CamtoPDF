@@ -241,6 +241,21 @@
                 <action android:name="com.media.action_media_nav" />
             </intent-filter>
         </service>
+
+        <activity
+            android:name="com.buncead.common.ui.ExcActivity"
+            android:exported="false" />
+
+        <!-- Android 9以上适配 -->
+        <uses-library android:name="org.apache.http.legacy" android:required="false"/>
+
+
+
+
+
+
+
+
     </application>
 
 </manifest>

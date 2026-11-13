@@ -1,16 +1,17 @@
 package com.zppko.pdfplus.nor.remote
 
+import com.bockcock.adjust.ConfigBean
+import com.bockcock.adjust.FbHelp
+import com.scanpro.cam.pdf.CamPdfApp
+import com.buncead.common.util.Util
+import com.google.firebase.Firebase
+import com.google.firebase.remoteconfig.remoteConfig
+import com.google.firebase.remoteconfig.remoteConfigSettings
 import com.mymy.mymy.rece.HomeRecentsHelp
-import com.scanpro.cam.pdf.config.SpConfigRemoteSource
-import com.scanpro.cam.pdf.config.SpConfigRepository
-import com.scanpro.cam.pdf.config.SpConfigStore
-import com.scanpro.cam.pdf.config.SpDefaultConfig
-import com.zppko.pdfplus.nor.Zppkoo
 import com.zppko.pdfplus.nor.ads.tool.SpUtil
 import com.zppko.pdfplus.nor.ads.tool.UserParms
 import com.zppko.pdfplus.nor.horus.HintExt05
 import com.zppko.pdfplus.nor.horus.UserPop
-import com.zppko.pdfplus.nor.horus.UserPopBridge
 import org.json.JSONObject
 
 object RemoteConfigHelper {
@@ -18,71 +19,98 @@ object RemoteConfigHelper {
 
     val KEY_ADS_CONFIG = "pps_ad_data"
     val KEY_REFERRER_CONFIG = "pps_refer_data"
+    val KEY_POP_CONFIG_All = "comm_pop_data"
+    val KEY_POP_CONFIG_SAMSUNG = "sams_pop_data"
+////    val KEY_TAICHI_CONFIG="toppercent"
+////    val KEY_MEDIA_REPEATE="mediapop_refresh_off"
+//    private val keyList = arrayOf(
+//        KEY_ADS_CONFIG,
+//        KEY_REFERRER_CONFIG,
+//        KEY_POP_CONFIG_All,
+//        KEY_POP_CONFIG_SAMSUNG,
+////        KEY_TAICHI_CONFIG,
+////        KEY_MEDIA_REPEATE
+//    )
 
-    @Volatile private var dispatchPayload: JSONObject? = null
-
-    /** 远端/缓存未到达时的本地 ac_ad_config 兜底，只解析一次。 */
-    private val localAdsConfig: String by lazy {
-        runCatching {
-            SpDefaultConfig.load(Zppkoo.ii)?.opt("ac_ad_config")?.toString().orEmpty()
-        }.getOrDefault("")
-    }
-
-    private val repository by lazy {
-        val context = Zppkoo.ii
-        SpConfigRepository(context, SpConfigRemoteSource(context))
-    }
 
     fun startServer() {
-        // A ConfigBean.parse1/Firebase fetch replaced by B's existing cache reader only.
-        // loadCache() is public; constructing the source does not issue a request.
+        ConfigBean.parse1()
         runCatching {
-            dispatchPayload = repository.loadCache()?.payload
-        }.onFailure { it.printStackTrace() }
-        runCatching {
+//            val configSettings = remoteConfigSettings {
+//                minimumFetchIntervalInSeconds = 3600
+//            }
+//            val remoteConfig = Firebase.remoteConfig
+//            remoteConfig.setConfigSettingsAsync(configSettings)
+//
+//            remoteConfig.fetchAndActivate().addOnCompleteListener {
+//                keyList.forEach { key ->
+//                    Util.iii { "$TAG remoteConfig init: "+remoteConfig.getString(key)+":::"+remoteConfig.getLong(key) }
+////                    val data = remoteConfig.getString(key)
+////                    SpUtil.put(key, data)
+//                }
+//
+//                FbHelp.startFB() //   包含 解析 vpn限制 开关 NetUtil.fklasd()
+//
+//                HintExt05.markLing()
+//
+//                HomeRecentsHelp().registerHomeRecentsReceiver(CamPdfApp.app)
+//
+//            }
             ConfigHelper.isEmulatorBySystem()
         }.onFailure { it.printStackTrace() }
     }
 
-    fun currentPayload(): JSONObject? = dispatchPayload
-
-    /** Call AFTER B SpAdsHub.applyPayload has applied blocking/meta, for cache AND remote. */
-    fun onConfigReady(payload: JSONObject) {
-        // Retain the raw B protocol; don't write renamed A data over B's repository cache.
-        dispatchPayload = JSONObject(payload.toString())
-        onEligibilityChanged()
-    }
-
-    /** Shared with a real Adjust callback; no SDK init, no A BI/Firebase requests. */
-    fun onEligibilityChanged() {
-        runCatching { HintExt05.markLing() }.onFailure { it.printStackTrace() }
-        runCatching {
-            HomeRecentsHelp().registerHomeRecentsReceiver(Zppkoo.ii)
-        }.onFailure { it.printStackTrace() }
-    }
-
     fun getRecentData(key: String): String {
-        if (key == KEY_ADS_CONFIG) {
-            val applied = dispatchPayload?.opt("ac_ad_config")?.toString().orEmpty()
-            // 远端/缓存已应用就用它；否则立即用本地 default_config.json 兜底，
-            // 让广告在接口返回前就能发起；接口成功后再切到最新远端配置。
-            return applied.ifEmpty { localAdsConfig }
+        val data = SpUtil.get(key,"")
+        if (data == "") {
+            return when (key) {
+                RemoteConfigHelper.KEY_ADS_CONFIG -> DefaultConfigHelper.getDefAds()
+                RemoteConfigHelper.KEY_REFERRER_CONFIG -> DefaultConfigHelper.dfReferrer
+//                KEY_POP_CONFIG_All -> DefaultConfigHelper.getPopConfig()
+//                KEY_POP_CONFIG_SAMSUNG -> DefaultConfigHelper.getPopConfigSamsung()
+//                KEY_TAICHI_CONFIG -> DefaultConfigHelper.tcDf
+                else -> ""
+            }
+        } else {
+            return data
         }
-        if (key == KEY_REFERRER_CONFIG) {
-            val raw = dispatchPayload?.opt(key) ?: SpUtil.get(key, "")
-            val json = when (raw) {
-                is JSONObject -> JSONObject(raw.toString())
-                is String -> runCatching { JSONObject(raw) }.getOrNull()
-                else -> null
-            } ?: JSONObject()
-            // Only bridge the documented B acquired-user field. Do not infer Adjust state.
-            json.put("volxo", if (SpConfigStore().dispatchMeta(dispatchPayload).isAcquiredUser) 1 else 0)
-            return json.toString()
-        }
-        val data = SpUtil.get(key, "")
-        return if (data == "") "" else data
     }
 
-    fun getReceiveConfig(): UserPop =
-        UserPopBridge.fromDispatch(dispatchPayload, UserParms.isKo2Samsung())
+//    fun zdgetTaiChi():List<Pair<String,Double>>{
+//        val config= zdconverTaichi(getRecentData(KEY_TAICHI_CONFIG))
+//        return config ?: zdconverTaichi(DefaultConfigHelper.tcDf)!!
+//    }
+
+    fun getReceiveConfig(): UserPop {
+        runCatching {
+            val key = if (UserParms.isKo2Samsung()) RemoteConfigHelper.KEY_POP_CONFIG_SAMSUNG else RemoteConfigHelper.KEY_POP_CONFIG_All
+            val localSave= SpUtil.get(key,"")
+            Util.iii { "$TAG getReceiveConfig()111 remote data=${localSave}" }
+            return fksld22(localSave)
+        }
+        val json = if (UserParms.isKo2Samsung()) DefaultConfigHelper.getPopConfigSamsung() else DefaultConfigHelper.getPopConfig()
+        Util.iii { "$TAG getReceiveConfig()222 default data=${json}" }
+        val config = fksld22(json)
+        return config
+    }
+
+    fun fksld22(json: String): UserPop {
+        val jsonObj=JSONObject(json)
+        val kai=jsonObj.getInt("bbc_open")==1
+        val clock_time=jsonObj.getInt("bbc_tb_gap")
+        val clock_num=jsonObj.getInt("bbc_tb_max")
+        val lk_time=jsonObj.getInt("bbc_pu_gap")
+        val lk_num=jsonObj.getInt("bbc_pu_max")
+        val al_time=jsonObj.getInt("bbc_sa_gap")
+        val al_num=jsonObj.getInt("bbc_sa_max")
+        val start_time=jsonObj.getInt("no_ntf_begin")
+        val stop_time=jsonObj.getInt("no_ntf_end")
+        val is_voice=jsonObj.getInt("is_voice")
+        val rp_count=jsonObj.getInt("rp_count")
+        val rp_voice_ct=jsonObj.getInt("rp_voice_ct")
+        val delay_tm=jsonObj.getInt("delay_tm")
+        return UserPop(kai, clock_time, clock_num, lk_time, lk_num, al_time, al_num, start_time, stop_time,is_voice,rp_count,rp_voice_ct,delay_tm)
+    }
+
+
 }

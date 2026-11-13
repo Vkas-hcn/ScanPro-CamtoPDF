@@ -18,7 +18,7 @@ object HintExt05 {
 
 
     fun coIntance(): Context {
-        return Zppkoo.ii
+        return Zppkoo.Companion.ii
     }
 
     private fun coRandomCode(): Int {

@@ -14,8 +14,8 @@ android {
         applicationId = "com.scanpro.cam.pdf"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 7
+        versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Overridden per buildType; debug keeps Google sample App ID.
@@ -36,7 +36,7 @@ android {
             signingConfig = signingConfigs.getByName("common")
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("boolean", "USE_TEST_ADS", "false")
+            buildConfigField("Boolean", "IS_BUNDLE", "true")
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3840731205415196~4572255037"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -46,7 +46,7 @@ android {
         debug {
             signingConfig = signingConfigs.getByName("common")
             isMinifyEnabled = false
-            buildConfigField("boolean", "USE_TEST_ADS", "true")
+            buildConfigField("Boolean", "IS_BUNDLE", "false")
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
         }
     }

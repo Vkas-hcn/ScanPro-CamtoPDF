@@ -1,76 +1,94 @@
 package com.zppko.pdfplus.nor.ads.mob
 
-import android.app.Activity
-import com.scanpro.cam.pdf.ads.SpAdSession
-import com.scanpro.cam.pdf.analytics.AdTrackingHelper
+import android.widget.FrameLayout
+import com.buncead.common.ui.BaseActivity
+import com.buncead.common.util.Util
+import com.google.android.gms.ads.nativead.NativeAd
+import com.mymy.mymy.ads.count.AdCountInter
+import com.mymy.mymy.ads.count.AdCountNati
+import com.mymy.mymy.ads.poi.TrackAd
+import com.mymy.mymy.ads.poi.TrackBean
+import com.tradplus.ads.open.interstitial.TPInterstitial
 import com.tradplus.ads.open.nativead.TPNative
+import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
 import com.zppko.pdfplus.nor.ads.trad.TradAdNative
 import com.zppko.pdfplus.nor.ads.trad.TradLoadCallback
 import com.zppko.pdfplus.nor.ads.trad.TradShowCallback
 
-/**
- * 原生。骨架照 SmartPdfScan_luow NatAdsLoad（childLoad + getAdView + childShow 空实现），
- * SDK 用 TradPlus TPNative；渲染由 B 现有 SpNativeAdManager 负责。
- * 展示计数：AdCountNati.nati_addShowCount() 由 SpNativeAdManager 在展示前完成，这里不重复。
- */
+
 class NatAdsLoad(
     setting: AdsSetting
 ) : BaseAdsLoad(setting) {
+    val TAG = "NatAdsLoad"
+    val trBean: TrackBean = TrackBean.nati(setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId)
 
-    private var lastPoin = ""
+    private var lastPoin=""
 
-    private val trad = TradAdNative()
-
+    val trad = TradAdNative()
     override fun childLoad() {
-        if (setting.zId.isEmpty()) {
-            zmyAdsLoadFFFF("配置里 placementId 为空")
-            return
+        TrackAd.loadStart(trBean)
+
+        val nowAd: TPNative? = trad.getAD()
+        if (nowAd==null) {
+            Util.eee { "$TAG no ad obj, first init, start load=${setting.zId}" }
+            trad.initSplashAd(setting.zId,object : TradLoadCallback() {
+                override fun onAdLoaded() {
+                    zmyAdsLoadSSSS()
+
+                    trBean.adSource = "${trad.mTPAdInfo?.adSourceName}"
+                    TrackAd.loadSuccess(trBean)
+                }
+                override fun onAdFailedToLoad(code: Int, message: String) {
+                    TrackAd.loadFailed(trBean, "${code}", message)
+
+                    zmyAdsLoadFFFF("")
+                }
+            })
+
+            trad.setShowCallback(object: TradShowCallback() {
+                override fun onAdDismissed() {
+
+                }
+                override fun onAdFailedToShow() {
+
+                }
+                override fun onAdShowed() {
+                    AdCountNati.nati_addShowCount()
+                    TrackAd.showSuccess(trBean)
+                }
+                override fun onAdClicked() {
+                    AdCountNati.nati_addClickCount()
+                    TrackAd.showClick(trBean)
+                }
+            })
+
+        }else{
+            Util.eee { "use ad obj, start load=${setting.zId}" }
+            nowAd.loadAd()
         }
-        trad.initSplashAd(setting.zId, object : TradLoadCallback() {
-            override fun onAdLoaded() {
-                zmyAdsLoadSSSS(trad.mTPAdInfo?.adSourceName)
-            }
-
-            override fun onAdFailedToLoad(code: Int, message: String) {
-                zmyAdsLoadFFFF("code=$code $message")
-            }
-        })
-
-        // A 原样：原生在 load 时就挂 show 回调（展示由页面触发）。
-        trad.setShowCallback(object : TradShowCallback() {
-            override fun onAdShowed() {
-                // 展示起点由 SpNativeAdManager.trackNativeImpression 记录。
-            }
-
-            override fun onAdClicked() {
-                SpAdSession.markAdClicked()
-                trackLife?.let { AdTrackingHelper.click(it) }
-            }
-
-            override fun onAdDismissed() {
-            }
-
-            override fun onAdFailedToShow() {
-            }
-        })
     }
 
-    fun getAdView(point: String): TPNative? {
-        lastPoin = point
-        return trad.getAD()
+    fun getAdView(point:String):TPNative?{
+        lastPoin=point
+        val nowAd: TPNative? = trad.getAD()
+        return nowAd
     }
 
-    override fun childShow(act: Activity, event: String, whenOnVisible: Boolean, finish: () -> Unit) {
-        // A 原样：原生由页面拿对象自己挂 UI（B 渲染层负责），此处空实现。
+    override fun childShow(act: BaseActivity, event: String, container: FrameLayout, whenOnVisible:Boolean, finish: () -> Unit) {
+
     }
 
     override fun zcanUsable(): Boolean {
-        return trad.getAD()?.isReady == true
+        val nowAd: TPNative? = trad.getAD()
+        return  nowAd?.isReady ?: false
     }
 
     override fun zAdsDestory() {
-        trad.getAD()?.onDestroy()
+//        Util.eee { "zAdsDestory()" }
+//        val nowAd: TPNative? = trad.getAD()
+//        nowAd?.onDestroy()
     }
+
 }

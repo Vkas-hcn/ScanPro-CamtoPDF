@@ -6,7 +6,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import android.widget.RemoteViews
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
@@ -14,7 +13,6 @@ import androidx.core.app.NotificationCompat.DecoratedCustomViewStyle
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.scanpro.cam.pdf.R
-import com.smart.pdf.scanner.util.LocaleHelper
 import com.zppko.pdfplus.nor.Route
 import com.zppko.pdfplus.nor.Zppkoo
 import com.zppko.pdfplus.nor.ads.tool.UserParms
@@ -28,7 +26,7 @@ object HintExt01 {
     const val CO_S_TYPE_BAR = 3
 
     fun coIntance(): Context {
-        return Zppkoo.ii
+        return Zppkoo.Companion.ii
     }
 
     fun startJob(context: Context) {
@@ -54,9 +52,6 @@ object HintExt01 {
                         coIntance(), Intent(coIntance(), CCPdfToolService::class.java)
                     )
                 }
-            }.onFailure { error ->
-                // Migration adaptation: expose startup failures without changing service policy.
-                Log.e("HintExt01", "launchFg failed", error)
             }
         }
     }
@@ -87,11 +82,10 @@ object HintExt01 {
         val deleteIndex:PendingIntent = getBroadcastPendingIntent(context)
 
         val builder = NotificationCompat.Builder(context, channelName).apply {
-            setSmallIcon(R.drawable.sp_ic_notify)
+            setSmallIcon(R.drawable.ic_scan_small)
             setPriority(NotificationCompat.PRIORITY_DEFAULT)
             setCategory(NotificationCompat.CATEGORY_SERVICE)
             setOnlyAlertOnce(true)
-            setShowWhen(false)
             setGroupSummary(false)
             setGroup("")
             setSound(null)
@@ -99,31 +93,48 @@ object HintExt01 {
             setDeleteIntent(deleteIndex)
         }
 
-        builder.setStyle(DecoratedCustomViewStyle())
         if (AppCacheUtil.isAndroid12()) {
             builder.setCustomContentView(createSSSview())
             builder.setCustomBigContentView(createLLLview())
+            builder.setCustomHeadsUpContentView(createLLLview())
+            builder.setStyle(DecoratedCustomViewStyle())
         } else {
-            val big = createLLLview()
-            builder.setCustomContentView(big)
-            builder.setCustomBigContentView(big)
-            builder.setCustomHeadsUpContentView(big)
+            builder.setCustomContentView(createLLLview())
+            builder.setCustomBigContentView(createLLLview())
+            builder.setCustomHeadsUpContentView(createLLLview())
         }
         return builder.build()
     }
 
 
     private fun createSSSview(): RemoteViews {
-        return HintNotifyViews.persistent(small = true)
+        val fpkName = coIntance().packageName
+        val view = RemoteViews(fpkName, R.layout.notification_tool_bar_simple)
+        bindingClickEvent(view)
+        return view
     }
 
     private fun createLLLview(): RemoteViews {
-        return HintNotifyViews.persistent(small = false)
+        val fpkName = coIntance().packageName
+        val view = RemoteViews(fpkName, R.layout.notification_tool_bar_large)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            view.setViewPadding(R.id.root, 0, 20, 0, 20)
+        }
+        bindingClickEvent(view)
+        return view
     }
 
 
     private fun bindingClickEvent(view: RemoteViews) {
-        HintNotifyViews.bindPersistent(view)
+        val ctx = coIntance()
+        view.setOnClickPendingIntent(R.id.delete_cache, createIntent(Route.Garbage, CO_S_TYPE_BAR))
+        view.setTextViewText(R.id.tv_delete_cache, ctx.getString(R.string.pop_top_1))
+
+        view.setOnClickPendingIntent(R.id.delete_large, createIntent(Route.LargeFile, CO_S_TYPE_BAR))
+        view.setTextViewText(R.id.tv_delete_large, ctx.getString(R.string.pop_top_2))
+
+        view.setOnClickPendingIntent(R.id.delete_dup, createIntent(Route.DuplicateFile, CO_S_TYPE_BAR))
+        view.setTextViewText(R.id.tv_delete_dup, ctx.getString(R.string.pop_top_3))
     }
 
     private fun hasnTify(context: Context, id: Int): Boolean =

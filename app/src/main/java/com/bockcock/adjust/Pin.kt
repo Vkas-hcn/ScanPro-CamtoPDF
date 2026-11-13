@@ -1,17 +1,18 @@
 package com.bockcock.adjust
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.buncead.common.util.Util
 import com.flux.tracksdk.core.TrackSDK
 import com.flux.tracksdk.model.TrackPolicy
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.scanpro.cam.pdf.analytics.AdTrackingHelper
-import com.scanpro.cam.pdf.util.AppLog
-import com.zppko.pdfplus.nor.Zppkoo
+import com.mymy.mymy.SaveKv
+import com.zppko.pdfplus.nor.remote.ConfigHelper
+import com.zppko.pdfplus.nor.remote.RemoteConfigHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -23,56 +24,60 @@ object Pin {
 
     // adjust
 
+//    val ad_impression = "ad_impression"// FirebaseAnalytics.Event.AD_IMPRESSION
     val ad_impression_revenue = "ad_impression_revenue"
     val total_ads_revenue_001 = "total_ads_revenue_001"
 
-    val ntf_perm_no = "ntf_perm_no"
-    val ntf_perm_ok = "ntf_perm_ok"
+    val  ntf_perm_no = "ntf_perm_no"
+    val  ntf_perm_ok = "ntf_perm_ok"
 
-    val trigger_scanpdf_ntf = "trigger_scanpdf_ntf"
-    val click_scanpdf_ntf = "click_scanpdf_ntf"
-    val trigger_imgpdf_ntf = "trigger_imgpdf_ntf"
-    val click_imgpdf_ntf = "click_imgpdf_ntf"
-    val trigger_depdf_ntf = "trigger_depdf_ntf"
-    val click_depdf_ntf = "click_depdf_ntf"
+    val  trigger_scanpdf_ntf = "trigger_scanpdf_ntf"
+    val  click_scanpdf_ntf = "click_scanpdf_ntf"
+    val  trigger_imgpdf_ntf = "trigger_imgpdf_ntf"
+    val  click_imgpdf_ntf = "click_imgpdf_ntf"
+    val  trigger_depdf_ntf = "trigger_depdf_ntf"
+    val  click_depdf_ntf = "click_depdf_ntf"
 
-    val trigger_media_ntf = "trigger_media_ntf"
-    val click_media_ntf = "click_media_ntf"
+    val  trigger_media_ntf = "trigger_media_ntf"
+    val  click_media_ntf = "click_media_ntf"
 
-    val ntf_top_trigger = "ntf_top_trigger"
-    val ntf_top_click = "ntf_top_click"
+    val  ntf_top_trigger = "ntf_top_trigger"
+    val  ntf_top_click = "ntf_top_click"
 
-    fun event(eventName: String, pt: Pt? = null) {
-        val text = pt?.map?.entries?.joinToString(", ") { "${it.key}=${it.value}" } ?: "无"
-        // Reuse B's initialized Firebase/TrackSDK/Adjust instances and B's token mapping.
-        // B's BI-only product contract overrides A's unconditional three-platform fan-out.
-        if (eventName !in biOnlyEvents) {
-            runCatching {
-                FirebaseAnalytics.getInstance(Zppkoo.ii).logEvent(eventName, pt?.bundle)
-                AppLog.tracking.i("埋点已提交 平台=firebase 事件=$eventName 参数=$text")
-            }.onFailure {
-                AppLog.tracking.w("埋点提交失败 平台=firebase 事件=$eventName 参数=$text", it)
+    fun event(eventName: String,pt:Pt?=null){
+        // Util.iii { "$TAG event, eventName=${eventName}, pt=${pt}" }
+        FirebaseAna.logEvent(eventName,pt?.bundle)
+        AdJustHelp.event(eventName,pt?.map)
+//
+        TrackSDK.track(eventName,pt?.map?.toMap(), TrackPolicy.IMMEDIATE)
+    }
+
+
+    fun myTrack(eventName: String, properties:MutableMap<String,Any>,policy: TrackPolicy ){
+        TrackSDK.track(eventName, properties, TrackPolicy.IMMEDIATE)
+    }
+
+    fun anaMUSer(canShowAdsss_a2: Boolean){
+        if (SaveKv.isAlrMUser()){
+
+        }else{
+            if (canShowAdsss_a2){
+                SaveKv.setAlrMUser()
+                Pin.event(Pin.activated)
             }
-            AdTrackingHelper.adjustPoint(
-                eventName,
-                pt?.map?.get("revenue")?.toDoubleOrNull(),
-                pt?.map?.get("currency"),
-            )
-        }
-        // Do not call SpTracker.log here: it would mirror a duplicate BATCH event.
-        // A's immediate TrackSDK policy and string-valued parameter map are retained.
-        runCatching {
-            TrackSDK.track(eventName, pt?.map?.toMap() ?: emptyMap(), TrackPolicy.IMMEDIATE)
-            AppLog.tracking.i("埋点已提交 平台=tracksdk 事件=$eventName 参数=$text")
-        }.onFailure {
-            AppLog.tracking.w("埋点提交失败 平台=tracksdk 事件=$eventName 参数=$text", it)
         }
     }
 
-    fun myTrack(eventName: String, properties: MutableMap<String, Any>, policy: TrackPolicy) {
-        // A deliberately uses IMMEDIATE regardless of the supplied policy.
-        // B TrackSDK 3.x accepts string-valued properties.
-        TrackSDK.track(eventName, properties.mapValues { it.value.toString() }, TrackPolicy.IMMEDIATE)
+    fun anaMUSer2(){
+        if (SaveKv.isAlrMUser()){
+
+        }else{
+            val canShowAdsss_a2 = ConfigHelper.canShowAdsss_a2()
+            if (canShowAdsss_a2){
+                SaveKv.setAlrMUser()
+                Pin.event(Pin.activated)
+            }
+        }
     }
 
     val activated = "activated"
@@ -91,11 +96,6 @@ object Pin {
     val keepalive_trigger = "keepalive_trigger"
     val keepalive_service_stop = "keepalive_service_stop"
 
-    private val biOnlyEvents = setOf(
-        activated, biorganic, keepalive_service_start, keepalive_trigger,
-        keepalive_service_stop, reactivation_landing, "notification_received",
-        "notification_frequency_limited", "ad_blocked", "ad_show_timeout",
-    )
 
     fun isAppInForeground(): Boolean {
         return ProcessLifecycleOwner.get().lifecycle.currentState
@@ -105,7 +105,7 @@ object Pin {
     private fun firebaseHeader(context: Context): Map<String, Any> {
         val appState = if (isAppInForeground()) {
             1
-        } else {
+        }else{
             2
         }
 
@@ -140,4 +140,6 @@ object Pin {
             "event_time" to time,
         )
     }
+
+
 }

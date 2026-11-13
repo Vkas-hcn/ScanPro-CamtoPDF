@@ -13,7 +13,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.commit
 import androidx.lifecycle.lifecycleScope
-import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamOfficeReaderBinding
 import com.scanpro.cam.pdf.home.FileType
@@ -36,7 +35,6 @@ class CamOfficeReaderActivity : SpActivity<ActivityCamOfficeReaderBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         applyToolbarInset()
-        SpPageAdTriggers.preloadMainBack(this)
         binding.btnBack.setOnClickListener { leaveWithBackAd() }
         onBackPressedDispatcher.addCallback(
             this,
@@ -93,9 +91,9 @@ class CamOfficeReaderActivity : SpActivity<ActivityCamOfficeReaderBinding>() {
 
     private fun leaveWithBackAd() {
         if (isFinishing || isDestroyed) return
-        SpPageAdTriggers.showBackHomeIntThen(this) {
+//        SpPageAdTriggers.showBackHomeIntThen(this) {
             if (!isFinishing && !isDestroyed) finish()
-        }
+//        }
     }
 
     private fun applyToolbarInset() {

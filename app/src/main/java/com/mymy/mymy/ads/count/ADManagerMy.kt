@@ -26,6 +26,7 @@ object ADManagerMy {
         CoroutineScope(Dispatchers.IO).launch {
             mSaveTime = KvUtil.getLong(KEY_SAVE_TIME)
 
+            AdCountOpen.open_getCount()
             AdCountInter.inter_getCount()
             AdCountNati.nati_getCount()
         }
@@ -41,6 +42,7 @@ object ADManagerMy {
             mSaveTime = System.currentTimeMillis()
             KvUtil.setLong(KEY_SAVE_TIME, mSaveTime)
 
+            AdCountOpen.open_resetCount()
             AdCountInter.inter_resetCount()
             AdCountNati.nati_resetCount()
             return false

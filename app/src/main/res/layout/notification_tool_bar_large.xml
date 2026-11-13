@@ -20,7 +20,7 @@
             android:layout_marginHorizontal="8dp"
             android:importantForAccessibility="no"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_notify_bar_home" />
+            android:src="@drawable/ic_home_list_pdf" />
 
         <TextView
             android:id="@+id/tv_delete_cache"
@@ -51,7 +51,7 @@
             android:layout_marginHorizontal="8dp"
             android:importantForAccessibility="no"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_scan_small" />
+            android:src="@drawable/ic_home_list_xls" />
 
         <TextView
             android:id="@+id/tv_delete_large"
@@ -82,7 +82,7 @@
             android:layout_marginHorizontal="8dp"
             android:importantForAccessibility="no"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_notify_bar_recent" />
+            android:src="@drawable/ic_home_list_ppt" />
 
         <TextView
             android:id="@+id/tv_delete_dup"

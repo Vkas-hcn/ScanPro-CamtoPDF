@@ -24,8 +24,8 @@
         android:shortcutLongLabel="@string/shortcut_leave">
         <intent
             android:targetPackage="com.npro.mac.fdp.debug"
-            android:targetClass="com.scanpro.cam.pdf.leave.SpLeaveEntryActivity"
-            android:action="com.scanpro.cam.pdf.delete">
+            android:targetClass="com.scanpro.cam.pdf.boot.SpBootActivity"
+            android:action="android.intent.action.VIEW">
             <extra
                 android:name="sp_from_type"
                 android:value="delete_app" />

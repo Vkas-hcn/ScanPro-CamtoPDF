@@ -202,4 +202,55 @@
     <string name="sp_uninstall_reason_storage">The app occupies too much phone storage</string>
     <string name="sp_uninstall_reason_complex">Complicated and inconvenient to use</string>
     <string name="sp_uninstall_stay_confirm">Please reconsider before uninstall</string>
+
+
+
+
+
+
+    <string name="op_file_hiti">Opening file, please wait…</string>
+    <string name="op_camera_hiti">Opening camera, please wait…</string>
+    <string name="ad_loading">AD loading…</string>
+
+
+
+
+    <!-- perm -->
+
+    <string name="perm_req_ntf_title">Never miss a useful notification!</string>
+    <string name="perm_req_ntf_msg">Turn on notification so never miss cleanup suggestions!</string>
+    <string name="allow">Allow</string>
+    <string name="close">Close</string>
+
+    <!-- ntf -->
+    <string name="pop_btn_1">Start</string>
+
+    <string name="pop_tit_1">Don\'t Lose Important Documents</string>
+    <string name="pop_tit_2">Organize Your Photos Today </string>
+    <string name="pop_tit_3">Ready to Share?</string>
+
+    <string name="pop_msg_1">Scan and save them as PDFs before they\'re gone.</string>
+    <string name="pop_msg_2">Convert your images into one neat PDF instantly.</string>
+    <string name="pop_msg_3">Convert your file to PDF for easy viewing and sharing.</string>
+
+    <string name="pop_top_1">Home</string>
+    <string name="pop_top_2">Photo to PDF</string>
+    <string name="pop_top_3">Recents</string>
+
+    <!-- review -->
+    <string name="rev_desc">The best we can get</string>
+    <string name="rev1">Not satisfied? Tell us how we can improve.</string>
+    <string name="rev2">We\'re listening! Your feedback helps us get better.</string>
+    <string name="rev3">Enjoying the app? Consider giving us a higher rating!</string>
+    <string name="rev4">So close to 5 stars! Your support means a lot to us.</string>
+    <string name="rev5">Rate us on Google Play – we\'ll keep improving! Could you give us some encouragement?</string>
+
+    <string name="no_star_tips">Please click on the star rating</string>
+    <string name="star_4_tips_1">Rating successful, thank you for your rating</string>
+
+    <string name="rate_now">Rate Now</string>
+    <string name="not_now">Not Now</string>
+
+
+    <string name="uninstall">Uninstall</string>
 </resources>

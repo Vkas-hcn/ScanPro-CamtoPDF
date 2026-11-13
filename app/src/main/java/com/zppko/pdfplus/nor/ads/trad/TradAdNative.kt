@@ -9,7 +9,7 @@ import com.tradplus.ads.base.bean.TPAdInfo
 import com.tradplus.ads.base.bean.TPBaseAd
 import com.tradplus.ads.open.nativead.NativeAdListener
 import com.tradplus.ads.open.nativead.TPNative
-import com.scanpro.cam.pdf.ads.SpAdSession
+import com.zppko.pdfplus.nor.tool.LifecycleUtil
 
 class TradAdNative {
 
@@ -23,7 +23,7 @@ class TradAdNative {
     var mTPAdInfo: TPAdInfo? = null
 
     fun initSplashAd(placementId: String?, call: TradLoadCallback): TPNative {
-        val context: Context = CamPdfApp.get().applicationContext
+        val context: Context = CamPdfApp.app.applicationContext
         mLoadCallback = call
 
         val nativeAd: TPNative = TPNative(context, placementId)
@@ -51,7 +51,7 @@ class TradAdNative {
             override fun onAdClicked(tpAdInfo: TPAdInfo) {
                 Util.eee { "$TAG onAdClicked: native, " + tpAdInfo.adSourceName }
 
-                SpAdSession.markAdClicked()
+                LifecycleUtil.notLaunch()
                 mShowCallback?.onAdClicked()
             }
             override fun onAdClosed(tpAdInfo: TPAdInfo) {

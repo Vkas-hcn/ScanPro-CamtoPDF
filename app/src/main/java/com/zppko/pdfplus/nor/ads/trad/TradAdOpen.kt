@@ -8,7 +8,7 @@ import com.tradplus.ads.base.bean.TPAdInfo
 import com.tradplus.ads.base.bean.TPBaseAd
 import com.tradplus.ads.open.splash.SplashAdListener
 import com.tradplus.ads.open.splash.TPSplash
-import com.scanpro.cam.pdf.ads.SpAdSession
+import com.zppko.pdfplus.nor.tool.LifecycleUtil
 
 
 class TradAdOpen {
@@ -22,7 +22,7 @@ class TradAdOpen {
     var mTPAdInfo: TPAdInfo? = null
 
     fun initSplashAd(placementId: String?, call: TradLoadCallback): TPSplash {
-        val context: Context = CamPdfApp.get().applicationContext
+        val context: Context = CamPdfApp.app.applicationContext
         mLoadCallback = call
 
         val splashAd: TPSplash = TPSplash(context, placementId)
@@ -64,7 +64,7 @@ class TradAdOpen {
                 Util.eee { "$TAG onAdClicked: open, " + tpAdInfo?.adSourceName }
 //                this@SplashActivity.finish()
 
-                SpAdSession.markAdClicked()
+                LifecycleUtil.notLaunch()
                 mShowCallback?.onAdClicked()
             }
             override fun onAdClosed(tpAdInfo: TPAdInfo?) {

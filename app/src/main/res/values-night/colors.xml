@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ntf_title_color100">#FFFFFFFF</color>
+    <color name="ntf_content_color100">#FFDFDFdF</color>
+</resources>

@@ -16,7 +16,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.scanpro.cam.pdf.R
-import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamPdfReaderBinding
 import com.scanpro.cam.pdf.home.CamFileItem
@@ -36,7 +35,6 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         applyInsets()
-        SpPageAdTriggers.preloadMainBack(this)
         binding.btnBack.setOnClickListener { leaveWithBackAd() }
         onBackPressedDispatcher.addCallback(
             this,
@@ -120,9 +118,9 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
 
     private fun leaveWithBackAd() {
         if (isFinishing || isDestroyed) return
-        SpPageAdTriggers.showBackHomeIntThen(this) {
+//        SpPageAdTriggers.showBackHomeIntThen(this) {
             if (!isFinishing && !isDestroyed) finish()
-        }
+//        }
     }
 
     private fun applyInsets() {
