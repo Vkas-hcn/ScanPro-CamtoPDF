@@ -32,7 +32,7 @@ object Util {
     }
 
     fun toast(msg:String){
-        Toast.makeText(CamPdfApp.get(),msg, Toast.LENGTH_SHORT).show();
+        Toast.makeText(CamPdfApp.Companion.app,msg, Toast.LENGTH_SHORT).show();
     }
 
     fun dp2px(dp: Int): Int {
@@ -47,7 +47,7 @@ object Util {
     }
 
     fun str(res:Int): String {
-        return CamPdfApp.get().getString(res)
+        return CamPdfApp.Companion.app.getString(res)
     }
 
 //    fun openFile(mActivity: AppCompatActivity, bean: FileItem) {

@@ -1,42 +1,30 @@
 package com.zppko.pdfplus.nor.ads
 
-import android.app.Activity
-import android.content.Context
+
 import android.util.Log
+import android.widget.FrameLayout
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.util.AppLog
-// TradPlus 比价 SDK：查某 placement 的真实 eCPM（USD，两位小数）。
+import com.mymy.mymy.ads.poi.ADBlockReason
+import com.mymy.mymy.ads.poi.TrackAd
+import com.mymy.mymy.ads.poi.TrackBean
+import com.buncead.common.ui.BaseActivity
 import com.tp.compareprice.ComparePriceUtil.recursiveComparePrice
+
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
-import com.zppko.pdfplus.nor.ads.sett.AdsSetting
-import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
-import com.zppko.pdfplus.nor.ads.mob.OpenAdsLoad
 import com.zppko.pdfplus.nor.ads.mob.IntAdsLoad
 import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
-import com.zppko.pdfplus.nor.ads.tool.OmUtil
-import com.zppko.pdfplus.nor.ads.tool.UserParms
+import com.zppko.pdfplus.nor.ads.mob.OpenAdsLoad
+import com.zppko.pdfplus.nor.ads.sett.AdsSetting
+import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
+import com.zppko.pdfplus.nor.remote.DefaultConfigHelper
 import com.zppko.pdfplus.nor.remote.RemoteConfigHelper
+
 import org.json.JSONObject
 
 object ImpressionUtils {
 
     private val myPoolzzdd = mutableMapOf<String, BaseAdsLoad?>()
-
-    /** 池访问锁：保证「读池→判单飞→建 loader→写池→置 loading」原子，防止同一广告位被并发重复加载。 */
-    private val loadLock = Any()
-
-    /** TradPlus placement id → B 广告位名（供全局收益监听反查 pos_id）。 */
-    private val adIdToPlace = mutableMapOf<String, String>()
-    /** B 广告位名 → 配置 zType（op/int/nat/banner）。 */
-    private val placeToType = mutableMapOf<String, String>()
-
-    fun placeForAdId(adId: String?): String? =
-        adId?.takeIf { it.isNotBlank() }?.let { adIdToPlace[it] }
-
-    fun adTypeForPlace(place: String?): String? =
-        place?.takeIf { it.isNotBlank() }?.let { placeToType[it] }
     private fun convertBaseAds(setting: AdsSetting): BaseAdsLoad? {
         return when (setting.zType) {
             CodeKeyAndEvent.xxdx_TYPE_OPEN -> OpenAdsLoad(setting)
@@ -46,27 +34,30 @@ object ImpressionUtils {
         }
     }
 
-    // 迁移适配：解析 B 协议 ac_ad_config（ad_unit_id/ad_paltfrom/ad_type/ad_timelimit），
-    // 位表=B 的 17 位；weight 按数组顺序合成（保证 PDF26 失败降级链可用）。
     private fun loadAdsSettingList(data: String): MutableList<AdsSetting> {
-        val gameTags = SpAdPosition.ALL
+        val gameTags = arrayOf(
+            CodeKeyAndEvent.zx_PLACE_OPEN,
+            CodeKeyAndEvent.zx_PLACE_INTER_ClEAN,
+            CodeKeyAndEvent.zx_PLACE_INTER_SCAN,
+            CodeKeyAndEvent.zx_PLACE_INTER_DONE,
+            CodeKeyAndEvent.zx_PLACE_NATIVE_MAIN,
+//            CodeKeyAndEvent.zx_PLACE_NATIVE_SCAN,
+//            CodeKeyAndEvent.zx_PLACE_NATIVE_RESULT
+        )
         val gameList = mutableListOf<AdsSetting>()
         runCatching {
             val jsonObject = JSONObject(data)
             gameTags.forEach {
-                val jsonArray = jsonObject.optJSONArray(it) ?: return@forEach
+                val jsonArray = jsonObject.getJSONArray(it)
                 if (jsonArray.length() > 0) {
                     for (index in (0 until jsonArray.length())) {
-                        val gameJson = jsonArray.optJSONObject(index) ?: continue
-                        val unitId = gameJson.optString("ad_unit_id", "")
-                        val zType = gameJson.optString("ad_type", "")
-                        if (unitId.isEmpty() || zType.isEmpty()) continue
+                        val gameJson = jsonArray.getJSONObject(index)
                         val adsSetting = AdsSetting(
-                            unitId,
-                            gameJson.optString("ad_paltfrom", "admob"),
-                            zType,
-                            gameJson.optLong("ad_timelimit", 600L).let { if (it <= 0) 600L else it },
-                            jsonArray.length() - index,
+                            gameJson.getString("boxaxj"),
+                            gameJson.getString("opxmlf"),
+                            gameJson.getString("ujhscs"),
+                            gameJson.getLong("vksnx"),
+                            gameJson.optInt("gkqcx", 0),
                             it
                         )
                         gameList.add(adsSetting)
@@ -77,27 +68,18 @@ object ImpressionUtils {
         return gameList
     }
 
-    fun init(context: Context, finish: (() ->Unit)? = null) {
-        if (UserParms.isOm()) {
-            Log.e("spLog", "欧盟用户UMP")
-            OmUtil.start(context as Activity) {
-                finish?.invoke()
-            }
-        } else {
-            Log.e("spLog", "不是欧盟用户跳过UMP")
-            finish?.invoke()
-        }
-    }
-
 
     fun loadSuccess(place: String): Boolean {
         return (myPoolzzdd[place] != null && myPoolzzdd[place]?.zIsShowAds() == true)
     }
 
-    /** 开屏比价：取某位就绪广告的 eCPM（解析失败/未就绪返回 0.0）。 */
     fun getEcpm(place: String): Double {
         val unit = myPoolzzdd[place]
-        return if (unit != null && unit.zIsShowAds()) parseEcpm(unit.getEcpm()) else 0.0
+        val bool = unit != null && unit.zIsShowAds() == true
+        if (bool){
+           return parseEcpm(unit.getEcpm())
+        }
+        return 0.0
     }
 
     /**
@@ -117,40 +99,29 @@ object ImpressionUtils {
         }
     }
 
-    /** 只保留数字和小数点，解析成 Double；空/异常返回 0.0（照 SmartPdfScan_luow）。 */
-    fun parseEcpm(rawStr: String?): Double {
-        if (rawStr.isNullOrBlank()) return 0.0
-        val cleanedStr = rawStr.replace(Regex("[^0-9.]"), "")
-        return cleanedStr.toDoubleOrNull() ?: 0.0
-    }
-
-    fun show(act: Activity?, place: String, point:String, whenOnVisible:Boolean=true, finish: () -> Unit) {
+    fun show(act: BaseActivity?, place: String, point:String, container: FrameLayout, whenOnVisible:Boolean=true, finish: () -> Unit) {
         if (act == null) {
-            AppLog.ads.w("展示拦截 位置=$place 场景=$point 结果=拦截 原因=宿主Activity为空")
             finish.invoke()
             return
         }
         val unit = myPoolzzdd[place]
         if (loadSuccess(place)) {
-            AppLog.ads.i("展示 位置=$place 场景=$point 结果=取用缓存 补加载=true")
-            synchronized(loadLock) {
-                myPoolzzdd[place] = null
-                loadLocked(place)
-            }
-            unit?.zShoweee(act, point,whenOnVisible, finish)
+//            myPoolzzdd[place] = null
+//            load(place)
+            unit?.zShoweee(act, point,container,whenOnVisible, finish)
         } else {
-            AppLog.ads.w("展示拦截 位置=$place 场景=$point 结果=拦截 原因=池内没有就绪广告")
-            // 迁移适配：android.app.Activity 无 lifecycle 属性，宿主为 LifecycleOwner 时才走
-            // onResume 延迟回调；否则立即 finish。
-            val host = act as? LifecycleOwner
-            if (whenOnVisible && host != null){
+            unit?.setting?.let { setting ->
+                TrackAd.blocked(TrackBean.getTradBean(setting.zType,setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId),ADBlockReason.disabled)
+            }
+
+            if (whenOnVisible){
                 val observer = object : DefaultLifecycleObserver {
                     override fun onResume(owner: LifecycleOwner) {
-                        host.lifecycle.removeObserver(this)
+                        act.lifecycle.removeObserver(this)
                         finish.invoke()
                     }
                 }
-                host.lifecycle.addObserver(observer)
+                act.lifecycle.addObserver(observer)
             }else{
                 finish.invoke()
             }
@@ -159,70 +130,91 @@ object ImpressionUtils {
 
     fun getNewLoadConfig(place: String, weight: Int): AdsSetting? {
         val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
-        val list = loadAdsSettingList(data)
+        var list = loadAdsSettingList(data)
+        if (list.isEmpty()) {
+            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
+        }
         return list.filter { it.zPlace == place && it.zWeight < weight }.maxByOrNull { it.zWeight }
     }
 
-    // 回补（SmartPdfScan 原方法）：PDF26 无原生，B 原生渲染层靠它取已就绪的 NatAdsLoad。
+
     fun fireAnative(place: String): NatAdsLoad? {
         if (myPoolzzdd[place] != null && myPoolzzdd[place]?.zIsShowAds() == true) {
             val unit = myPoolzzdd[place]
-            return if (unit is NatAdsLoad) unit else null
+            return if (unit is NatAdsLoad){
+                unit
+            }
+            else
+                null
         }
         return null
     }
 
 
     fun load(place: String) {
-        synchronized(loadLock) { loadLocked(place) }
-    }
-
-    private fun loadLocked(place: String) {
         val unit = myPoolzzdd[place]
 
-        if (unit != null && !unit.canReloadAds()) {
-            if (unit.zIsLoading()) {
-                AppLog.ads.i("加载 位置=$place 结果=跳过 原因=正在加载中")
-            } else {
-                AppLog.ads.i(
-                    "缓存 位置=$place 结果=命中 剩余=${unit.zCacheLeftMs() / 1000}s " +
-                        "TTL=${unit.zCacheTtlMs() / 1000}s",
-                )
+        if (unit != null ) {
+//        if (unit != null && !unit.canReloadAds()) {
+            if (unit.zIsShowAds()){
+                Log.e("hhhh广告", "${place}: 有加载好的，不需要加载")
+            }else{
+                Log.e("hhhh广告", "${place}: 没有广告，需要加载")
+                unit.zLoadeee()
             }
             return
         }
-        if (unit != null && unit.zLoadedAt() > 0L) {
-            val ageSec = (System.currentTimeMillis() - unit.zLoadedAt()) / 1000
-            AppLog.ads.i(
-                "缓存 位置=$place 结果=过期 已缓存=${ageSec}s TTL=${unit.zCacheTtlMs() / 1000}s",
-            )
-        }
 
         val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
-        val list = loadAdsSettingList(data)
+        var list = loadAdsSettingList(data)
+        if (list.isEmpty()) {
+            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
+        }
+        Log.e("hhhh广告", "获取最新广告配置")
+        list.forEach {
+            Log.e("hhhh广告", "配置：${it}")
+        }
 
-        val config = list.sortedByDescending { it.zWeight }.find { it.zPlace == place }
-        if (config == null) {
-            AppLog.ads.w("加载拦截 位置=$place 结果=拦截 原因=配置里没有该广告位（已解析=${list.size} 条）")
-            return
+//        val config = list.sortedByDescending { it.zWeight }.find { it.zPlace == place }
+        val config = list.sortedByDescending { it.zWeight }.filter { !it.zId.isNullOrEmpty() }.find { it.zPlace == place }
+        if (config != null) {
+            myPoolzzdd[place] = convertBaseAds(config).apply { this?.zLoadeee() }
+        } else {
+            Log.e("hhhh广告", "找不到该广告位配置：${place}")
         }
-        adIdToPlace[config.zId] = place
-        placeToType[place] = config.zType
-        val loader = convertBaseAds(config)
-        if (loader == null) {
-            AppLog.ads.w("加载拦截 位置=$place 类型=${config.zType} 结果=拦截 原因=不支持的广告类型")
-            return
-        }
-        AppLog.ads.i(
-            "加载 位置=$place 厂商=${config.zFirm} 类型=${config.zType} " +
-                "id=${config.zId} 权重=${config.zWeight} 结果=排队",
-        )
-        myPoolzzdd[place] = loader
-        loader.zLoadeee()
     }
 
 
 
+    fun parseEcpm(rawStr: String?): Double {
+        if (rawStr.isNullOrBlank()) return 0.0
 
+        // 只保留数字 (0-9) 和小数点 (.)
+        val cleanedStr = rawStr.replace(Regex("[^0-9.]"), "")
+
+        return cleanedStr.toDoubleOrNull() ?: 0.0
+    }
 
 }
+
+
+/*
+fun parseEcpm(rawStr: String?): Double {
+    if (rawStr.isNullOrBlank()) return 0.0
+
+    // 只保留数字 (0-9) 和小数点 (.)
+    val cleanedStr = rawStr.replace(Regex("[^0-9.]"), "")
+
+    return cleanedStr.toDoubleOrNull() ?: 0.0
+}
+
+fun main() {
+    val s1 = "¥15.50"
+    val s2 = "$2.10"
+    val s3 = "1,234.50元"
+
+    println(parseEcpm(s1)) // 输出: 15.5
+    println(parseEcpm(s2)) // 输出: 2.1
+    println(parseEcpm(s3)) // 输出: 1234.5
+}
+ */

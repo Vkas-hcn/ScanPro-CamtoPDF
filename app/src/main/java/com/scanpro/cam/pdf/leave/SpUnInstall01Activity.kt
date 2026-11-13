@@ -6,10 +6,6 @@ import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import com.scanpro.cam.pdf.CamShellActivity
-import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivitySpUninstall01Binding
 
@@ -37,7 +33,6 @@ import com.scanpro.cam.pdf.databinding.ActivitySpUninstall01Binding
  */
 class SpUnInstall01Activity : SpActivity<ActivitySpUninstall01Binding>() {
 
-    private var nativeAdManager: SpNativeAdManager? = null
 
     override fun inflateBinding(inflater: LayoutInflater): ActivitySpUninstall01Binding {
         return ActivitySpUninstall01Binding.inflate(inflater)
@@ -51,36 +46,18 @@ class SpUnInstall01Activity : SpActivity<ActivitySpUninstall01Binding>() {
         binding.btnStay.setOnClickListener { toHome() }
         binding.btnUninstall.setOnClickListener { showInterstitialThenLeave() }
 
-        SpAdsHub.getOrNull()?.fullScreen(this)?.checkAndLoadAd(
-            position = SpAdPosition.AC_UNINSTALL1_INT,
-            scene = SpAdPosition.AC_UNINSTALL1_INT,
-        )
-        loadNativeAd()
+
     }
 
     override fun onDestroy() {
-        nativeAdManager?.release()
-        nativeAdManager = null
+
         super.onDestroy()
     }
 
-    /** Apollo `loadNativeAd()`：一个 manager 只建一次，位置 `ac_uninstall1_nat`，版式 small。 */
-    private fun loadNativeAd() {
-        if (nativeAdManager != null) return
-        val hub = SpAdsHub.getOrNull() ?: return
-        nativeAdManager = hub.native(this, binding.adLayout).also {
-            it.checkLoadAndShowAd(SpAdPosition.AC_UNINSTALL1_NAT, SpNativeAdStyle.small)
-        }
-    }
 
     /** Apollo：`showInterstitialAdNoWait(ac_uninstall1_int) { toUninstall() }`。 */
     private fun showInterstitialThenLeave() {
-        val manager = SpAdsHub.getOrNull()?.fullScreen(this)
-        if (manager == null) {
-            toUninstall()
-            return
-        }
-        manager.showInterstitialAdNoWait(SpAdPosition.AC_UNINSTALL1_INT) { toUninstall() }
+        toUninstall()
     }
 
     /** Apollo `toUninstall()`：进第 2 步，自己结束。 */

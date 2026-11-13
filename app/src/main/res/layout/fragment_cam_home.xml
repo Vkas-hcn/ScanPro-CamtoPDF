@@ -211,16 +211,22 @@
             </LinearLayout>
         </LinearLayout>
     </HorizontalScrollView>
-
+    <FrameLayout
+        app:layout_constraintTop_toBottomOf="@+id/file_type_scroll"
+        android:id="@+id/fl_nati"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginHorizontal="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
     <FrameLayout
         android:id="@+id/content_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/file_type_scroll">
+        app:layout_constraintTop_toBottomOf="@id/fl_nati">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rv_files"
@@ -258,54 +264,64 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <LinearLayout
+        <!-- 权限引导：文案/按钮在最上面，插画放到下面。
+             外层可滚动 + fillViewport：空间被原生广告压缩时先保证文案和按钮可见，插画可滑出来。 -->
+        <androidx.core.widget.NestedScrollView
             android:id="@+id/permission_state"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:paddingHorizontal="32dp"
-            android:paddingTop="24dp"
+            android:fillViewport="true"
+            android:scrollbars="none"
             android:visibility="gone"
             tools:visibility="gone">
 
-            <ImageView
-                android:layout_width="@dimen/home_permission_illustration"
-                android:layout_height="@dimen/home_permission_illustration"
-                android:contentDescription="@string/home_permission_title"
-                android:src="@drawable/ic_permission" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/home_permission_title"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:gravity="center"
-                android:lineSpacingExtra="2dp"
-                android:text="@string/home_permission_desc"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:orientation="vertical"
+                android:paddingHorizontal="32dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="24dp">
 
-            <TextView
-                android:id="@+id/btn_grant_permission"
-                android:layout_width="200dp"
-                android:layout_height="48dp"
-                android:layout_marginTop="20dp"
-                android:background="@drawable/cam_btn_primary"
-                android:gravity="center"
-                android:text="@string/home_permission_action"
-                android:textColor="@color/white"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/home_permission_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="2dp"
+                    android:text="@string/home_permission_desc"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/btn_grant_permission"
+                    android:layout_width="200dp"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/cam_btn_primary"
+                    android:gravity="center"
+                    android:text="@string/home_permission_action"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:layout_width="@dimen/home_permission_illustration"
+                    android:layout_height="@dimen/home_permission_illustration"
+                    android:layout_marginTop="24dp"
+                    android:contentDescription="@string/home_permission_title"
+                    android:src="@drawable/ic_permission" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

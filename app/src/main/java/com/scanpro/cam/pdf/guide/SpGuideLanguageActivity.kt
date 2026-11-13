@@ -15,12 +15,7 @@ import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.scanpro.cam.pdf.R
-import com.scanpro.cam.pdf.ads.SpAdMobInit
-import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.ads.SpBlockingLogic
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
+
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivitySpGuideLanguageBinding
 import com.scanpro.cam.pdf.databinding.ItemCamLanguageBinding
@@ -50,7 +45,6 @@ class SpGuideLanguageActivity : SpActivity<ActivitySpGuideLanguageBinding>() {
         CamLanguageOption("ru", R.string.language_russian),
     )
 
-    private var nativeAdManager: SpNativeAdManager? = null
     private var timer: CountDownTimer? = null
     private var jumped = false
 
@@ -74,14 +68,10 @@ class SpGuideLanguageActivity : SpActivity<ActivitySpGuideLanguageBinding>() {
         binding.rvLanguages.adapter = adapter
         binding.tvNext.setOnClickListener { onNextClicked() }
 
-        SpAdsHub.getOrNull()?.fullScreen(this)?.checkAndLoadAd(
-            position = SpAdPosition.AC_LANGUAGE_INT,
-            scene = SpAdPosition.AC_LANGUAGE_INT,
-        )
-        loadNativeAd()
-        if (isStartTimer(SpAdPosition.AC_LANGUAGE_NAT)) {
+
+//        if (isStartTimer(SpAdPosition.AC_LANGUAGE_NAT)) {
             startNextCountdown()
-        }
+//        }
     }
 
     override fun onStop() {
@@ -91,19 +81,9 @@ class SpGuideLanguageActivity : SpActivity<ActivitySpGuideLanguageBinding>() {
 
     override fun onDestroy() {
         cancelTimer()
-        nativeAdManager?.release()
-        nativeAdManager = null
         super.onDestroy()
     }
 
-    private fun loadNativeAd() {
-        if (nativeAdManager != null) return
-        binding.adLayout.visibility = View.GONE
-        val hub = SpAdsHub.getOrNull() ?: return
-        nativeAdManager = hub.native(this, binding.adLayout).also {
-            it.checkLoadAndShowAd(SpAdPosition.AC_LANGUAGE_NAT, SpNativeAdStyle.small)
-        }
-    }
 
     private fun onNextClicked() {
         cancelTimer()
@@ -111,12 +91,7 @@ class SpGuideLanguageActivity : SpActivity<ActivitySpGuideLanguageBinding>() {
     }
 
     private fun showLanguageIntThenJump() {
-        val manager = SpAdsHub.getOrNull()?.fullScreen(this)
-        if (manager == null) {
-            jumpPage()
-            return
-        }
-        manager.showInterstitialAdNoWait(SpAdPosition.AC_LANGUAGE_INT) { jumpPage() }
+        jumpPage()
     }
 
     private fun jumpPage() {
@@ -130,17 +105,17 @@ class SpGuideLanguageActivity : SpActivity<ActivitySpGuideLanguageBinding>() {
         finish()
     }
 
-    /**
-     * Apollo `isStartTimer(ac_language_nat)`：SDK 已初始化且总闸放行才开 5 秒倒计时。
-     */
-    private fun isStartTimer(position: String): Boolean {
-        if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) return false
-        val blocking = SpBlockingLogic.get(this)
-        return !blocking.isShowPartialAdsOnly(position) &&
-            !blocking.isVPNBlock() &&
-            blocking.canShowAdByShowCountLimit() &&
-            blocking.canShowAllAd()
-    }
+//    /**
+//     * Apollo `isStartTimer(ac_language_nat)`：SDK 已初始化且总闸放行才开 5 秒倒计时。
+//     */
+//    private fun isStartTimer(position: String): Boolean {
+//        if (SpAdMobInit.getOrNull()?.isMobileAdsInitialize() != true) return false
+//        val blocking = SpBlockingLogic.get(this)
+//        return !blocking.isShowPartialAdsOnly(position) &&
+//            !blocking.isVPNBlock() &&
+//            blocking.canShowAdByShowCountLimit() &&
+//            blocking.canShowAllAd()
+//    }
 
     private fun startNextCountdown() {
         cancelTimer()

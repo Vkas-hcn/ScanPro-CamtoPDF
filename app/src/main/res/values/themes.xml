@@ -2,7 +2,6 @@
 <resources>
     <style name="Base.Theme.CamPdf" parent="Theme.Material3.Light.NoActionBar">
         <!-- Avoid black/dark flash when Activities recreate on locale change -->
-        <item name="android:windowBackground">@drawable/bg</item>
         <item name="android:windowAnimationStyle">@style/CamWindow.NoFlash</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
@@ -23,8 +22,4 @@
         <item name="android:windowAnimationStyle">@null</item>
     </style>
 
-    <style name="SpRateSheetAnimation">
-        <item name="android:windowEnterAnimation">@anim/slide_in_bottom</item>
-        <item name="android:windowExitAnimation">@anim/slide_out_bottom</item>
-    </style>
 </resources>

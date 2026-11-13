@@ -88,9 +88,7 @@
     native <methods>;
 }
 
--keep class com.scanpro.cam.pdf.ads.SpAdInfo { *; }
--keep class com.scanpro.cam.pdf.ads.SpAdConfig { *; }
--keep class com.scanpro.cam.pdf.ads.SpNatConfig { *; }
+
 -keep class com.scanpro.cam.pdf.notice.SpNewConfig { *; }
 -keep class com.scanpro.cam.pdf.notice.SpAcPopConfig { *; }
 -keep class com.scanpro.cam.pdf.notice.SpPopRefresh { *; }

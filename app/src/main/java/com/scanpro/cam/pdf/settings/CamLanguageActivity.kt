@@ -13,7 +13,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.scanpro.cam.pdf.R
-import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamLanguageBinding
 import com.scanpro.cam.pdf.databinding.ItemCamLanguageBinding
@@ -44,7 +43,6 @@ class CamLanguageActivity : SpActivity<ActivityCamLanguageBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         applyInsets()
-        SpPageAdTriggers.preloadMainBack(this)
         binding.btnBack.setOnClickListener { leaveWithBackAd() }
         onBackPressedDispatcher.addCallback(
             this,
@@ -73,7 +71,7 @@ class CamLanguageActivity : SpActivity<ActivityCamLanguageBinding>() {
 
     private fun leaveWithBackAd() {
         if (isFinishing || isDestroyed) return
-        SpPageAdTriggers.showBackHomeIntThen(this) { finishWithResult() }
+//        SpPageAdTriggers.showBackHomeIntThen(this) { finishWithResult() }
     }
 
     private fun finishWithResult() {

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:focusable="true"
+    android:clickable="true"
+    android:layout_height="match_parent"    android:background="@color/white">
+
+    <LinearLayout
+        android:layout_gravity="center_vertical"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <ImageView
+            android:id="@+id/icon"
+            android:layout_width="wrap_content"
+            android:src="@drawable/ic_scan_big"
+            android:layout_height="wrap_content"/>
+
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:layout_width="wrap_content"
+            app:indicatorColor="#FF2563EB"
+            android:progress="55"
+            android:indeterminate="true"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="18dp"
+            app:trackThickness="4dp"
+            app:trackCornerRadius="4dp"
+            app:indicatorInset="0dp"
+            app:indicatorSize="56dp"
+            android:layout_height="wrap_content"/>
+
+        <TextView
+            android:text="@string/op_file_hiti"
+            android:textColor="#FF080C1B"
+            android:id="@+id/content"
+            android:textSize="16sp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <TextView
+            android:text="@string/ad_loading"
+            android:textColor="#FF828797"
+            android:textSize="12sp"
+            android:layout_marginTop="18dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+</FrameLayout>

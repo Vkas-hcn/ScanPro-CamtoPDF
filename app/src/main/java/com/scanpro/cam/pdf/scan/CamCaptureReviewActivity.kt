@@ -16,7 +16,6 @@ import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.data.CamImageToPdf
 import com.scanpro.cam.pdf.databinding.ActivityCamCaptureReviewBinding
 import com.scanpro.cam.pdf.databinding.ItemCamCapturePageBinding
-import com.scanpro.cam.pdf.rate.SpRateFlow
 import com.scanpro.cam.pdf.analytics.SpTracker
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -96,14 +95,6 @@ class CamCaptureReviewActivity : SpActivity<ActivityCamCaptureReviewBinding>() {
                 SpTracker.log(this@CamCaptureReviewActivity, SpTracker.CONVERT_SUCCESS)
                 Toast.makeText(this@CamCaptureReviewActivity, R.string.scan_saved, Toast.LENGTH_SHORT).show()
                 CamCaptureSession.clear()
-                setResult(RESULT_OK)
-                val shown = SpRateFlow.tryPromptAfterPdfSave(
-                    activity = this@CamCaptureReviewActivity,
-                    onDismissed = { finish() },
-                )
-                if (!shown) {
-                    finish()
-                }
             }.onFailure {
                 Toast.makeText(this@CamCaptureReviewActivity, R.string.scan_save_failed, Toast.LENGTH_SHORT).show()
             }

@@ -12,9 +12,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
-import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.ads.SpPageAdTriggers
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
+import com.buncead.common.ui.ExcActivity
+import com.buncead.common.util.PermNotifyUtil
+import com.mymy.mymy.review.ReviewUtil
+
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.made.CamMadeFragment
 import com.scanpro.cam.pdf.databinding.ActivityCamShellBinding
@@ -22,9 +23,7 @@ import com.scanpro.cam.pdf.home.CamHomeFragment
 import com.scanpro.cam.pdf.home.FileType
 import com.scanpro.cam.pdf.notice.SpNotificationEntry
 import com.scanpro.cam.pdf.notice.SpNotifyExtras
-import com.scanpro.cam.pdf.notice.SpNotifyPermissionFlow
 import com.scanpro.cam.pdf.main.CamStubFragment
-import com.scanpro.cam.pdf.rate.SpPlayReview
 import com.scanpro.cam.pdf.recent.CamRecentFragment
 import com.scanpro.cam.pdf.scan.CamCaptureActivity
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
@@ -38,10 +37,12 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     private var currentTab = Tab.HOME
     private var pendingNotificationFileType: FileType? = null
     private var appliedLocaleGeneration = SpLocale.generation
-    private var mainNativeAdManager: SpNativeAdManager? = null
+
+    /** 评价流程是否正在展示，以及上一次流程结束的时间（防止弹框自身触发的 onResume 反复请求）。 */
+    private var reviewFlowActive = false
+    private var lastReviewFinishedAtMs = 0L
 
     /** 第二处通知权限申请（对齐 luow：启动页问过一次后，主界面再问一次并做二次引导）。 */
-    private var notifyPermissionFlow: SpNotifyPermissionFlow? = null
 
     override fun inflateBinding(inflater: LayoutInflater): ActivityCamShellBinding {
         return ActivityCamShellBinding.inflate(inflater)
@@ -52,14 +53,10 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         applyShellNavInset()
         binding.tabHome.setOnClickListener { onBottomTabClicked(Tab.HOME) }
         binding.tabScan.setOnClickListener {
-            SpPageAdTriggers.showFileIntThen(this) { CamCaptureActivity.start(this) }
+            startActivity(Intent(this, ExcActivity::class.java))
         }
         binding.tabRecent.setOnClickListener { onBottomTabClicked(Tab.RECENT) }
         binding.tabMade.setOnClickListener { onBottomTabClicked(Tab.CREATION) }
-
-        notifyPermissionFlow = SpNotifyPermissionFlow(this, showGuide = true) {
-            // 授权结果由流程内部处理（已授权时补点前台服务）；这里没有额外后续动作。
-        }
 
         if (savedInstanceState == null) {
             if (!handleNotificationRoute(intent)) switchShellTab(Tab.HOME)
@@ -68,9 +65,8 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             currentTab = Tab.entries[savedInstanceState.getInt(KEY_TAB, 0)]
             refreshTabChrome(currentTab)
         }
-        loadHomeAds()
-        // 通知权限：启动页问过一次，这里再问一次；系统框还能弹就继续弹系统框，弹不出来才走自定义引导。
-        notifyPermissionFlow?.checkAndRequest()
+
+        PermNotifyUtil.check2requestNotificationPermission(mActivity, { })
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -79,7 +75,15 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
         handleNotificationRoute(intent)
         maybeOpenLeaveFlow(intent)
     }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        PermNotifyUtil.onRequestPermissionsResult(requestCode, permissions, grantResults, this, { })
+    }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        PermNotifyUtil.onActivityResult(requestCode,resultCode,data,this,{ })
+    }
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(KEY_TAB, currentTab.ordinal)
@@ -96,11 +100,11 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             "b_scan" -> {
                 switchShellTab(Tab.HOME)
                 binding.root.post {
-                    if (!isFinishing && !isDestroyed) {
-                        SpPageAdTriggers.showFileIntThen(this) {
-                            if (!isFinishing && !isDestroyed) CamCaptureActivity.start(this)
-                        }
-                    }
+//                    if (!isFinishing && !isDestroyed) {
+//                        SpPageAdTriggers.showFileIntThen(this) {
+//                            if (!isFinishing && !isDestroyed) CamCaptureActivity.start(this)
+//                        }
+//                    }
                 }
             }
             "b_home" -> switchShellTab(Tab.HOME)
@@ -146,27 +150,25 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             return
         }
         if (currentTab == Tab.HOME) {
-            // 首页直接走 Google Play 应用内评价，不再弹自定义评价框。
-            binding.root.post {
-                if (!isFinishing && !isDestroyed) {
-                    SpPlayReview.launch(this, fallbackToStore = false)
-                }
-            }
+            // 每次进入首页直接调 Google Play 应用内评价，是否弹出由 Play 的配额决定。
+            maybeRequestReview()
         }
     }
 
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        notifyPermissionFlow?.onWindowFocusChanged(hasFocus)
+    private fun maybeRequestReview() {
+        if (reviewFlowActive) return
+        // 评价弹框关闭会立刻回 onResume，2 秒内不重复请求，避免自己把自己再拉起来。
+        if (System.currentTimeMillis() - lastReviewFinishedAtMs < 2_000L) return
+        reviewFlowActive = true
+        ReviewUtil().checkReview(this) {
+            reviewFlowActive = false
+            lastReviewFinishedAtMs = System.currentTimeMillis()
+        }
     }
 
-    override fun onDestroy() {
-        notifyPermissionFlow?.dismiss()
-        notifyPermissionFlow = null
-        mainNativeAdManager?.release()
-        mainNativeAdManager = null
-        super.onDestroy()
-    }
+
+
+
 
     private fun applyShellNavInset() {
         val nav = binding.shellNav
@@ -182,14 +184,9 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     private fun onBottomTabClicked(tab: Tab) {
         if (currentTab == tab) return
         switchShellTab(tab)
-        SpPageAdTriggers.checkLoadAdByTab(this, SpAdPosition.AC_FILE_INT)
     }
 
-    private fun loadHomeAds() {
-        if (mainNativeAdManager == null) {
-            mainNativeAdManager = SpPageAdTriggers.bindMainNative(this, binding.nativeAdLayout)
-        }
-    }
+
 
     private fun switchShellTab(tab: Tab) {
         currentTab = tab

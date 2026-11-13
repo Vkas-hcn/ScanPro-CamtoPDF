@@ -1,9 +1,35 @@
+import com.github.megatronking.stringfog.plugin.StringFogExtension
+
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
 }
 
+// ---- StringFog 字符串加密（照 SmartPdfScan_luow app/build.gradle，转为 Kotlin DSL）----
+apply(plugin = "stringfog")
+
+configure<StringFogExtension> {
+    // 加解密实现类（与根 build.gradle.kts 的 xor classpath 一致）
+    implementation = "com.github.megatronking.stringfog.xor.StringFogImpl"
+    // 生成的 StringFog 辅助类所在包名
+    packageName = "com.github.megatronking.stringfog.app"
+    // 加密开关
+    enable = true
+    // 需要加密的包（本项目 com.scanpro.cam.pdf）
+    fogPackages = arrayOf(
+        "com.bockcock.adjust",
+        "com.buncead.common.util",
+        "com.mymy.mymy",
+        "com.scanpro.cam.pdf",
+        "com.zppko.pdfplus.nor",
+    )
+    // 随机密钥生成器
+    kg = com.github.megatronking.stringfog.plugin.kg.RandomKeyGenerator()
+    // bytes 模式
+    mode = com.github.megatronking.stringfog.plugin.StringFogMode.bytes
+}
 android {
     namespace = "com.scanpro.cam.pdf"
     compileSdk {
@@ -36,7 +62,7 @@ android {
             signingConfig = signingConfigs.getByName("common")
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("boolean", "USE_TEST_ADS", "false")
+            buildConfigField("Boolean", "IS_BUNDLE", "true")
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3840731205415196~4572255037"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -46,13 +72,16 @@ android {
         debug {
             signingConfig = signingConfigs.getByName("common")
             isMinifyEnabled = false
-            buildConfigField("boolean", "USE_TEST_ADS", "true")
+            buildConfigField("Boolean", "IS_BUNDLE", "false")
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
     }
     buildFeatures {
         viewBinding = true
@@ -93,6 +122,9 @@ dependencies {
     implementation(libs.firebase.config)
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
+
+    // StringFog 运行时解密库（与插件配置的加解密算法一致）
+    implementation("com.github.megatronking.stringfog:xor:5.0.0")
 
     implementation("com.flux.tracksdk:tracksdk:3.0.3")
     implementation("com.adjust.sdk:adjust-android:5.6.1")

@@ -12,8 +12,9 @@
   1. 本文件（`src/debug/res/xml` 与 `src/release/res/xml` 各一份，release 的 targetPackage 是 com.scanpro.cam.pdf）；
   2. `SpLeaveEntry.ENABLED`。
 
-  debug 的 applicationId 被 `androidComponents` 改成 com.test.lwapp，所以这里的 targetPackage 跟着改，
-  否则装机后点快捷方式会报「应用不存在」。
+  debug 的 applicationId 被 `androidComponents` 改成 com.npro.mac.fdp.debug，所以这里的 targetPackage 跟着改，
+  否则装机后点快捷方式会报「应用不存在」。targetClass 必须与 release 一致指向中转页：
+  指向开屏会绕过 `SpLeaveEntry.isLeaveLaunch` 的 action 判定，开屏结束后不会进挽留页。
 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut

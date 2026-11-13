@@ -20,8 +20,7 @@ object KvUtil {
 
     private fun getPrefs(): SharedPreferences {
         if (!::prefs.isInitialized) {
-            // 迁移适配：PdfApp.app → CamPdfApp.get()
-            prefs = CamPdfApp.get().applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs = CamPdfApp.app.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         }
         return prefs
     }

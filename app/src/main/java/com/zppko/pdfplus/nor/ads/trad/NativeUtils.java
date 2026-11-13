@@ -3,7 +3,8 @@ package com.zppko.pdfplus.nor.ads.trad;
 import android.text.TextUtils;
 import android.view.ViewGroup;
 
-import com.tradplus.ads.open.R;
+
+import com.scanpro.cam.pdf.R;
 import com.tradplus.ads.open.nativead.TPNative;
 import com.tradplus.ads.open.nativead.TPNativeBanner;
 

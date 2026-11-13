@@ -29,7 +29,6 @@ object SpUtil {
     }
 
     // 获取数据
-    @Suppress("UNCHECKED_CAST")
     fun <T> get(key: String, defaultValue: T): T {
         return when (defaultValue) {
             is String -> sharedPreferences.getString(key, defaultValue) as T

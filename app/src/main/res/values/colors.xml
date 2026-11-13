@@ -26,4 +26,7 @@
     <color name="sp_notify_text">#FF333333</color>
     <color name="sp_notify_text_night">#FFECECEC</color>
     <color name="sp_notify_btn">#FFFF9800</color>
+
+    <color name="ntf_title_color100">#FF111111</color>
+    <color name="ntf_content_color100">#FF666666</color>
 </resources>

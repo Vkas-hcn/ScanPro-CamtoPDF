@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/container"
+    android:background="@drawable/cam_dialog_card"
+    android:backgroundTint="#fff"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_height="wrap_content">
+        <ImageView
+            android:layout_width="wrap_content"
+            android:id="@+id/image"
+            android:src="@drawable/ic_permission"
+            android:layout_height="wrap_content"/>
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:textColor="#000"
+        android:layout_marginTop="12dp"
+        android:layout_marginHorizontal="24dp"
+        android:id="@+id/title"
+        android:layout_gravity="center_horizontal"
+        android:textSize="18sp"
+        tools:text="@string/perm_req_ntf_title"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:layout_marginTop="12dp"
+        android:layout_width="wrap_content"
+        android:textColor="#FF999999"
+        android:gravity="center_horizontal"
+        android:textSize="14sp"
+        android:id="@+id/content"
+        tools:text="@string/perm_req_ntf_msg"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginHorizontal="21dp"
+        android:layout_height="wrap_content"/>
+
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="19dp"
+        android:id="@+id/ok"
+        android:layout_gravity="bottom"
+        android:layout_marginHorizontal="20dp"
+        android:background="@drawable/ntf_btn_green"
+        android:text="@string/allow"
+        android:textColor="#fff"
+        android:textSize="16sp" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:layout_marginBottom="12dp"
+        android:layout_marginTop="8dp"
+        android:layout_width="wrap_content"
+        android:textColor="#FF999999"
+        android:textSize="14sp"
+        android:background="?attr/selectableItemBackground"
+        android:id="@+id/close"
+        android:text="@string/close"
+        android:layout_gravity="center_horizontal"
+        android:layout_height="36dp"/>
+
+</LinearLayout>

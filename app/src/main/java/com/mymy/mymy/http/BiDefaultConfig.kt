@@ -1,0 +1,134 @@
+package com.mymy.mymy.http
+
+class BiDefaultConfig {
+
+    // 字段含义、单位与运营调参说明见：docs/本机下发配置-字段说明.md
+
+    /*
+        ,
+    "ffsws":1,
+    "pcjcs":[
+      "adjust",
+      "gclid",
+      "gbraid",
+      "dclid",
+      "facebook",
+      "instagram",
+      "meta",
+      "meta_ads",
+      "ig",
+      "fb",
+      "tiktok",
+      "bytedance",
+      "mtg",
+      "mintegral"
+    ]
+     */
+    val defaultConfig = """
+{
+  "pps_refer_data":{
+    "op_min_wt":200,
+    "op_max_wt":15000,
+    "op_day_sh":60,
+    "op_day_cli":60,
+    "op_gap":1000,
+    
+    "int_min_wt":200,
+    "int_max_wt":8000,
+    "int_day_sh":60,
+    "int_day_cli":60,
+    "int_gap":1000,
+    
+    "nat_day_sh":110,
+    "nat_day_cli":60,
+    "nat_gap":1000,
+    
+    "int_op_c":3,
+    "fb_id":"",
+    "fb_tk":"",
+    "bslcl":0,
+    "op_just_usr":0,
+    "volxo":"0"
+
+
+  },
+  "pps_ad_data":{
+    "cuu_launch":[
+      {
+        "boxaxj":"D9118E91DD06DF6D322369455CAED618",
+        "opxmlf":"tradplus",
+        "ujhscs":"op",
+        "vksnx":13800,
+        "gkqcx":3
+      }
+    ],
+    "co_scan_int":[
+      {
+        "boxaxj":"E609A0A67AF53299F2176C3A7783C46D",
+        "opxmlf":"tradplus",
+        "ujhscs":"int",
+        "vksnx":3000,
+        "gkqcx":3
+      }
+    ],
+    "co_done_int":[
+      {
+        "boxaxj":"",
+        "opxmlf":"tradplus",
+        "ujhscs":"int",
+        "vksnx":3000,
+        "gkqcx":3
+      }
+    ],
+    "co_result_int":[
+      {
+        "boxaxj":"E609A0A67AF53299F2176C3A7783C46D",
+        "opxmlf":"tradplus",
+        "ujhscs":"int",
+        "vksnx":3000,
+        "gkqcx":3
+      }
+    ],
+    "co_main_nat":[
+      {
+        "boxaxj":"DDBF26FBDA47FBE2765F1A089F1356BF",
+        "opxmlf":"tradplus",
+        "ujhscs":"nat",
+        "vksnx":3000,
+        "gkqcx":3
+      }
+    ]
+  },
+  "comm_pop_data":{
+    "no_ntf_begin":23,
+    "no_ntf_end":6,
+    "bbc_open":1,
+    "bbc_tb_gap":15,
+    "bbc_tb_max":80,
+    "bbc_pu_gap":0,
+    "bbc_pu_max":80,
+    "bbc_sa_gap":15,
+    "bbc_sa_max":80,
+    "is_voice":0,
+    "rp_count":0,
+    "rp_voice_ct":1,
+    "delay_tm":0
+  },
+  "sams_pop_data":{
+    "no_ntf_begin":23,
+    "no_ntf_end":6,
+    "bbc_open":1,
+    "bbc_tb_gap":20,
+    "bbc_tb_max":60,
+    "bbc_pu_gap":0,
+    "bbc_pu_max":60,
+    "bbc_sa_gap":20,
+    "bbc_sa_max":60,
+    "is_voice":0,
+    "rp_count":0,
+    "rp_voice_ct":1,
+    "delay_tm":0
+  }
+}
+    """.trimIndent()
+}

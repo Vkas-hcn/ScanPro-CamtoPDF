@@ -1,12 +1,11 @@
 package com.zppko.pdfplus.nor.remote
 
-import android.content.Context
 import android.os.Build
-import com.adjust.sdk.AdjustConfig
+import com.bockcock.adjust.AdJustAttribute
+import com.bockcock.adjust.ConfigBean
 import com.buncead.common.util.Util
-import com.scanpro.cam.pdf.BuildConfig
-import com.scanpro.cam.pdf.config.SpConfigStore
-import com.zppko.pdfplus.nor.Zppkoo
+import com.zppko.pdfplus.nor.ads.tool.SpUtil
+import com.zppko.pdfplus.nor.ads.tool.UserReferrer
 import com.zppko.pdfplus.nor.tool.MKV
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,10 +13,12 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import kotlin.text.contains
 
 object ConfigHelper {
 
-    val TAG = "RemoteConfigHelper"
+val TAG = "RemoteConfigHelper"
+
 
     private val sp_emm="gdf533a"
     fun isEmulatorBySystem() {
@@ -34,10 +35,11 @@ object ConfigHelper {
         }
     }
 
-    // bi 下发用。B 的 isAcquiredUser 替代 A ConfigBean.volxo；不是 B 通知总闸。
+
+    // bi 下发用
     private fun canShowOnRemote(): Boolean {
-        val payload = RemoteConfigHelper.currentPayload()
-        if (SpConfigStore().dispatchMeta(payload).isAcquiredUser){
+        //为0非买量用户。为1买量用户
+        if (ConfigBean.volxo == 1){
             Util.iii { "$TAG refer 买量用户" }
             return true
         }
@@ -105,11 +107,11 @@ object ConfigHelper {
     fun canShowAdsss_a2(): Boolean {
         // 0 开启(默认开启)，1关闭
         if (isOpAdjustCheck()){
-            if (canShowOnRemote() && isAdjustMuser() && !notCanShowOnDevice()){
+            if (canShowOnRemote()&& AdJustAttribute.isAdjustMuser()&& !notCanShowOnDevice()){
                 return true
             }
         }else{
-            if (canShowOnRemote() && !notCanShowOnDevice()){
+            if (canShowOnRemote()&& !notCanShowOnDevice()){
                 return true
             }
         }
@@ -122,55 +124,18 @@ object ConfigHelper {
             val jsonObject = JSONObject(data)
             val show = jsonObject.getInt("op_just_usr")
             // 0 开启(默认开启)，1关闭
+
             if (show ==0){
+//                Util.iii { "启用adjust 买量判断" }
                 return true
             }else{
+//                Util.iii { "不启用adjust 买量判断" }
                 return false
             }
         }
+//        Util.iii { "启动adjust 买量判断" }
         return true
     }
 
-    // A AdJustAttribute 的持久化资格状态；绝不把 dispatch 买量当作 Adjust 回调。
-    private const val SG_ADJUST_MUSER = 56216
-    private const val KEY_ADJUST_MUSER_INFO = "h4s65gdf53cv2"
-    private const val KEY_CHECK_NATURE_COUNT = "g4rf65gdfg23"
 
-    private val adjustPrefs by lazy {
-        // A KvUtil's original namespace/keys, without introducing another SDK/helper instance.
-        Zppkoo.ii.getSharedPreferences("pdf_ad_save", Context.MODE_PRIVATE)
-    }
-
-    fun isAdjustMuser(): Boolean = adjustPrefs.getInt(KEY_ADJUST_MUSER_INFO, 0) == SG_ADJUST_MUSER
-
-    /** Optional wiring on B's EXISTING AdjustConfig, before its one Adjust.initSdk call. */
-    fun userTypeListener(config: AdjustConfig) {
-        if (isAdjustMuser()) return
-        val count = adjustPrefs.getInt(KEY_CHECK_NATURE_COUNT, 0)
-        if (count > 5) return
-        config.setOnAttributionChangedListener { attribution ->
-            // Preserve A's captured registration-time count, not a new per-callback counter.
-            applyAdjustAttribution(attribution?.network, count)
-        }
-    }
-
-    /** Alternative forwarding entry for B's real callback; does not register/init an SDK. */
-    fun onAdjustAttributionChanged(network: String?) {
-        if (isAdjustMuser()) return
-        val count = adjustPrefs.getInt(KEY_CHECK_NATURE_COUNT, 0)
-        if (count > 5) return
-        applyAdjustAttribution(network, count)
-    }
-
-    private fun applyAdjustAttribution(network: String?, count: Int) {
-        if (network == null) return
-        // Preserve A's non-bundle test suffix; B DEBUG substitutes for A IS_BUNDLE.
-        val usrInfo = network.lowercase() + if (BuildConfig.DEBUG) "aaa" else ""
-        if ("organic" == usrInfo) {
-            adjustPrefs.edit().putInt(KEY_CHECK_NATURE_COUNT, count + 1).apply()
-        } else {
-            adjustPrefs.edit().putInt(KEY_ADJUST_MUSER_INFO, SG_ADJUST_MUSER).apply()
-            RemoteConfigHelper.onEligibilityChanged()
-        }
-    }
 }

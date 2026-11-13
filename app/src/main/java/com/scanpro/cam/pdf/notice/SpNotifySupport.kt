@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
-import com.scanpro.cam.pdf.ads.SpAdsHub
 import kotlin.random.Random
 
 /**
@@ -16,31 +15,7 @@ import kotlin.random.Random
  *   `getRandomCode` / `isToday`
  * - `notice/launcher_scene/SendManager.java` 的 `wakeScreen`
  */
-internal object SpNotifyEnv {
 
-    private const val TAG = "SpNotifyEnv"
-
-    val newConfig: SpNewConfig
-        get() = SpAdsHub.getOrNull()?.newConfigOf() ?: SpNewConfig()
-
-    val acPopConfig: SpAcPopConfig
-        get() = SpAdsHub.getOrNull()?.acPopConfigOf() ?: SpAcPopConfig()
-
-    val popRefresh: SpPopRefresh
-        get() = SpAdsHub.getOrNull()?.popRefreshOf() ?: SpPopRefresh()
-
-    val mediaConfig: SpMediaConfig
-        get() = SpAdsHub.getOrNull()?.mediaConfigOf() ?: SpMediaConfig()
-
-    /**
-     * Apollo 每个触发器开头都有 `if (remoteConfig.newConfig == null) return`：
-     * 远端配置没回来之前不发通知。这里用 [SpAdsHub.hasRemotePayload] 表达同一件事。
-     */
-    val hasRemoteConfig: Boolean
-        get() = SpAdsHub.getOrNull()?.hasRemotePayload() == true
-
-    fun isForeground(): Boolean = SpAdsHub.getOrNull()?.isForeground() == true
-}
 
 /** 通知权限与「这条通知还在不在状态栏」。 */
 internal object SpNotifyPermit {
@@ -93,7 +68,7 @@ internal object SpNotifyUtils {
         val now = java.util.Calendar.getInstance()
         val then = java.util.Calendar.getInstance().apply { timeInMillis = ms }
         return now.get(java.util.Calendar.YEAR) == then.get(java.util.Calendar.YEAR) &&
-            now.get(java.util.Calendar.DAY_OF_YEAR) == then.get(java.util.Calendar.DAY_OF_YEAR)
+                now.get(java.util.Calendar.DAY_OF_YEAR) == then.get(java.util.Calendar.DAY_OF_YEAR)
     }
 
     /** Apollo `UtilsKt.canInteractive` / `isScreenOn`。 */

@@ -4,12 +4,12 @@ import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import androidx.viewbinding.ViewBinding
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
-import androidx.viewbinding.ViewBinding
+import com.buncead.common.ui.BaseActivity
 import com.scanpro.cam.pdf.util.SpLocale
 import com.scanpro.cam.pdf.util.SpStatusBar
 
@@ -17,7 +17,7 @@ import com.scanpro.cam.pdf.util.SpStatusBar
  * Activity 基类：ViewBinding + 沉浸式状态栏。
  * 子类实现 [inflateBinding]，按需覆写 [initView] / [observeData]。
  */
-abstract class SpActivity<VB : ViewBinding> : AppCompatActivity() {
+abstract class SpActivity<VB : ViewBinding> : BaseActivity() {
 
     protected lateinit var binding: VB
         private set

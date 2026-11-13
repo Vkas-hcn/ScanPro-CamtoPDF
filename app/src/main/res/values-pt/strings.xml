@@ -120,12 +120,6 @@
 
     <string name="scan_preview">Prévia</string>
     <string name="scan_generate_pdf">Gerar PDF</string>
-    <string name="rating_message_low">Que tal nos dar um incentivo? Continuaremos trabalhando para melhorar.</string>
-    <string name="rating_message_high">Avalie-nos no Google Play — continuaremos melhorando! Que tal nos dar um incentivo?</string>
-    <string name="rating_action_low">Enviar</string>
-    <string name="rating_action_high">Sim, avaliar agora</string>
-    <string name="rating_best_hint">A melhor avaliação que podemos receber</string>
-    <string name="rating_thanks_internal">Obrigado pela sua avaliação. Recebemos seu feedback e continuaremos melhorando.</string>
     <string name="sp_notify_action">Ver</string>
     <string name="sp_notify_cover_desc">Prévia do arquivo</string>
     <string name="nt_scheduled_1">Seu documento do Word está pronto para abrir</string>

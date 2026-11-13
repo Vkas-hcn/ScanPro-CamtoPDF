@@ -1,72 +1,114 @@
 package com.zppko.pdfplus.nor.ads.mob
 
-import android.app.Activity
-import com.scanpro.cam.pdf.ads.SpAdSession
-import com.scanpro.cam.pdf.analytics.AdTrackingHelper
+import android.widget.FrameLayout
+import com.buncead.common.ui.BaseActivity
+import com.buncead.common.util.Util
+import com.facebook.ads.InterstitialAd
+import com.mymy.mymy.ads.count.AdCountInter
+import com.mymy.mymy.ads.poi.TrackAd
+import com.mymy.mymy.ads.poi.TrackBean
+
+import com.tradplus.ads.open.interstitial.TPInterstitial
+import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
 import com.zppko.pdfplus.nor.ads.trad.TradAdInter
 import com.zppko.pdfplus.nor.ads.trad.TradLoadCallback
 import com.zppko.pdfplus.nor.ads.trad.TradShowCallback
 
-/**
- * 插屏。骨架照 SmartPdfScan_luow IntAdsLoad（TradPlus TPInterstitial），
- * 埋点对齐 B：trackLife + AdTrackingHelper。展示计数由 SpFullScreenAdManager 在展示前
- * 调 AdCountInter.inter_addShowCount() 完成，这里不再重复计数。
- */
+
 class IntAdsLoad(
     setting: AdsSetting
 ) : BaseAdsLoad(setting) {
+    val TAG = "IntAdsLoad"
+    val trBean: TrackBean = TrackBean.inter(setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId)
 
-    private val trad = TradAdInter()
-
+    val trad = TradAdInter()
     override fun childLoad() {
-        if (setting.zId.isEmpty()) {
-            zmyAdsLoadFFFF("配置里 placementId 为空")
-            return
-        }
-        trad.initSplashAd(setting.zId, object : TradLoadCallback() {
-            override fun onAdLoaded() {
-                zmyAdsLoadSSSS(trad.mTPAdInfo?.adSourceName)
-            }
+        TrackAd.loadStart(trBean)
 
-            override fun onAdFailedToLoad(code: Int, message: String) {
-                zmyAdsLoadFFFF("code=$code $message")
-            }
-        })
+        val nowAd: TPInterstitial? = trad.getAD()
+        if (nowAd==null){
+            Util.eee { "$TAG no ad obj, first init, start load=${setting.zId}" }
+            trad.initSplashAd(setting.zId,object : TradLoadCallback() {
+                override fun onAdLoaded() {
+                    zmyAdsLoadSSSS()
+
+                    trBean.adSource = "${trad.mTPAdInfo?.adSourceName}"
+                    TrackAd.loadSuccess(trBean)
+                }
+                override fun onAdFailedToLoad(code: Int, message: String) {
+                    TrackAd.loadFailed(trBean, "${code}", message)
+
+                    zmyAdsLoadFFFF("")
+                }
+            })
+        }else{
+            Util.eee { "use ad obj, start load=${setting.zId}" }
+            nowAd.loadAd()
+        }
     }
 
-    override fun childShow(act: Activity, event: String, whenOnVisible: Boolean, finish: () -> Unit) {
-        val nowAd = trad.getAD() ?: return zDismiss(act, whenOnVisible, finish)
-        trad.setShowCallback(object : TradShowCallback() {
-            override fun onAdShowed() {
-                // 展示起点已由 BaseAdsLoad.zShoweee 记录；计数由 manager 完成。
-            }
+    override fun childShow(act: BaseActivity, event: String, container: FrameLayout, whenOnVisible:Boolean, finish: () -> Unit) {
+//        interAd?.setOnPaidEventListener {
+//            val adSourceName = interAd?.responseInfo?.loadedAdapterResponseInfo?.adSourceName
+//            sendValueToServer(it, adSourceName)
+//        }
 
-            override fun onAdClicked() {
-                SpAdSession.markAdClicked()
-                trackLife?.let { AdTrackingHelper.click(it) }
-            }
+        val nowAd: TPInterstitial? = trad.getAD()
+        if (nowAd == null) {
+            zDismiss(act,whenOnVisible, finish)
+        }else{
+            trad.setShowCallback(object: TradShowCallback() {
+                override fun onAdDismissed() {
+                    TrackAd.showDismiss(trBean)
 
-            override fun onAdDismissed() {
-                zDismiss(act, whenOnVisible, finish)
-            }
+                    container.removeAllViews()
+                    zDismiss(act,whenOnVisible, finish)
 
-            override fun onAdFailedToShow() {
-                zDismiss(act, whenOnVisible, finish)
-            }
-        })
-        nowAd.showAd(act, "sceneId")
+                    if (zcanUsable()){
+                        Util.eee { "$TAG ad close, ad isRead=true, no load" }
+                    }else{
+                        Util.eee { "$TAG ad close, ad isRead=false, start load=${setting.zId}" }
+                        nowAd.loadAd()
+                    }
+                }
+                override fun onAdFailedToShow() { // topon open没有show失败的call，下面代码没有意义
+                    zDismiss(act,whenOnVisible, finish)
+
+                }
+                override fun onAdShowed() {
+                    AdCountInter.inter_addShowCount()
+                    TrackAd.showSuccess(trBean)
+
+                    if (zcanUsable()){
+                        Util.eee { "$TAG ad show, ad isRead=true, no load" }
+                    }else{
+                        Util.eee { "$TAG ad show, ad isRead=false, start load=${setting.zId}" }
+                        nowAd.loadAd()
+                    }
+                }
+                override fun onAdClicked() {
+                    AdCountInter.inter_addClickCount()
+                    TrackAd.showClick(trBean)
+                }
+            })
+
+            nowAd.showAd(act,"sceneId")
+        }
     }
 
     override fun zcanUsable(): Boolean {
-        return trad.getAD()?.isReady == true
+        val nowAd: TPInterstitial? = trad.getAD()
+        return  nowAd?.isReady ?: false
+    }
+
+    override fun zAdsDestory() {
+
     }
 
     override fun getEcpm(): String {
         return trad.mTPAdInfo?.ecpm ?: "0.0"
     }
 
-    override fun zAdsDestory() {
-    }
 }

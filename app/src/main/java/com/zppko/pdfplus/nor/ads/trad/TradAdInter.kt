@@ -7,7 +7,7 @@ import com.tradplus.ads.base.bean.TPAdError
 import com.tradplus.ads.base.bean.TPAdInfo
 import com.tradplus.ads.open.interstitial.InterstitialAdListener
 import com.tradplus.ads.open.interstitial.TPInterstitial
-import com.scanpro.cam.pdf.ads.SpAdSession
+import com.zppko.pdfplus.nor.tool.LifecycleUtil
 
 class TradAdInter {
     val TAG = "TradAdInter"
@@ -20,7 +20,7 @@ class TradAdInter {
     var mTPAdInfo: TPAdInfo? = null
 
     fun initSplashAd(placementId: String?, call: TradLoadCallback): TPInterstitial {
-        val context: Context = CamPdfApp.get().applicationContext
+        val context: Context = CamPdfApp.app.applicationContext
         mLoadCallback = call
 
         val interstitialAd: TPInterstitial = TPInterstitial(context, placementId)
@@ -63,7 +63,7 @@ class TradAdInter {
             override fun onAdClicked(tpAdInfo: TPAdInfo) {
                 Util.eee { "$TAG onAdClicked: inter, " + tpAdInfo.adSourceName }
 
-                SpAdSession.markAdClicked()
+                LifecycleUtil.notLaunch()
                 mShowCallback?.onAdClicked()
             }
             override fun onAdClosed(tpAdInfo: TPAdInfo) {

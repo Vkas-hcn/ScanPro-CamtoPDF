@@ -24,9 +24,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.buncead.common.util.NetUtil
+import com.mymy.mymy.ads.count.AdCountNati
 import com.scanpro.cam.pdf.R
-import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.ads.SpPageAdTriggers
 import com.scanpro.cam.pdf.base.SpFragment
 import com.scanpro.cam.pdf.made.CamRenameResult
 import com.scanpro.cam.pdf.databinding.FragmentCamHomeBinding
@@ -36,6 +36,12 @@ import com.scanpro.cam.pdf.util.CamFileAlerts
 import com.scanpro.cam.pdf.util.CamPopupAlign
 import com.scanpro.cam.pdf.util.CamStoragePermit
 import com.scanpro.cam.pdf.viewer.CamDocRouter
+import com.zppko.pdfplus.nor.ads.ImpressionUtils
+import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
+import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
@@ -94,8 +100,6 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
         refreshStorageAccess()
         // 默认 PDF 算第一次选中，之后用户点类型才弹 `ac_top_int`
         typeAdArmed = true
-        // 文件列表页进入就预热 `ac_check_int`：原来要等用户点开文件才读缓存，几乎必然 miss。
-        runCatching { SpPageAdTriggers.preloadCheckInt(requireActivity()) }
     }
 
     override fun observeData() {
@@ -112,12 +116,17 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
     override fun onResume() {
         super.onResume()
         refreshStorageAccess()
+
+        nativeNetCheck()
     }
 
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
         // Tabs stay resumed under hide/show, so onResume does not run again.
-        if (!hidden && view != null) refreshStorageAccess()
+        if (!hidden && view != null) {
+            refreshStorageAccess()
+        }
+
     }
 
     override fun onDestroyView() {
@@ -159,7 +168,6 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
             typeAdArmed = true
             return
         }
-        activity?.let { SpPageAdTriggers.checkLoadAdByTab(it, SpAdPosition.AC_TOP_INT) }
     }
 
     private fun openCamFile(item: CamFileItem) {
@@ -238,6 +246,11 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
         binding.emptyState.isVisible = state is CamListState.Empty
         binding.permissionState.isVisible = state is CamListState.NeedPermission
 
+        if (state is CamListState.NeedPermission) {
+            // 每次回到无权限态都滚回顶部，保证先看到文案和按钮（插画在下面）
+            binding.permissionState.scrollTo(0, 0)
+        }
+
         if (state is CamListState.ListFiles) {
             fileAdapter.submitList(state.files)
         }
@@ -307,5 +320,100 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
 
     private fun toast(res: Int) {
         Toast.makeText(requireContext(), res, Toast.LENGTH_SHORT).show()
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    override fun onDestroy() {
+        onCleared()
+        super.onDestroy()
+    }
+
+    fun nativeNetCheck(){
+        // 网络是否允许加载和显示广告
+        val allow = NetUtil.isUseNet_noVpn()
+        val canShow = AdCountNati.natiCanShow()
+        if (allow && canShow){
+            prepareLoadNative()
+        }else{
+
+        }
+    }
+
+    fun prepareLoadNative(){
+        lifecycleScope.launch(Dispatchers.IO) {
+            delay(100)
+
+            if (lifecycle.currentState == Lifecycle.State.RESUMED){
+                loadNative(CodeKeyAndEvent.zx_PLACE_NATIVE_MAIN, CodeKeyAndEvent.bb_ACTION_NAV_MAIN)
+            }
+        }
+    }
+
+    var mNatAdsLoad: NatAdsLoad?=null
+    private var job:Job?=null
+
+    fun loadNative(place:String,point:String){
+
+        job?.cancel()
+        ImpressionUtils.load(place)
+        job = lifecycleScope.launch(Dispatchers.IO) {
+            while (true){
+                if (ImpressionUtils.loadSuccess(place)){
+                    mNatAdsLoad?.zAdsDestory()
+                    break
+                }
+                delay(500)
+            }
+            mNatAdsLoad=ImpressionUtils.fireAnative(place)
+
+            pShow(point)
+        }
+    }
+
+    fun onCleared() {
+        job?.cancel()
+        mNatAdsLoad?.zAdsDestory()
+    }
+
+    fun pShow(point:String){
+        val natAdsLoad = mNatAdsLoad
+        if (natAdsLoad ==null){
+            return
+        }
+
+        natAdsLoad.getAdView(point)?.let {
+            lifecycleScope.launch(Dispatchers.Main) {
+                if (lifecycle.currentState == Lifecycle.State.RESUMED){
+//                    NatShow.displayNativeAd(binding.flNati,it)
+                    val mTpNative = it
+                    mTpNative.showAd(binding.flNati, R.layout.tp_native_ad_list_item, "");
+                }
+            }
+        }
     }
 }

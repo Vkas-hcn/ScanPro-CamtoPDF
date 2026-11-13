@@ -9,7 +9,7 @@
   中转页负责补 `NEW_TASK | CLEAR_TASK`，等价 Apollo 的 `DeleteActivity`。
 
   开关有两处，必须同时改：
-  1. 本文件（`src/debug/res/xml` 与 `src/release/res/xml` 各一份，debug 的 targetPackage 是 com.test.lwapp）；
+  1. 本文件（`src/debug/res/xml` 与 `src/release/res/xml` 各一份，debug 的 targetPackage 是 com.npro.mac.fdp.debug）；
   2. `SpLeaveEntry.ENABLED`。
 
   `android:targetClass` 用完整类名：静态快捷方式的 intent 由系统直接构造，不走 manifest 的包名解析。

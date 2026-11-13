@@ -19,11 +19,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.scanpro.cam.pdf.CamShellActivity
 import com.scanpro.cam.pdf.R
-import com.scanpro.cam.pdf.ads.SpAdPosition
-import com.scanpro.cam.pdf.ads.SpAdsHub
-import com.scanpro.cam.pdf.ads.SpHotStartGate
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdManager
-import com.scanpro.cam.pdf.ads.manager.SpNativeAdStyle
+
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivitySpUninstall02Binding
 
@@ -48,7 +44,6 @@ import com.scanpro.cam.pdf.databinding.ActivitySpUninstall02Binding
  */
 class SpUnInstall02Activity : SpActivity<ActivitySpUninstall02Binding>() {
 
-    private var nativeAdManager: SpNativeAdManager? = null
 
     override fun inflateBinding(inflater: LayoutInflater): ActivitySpUninstall02Binding {
         return ActivitySpUninstall02Binding.inflate(inflater)
@@ -61,16 +56,11 @@ class SpUnInstall02Activity : SpActivity<ActivitySpUninstall02Binding>() {
 
         bindReasonRows()
 
-        SpAdsHub.getOrNull()?.fullScreen(this)?.checkAndLoadAd(
-            position = SpAdPosition.AC_UNINSTALL2_INT,
-            scene = SpAdPosition.AC_UNINSTALL2_INT,
-        )
-        loadNativeAd()
+
     }
 
     override fun onDestroy() {
-        nativeAdManager?.release()
-        nativeAdManager = null
+
         super.onDestroy()
     }
 
@@ -97,17 +87,7 @@ class SpUnInstall02Activity : SpActivity<ActivitySpUninstall02Binding>() {
         )
     }
 
-    /** Apollo `loadNativeAd()`：容器先 `GONE`，展示时由 manager 自己置为 `VISIBLE`。 */
-    private fun loadNativeAd() {
-        if (nativeAdManager != null) return
-        binding.adLayout.visibility = View.GONE
-        val hub = SpAdsHub.getOrNull() ?: return
-        nativeAdManager = hub.native(this, binding.adLayout).also {
-            it.checkLoadAndShowAd(SpAdPosition.AC_UNINSTALL2_NAT, SpNativeAdStyle.small)
-        }
-    }
 
-    /** Apollo `showUninstallDialog()`：不可取消的底部弹窗，窗口参数照抄。 */
     private fun showUninstallConfirm() {
         if (isFinishing || isDestroyed) return
         runCatching {
@@ -139,19 +119,13 @@ class SpUnInstall02Activity : SpActivity<ActivitySpUninstall02Binding>() {
 
     /** Apollo：关框后 `showInterstitialAdNoWait(ac_uninstall2_int) { toSettingPage() }`。 */
     private fun showInterstitialThenToSetting() {
-        val manager = SpAdsHub.getOrNull()?.fullScreen(this)
-        if (manager == null) {
-            toSettingPage()
-            return
-        }
-        manager.showInterstitialAdNoWait(SpAdPosition.AC_UNINSTALL2_INT) { toSettingPage() }
+        toSettingPage()
     }
 
     /** Apollo `toSettingPage()`：跳系统「应用详情」，用户在那里点卸载。 */
     private fun toSettingPage() {
         if (isFinishing || isDestroyed) return
-        // 去系统设置再回来不该弹开屏，否则会挡住卸载挽留流程
-        SpHotStartGate.suppressNext()
+
         runCatching {
             startActivity(
                 Intent(

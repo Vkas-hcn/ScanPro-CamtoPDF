@@ -10,19 +10,8 @@
         android:layout_width="31dp"
         android:layout_height="31dp"
         android:importantForAccessibility="no"
-        tools:src="@drawable/sp_ic_notify"/>
-    <!--    <TextView-->
-    <!--        android:id="@+id/title"-->
-    <!--        android:paddingHorizontal="10dp"-->
-    <!--        android:layout_width="0dp"-->
-    <!--        android:layout_height="wrap_content"-->
-    <!--        android:layout_weight="1"-->
-    <!--        android:visibility="gone"-->
-    <!--        android:ellipsize="end"-->
-    <!--        android:maxLines="2"-->
-    <!--        tools:text="123abc"-->
-    <!--        android:textSize="11sp"-->
-    <!--        android:textStyle="bold"/>-->
+        tools:src="@drawable/ic_scan_small"/>
+
     <TextView
         android:id="@+id/content"
         android:paddingHorizontal="10dp"
@@ -30,7 +19,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:ellipsize="end"
-        android:textColor="@color/sp_notify_text"
+        android:textColor="@color/ntf_content_color100"
         tools:text="123abc"
         android:maxLines="2"
         android:textSize="11sp"
@@ -46,7 +35,7 @@
         android:textColor="@color/white"
         android:layout_gravity="center"
         android:gravity="center"
-        android:background="@drawable/sp_shape_notify_btn"
+        android:background="@drawable/ntf_btn_green"
         android:paddingHorizontal="20dp"/>
 
 </LinearLayout>
