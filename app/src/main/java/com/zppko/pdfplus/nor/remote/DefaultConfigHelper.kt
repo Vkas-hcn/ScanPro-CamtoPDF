@@ -54,8 +54,8 @@ object DefaultConfigHelper {
           "nat_gap":1000,
           
            "int_op_c": 3,
-           "fb_id":"",
-           "fb_tk":"",
+           "fb_id":"1609607904229008",
+           "fb_tk":"c8dc6f92efecd136e409cfed145ffa5f",
            "bslcl": 0,
            "op_just_usr": 0,
            "volxo":"0"
