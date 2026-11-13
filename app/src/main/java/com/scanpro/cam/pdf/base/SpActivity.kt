@@ -4,12 +4,11 @@ import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import androidx.viewbinding.ViewBinding
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
-import androidx.viewbinding.ViewBinding
 import com.buncead.common.ui.BaseActivity
 import com.scanpro.cam.pdf.util.SpLocale
 import com.scanpro.cam.pdf.util.SpStatusBar

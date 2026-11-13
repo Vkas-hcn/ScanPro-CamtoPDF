@@ -92,4 +92,23 @@
             tools:text="Unable to open this file" />
     </FrameLayout>
 
+
+    <include layout="@layout/ly_ad_scan_ing"
+        android:layout_width="match_parent"
+        android:id="@+id/ly_ad"
+        android:visibility="gone"
+        android:layout_height="match_parent"/>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:id="@+id/ad_par"
+        android:layout_height="match_parent">
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:id="@+id/ad_com"
+            android:layout_height="match_parent">
+
+        </FrameLayout>
+    </FrameLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -2,6 +2,7 @@ import com.github.megatronking.stringfog.plugin.StringFogExtension
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
 }
@@ -79,6 +80,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
     buildFeatures {
         viewBinding = true
         buildConfig = true
@@ -120,7 +124,7 @@ dependencies {
     implementation(libs.firebase.messaging)
 
     // StringFog 运行时解密库（与插件配置的加解密算法一致）
-    implementation("com.github.megatronking.stringfog:xor:5.2.0")
+    implementation("com.github.megatronking.stringfog:xor:5.0.0")
 
     implementation("com.flux.tracksdk:tracksdk:3.0.3")
     implementation("com.adjust.sdk:adjust-android:5.6.1")

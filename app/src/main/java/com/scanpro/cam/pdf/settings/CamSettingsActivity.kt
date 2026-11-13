@@ -10,11 +10,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import com.buncead.common.util.NetUtil
+import com.mymy.mymy.ads.count.AdCountNati
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamSettingsBinding
 import com.scanpro.cam.pdf.databinding.ItemCamSettingsRowBinding
 import com.scanpro.cam.pdf.util.SpLocale
+import com.zppko.pdfplus.nor.ads.ImpressionUtils
+import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
+import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class CamSettingsActivity : SpActivity<ActivityCamSettingsBinding>() {
 
@@ -51,7 +62,13 @@ class CamSettingsActivity : SpActivity<ActivityCamSettingsBinding>() {
         binding.itemTerms.root.setOnClickListener { openUrl(R.string.settings_terms_url) }
     }
 
+    override fun onResume() {
+        super.onResume()
+        nativeNetCheck()
+    }
+
     override fun onDestroy() {
+        onCleared()
         super.onDestroy()
     }
 
@@ -111,6 +128,67 @@ class CamSettingsActivity : SpActivity<ActivityCamSettingsBinding>() {
         val url = SpLocale.wrap(this).getString(urlRes)
         // 跳浏览器（隐私政策等）再回来不该弹开屏
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    fun nativeNetCheck(){
+        // 网络是否允许加载和显示广告
+        val allow = NetUtil.isUseNet_noVpn()
+        val canShow = AdCountNati.natiCanShow()
+        if (allow && canShow){
+            prepareLoadNative()
+        }else{
+
+        }
+    }
+    fun prepareLoadNative(){
+        lifecycleScope.launch(Dispatchers.IO) {
+            delay(100)
+
+            if (lifecycle.currentState == Lifecycle.State.RESUMED){
+                loadNative(CodeKeyAndEvent.zx_PLACE_NATIVE_MAIN, CodeKeyAndEvent.bb_ACTION_NAV_MAIN)
+            }
+        }
+    }
+
+    var mNatAdsLoad: NatAdsLoad?=null
+    private var job:Job?=null
+
+    fun loadNative(place:String,point:String){
+
+        job?.cancel()
+        ImpressionUtils.load(place)
+        job = lifecycleScope.launch(Dispatchers.IO) {
+            while (true){
+                if (ImpressionUtils.loadSuccess(place)){
+                    mNatAdsLoad?.zAdsDestory()
+                    break
+                }
+                delay(500)
+            }
+            mNatAdsLoad=ImpressionUtils.fireAnative(place)
+
+            pShow(point)
+        }
+    }
+
+    fun onCleared() {
+        job?.cancel()
+        mNatAdsLoad?.zAdsDestory()
+    }
+
+    fun pShow(point:String){
+        val natAdsLoad = mNatAdsLoad
+        if (natAdsLoad ==null){
+            return
+        }
+
+        natAdsLoad.getAdView(point)?.let {
+            lifecycleScope.launch(Dispatchers.Main) {
+                if (lifecycle.currentState == Lifecycle.State.RESUMED){
+                    it.showAd(binding.flNati, R.layout.tp_native_ad_list_item, "");
+                }
+            }
+        }
     }
 
     companion object {

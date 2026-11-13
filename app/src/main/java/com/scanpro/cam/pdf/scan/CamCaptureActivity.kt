@@ -15,6 +15,7 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -27,15 +28,25 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
+import androidx.lifecycle.lifecycleScope
+import com.buncead.common.util.NetUtil
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamCaptureBinding
+import com.zppko.pdfplus.nor.ads.ImpressionUtils
+import com.zppko.pdfplus.nor.ads.InterShCount
+import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
+import com.zppko.pdfplus.nor.tool.Tool
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CamCaptureActivity : SpActivity<ActivityCamCaptureBinding>() {
 
@@ -82,14 +93,15 @@ class CamCaptureActivity : SpActivity<ActivityCamCaptureBinding>() {
         refreshCaptureUi()
         binding.ivThumbnail.clipToOutline = true
         binding.ivThumbnail.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-        binding.btnClose.setOnClickListener { finish() }
+        binding.btnClose.setOnClickListener { backPage() }
         binding.btnFlash.setOnClickListener { showFlashPopup() }
         binding.btnHd.setOnClickListener { showResolutionPopup() }
         binding.btnGrid.setOnClickListener { toggleGrid() }
         binding.btnSwitch.setOnClickListener { switchCamera() }
         binding.btnShutter.setOnClickListener { takePhoto() }
-        binding.btnNext.setOnClickListener { openReview() }
-        binding.thumbnailContainer.setOnClickListener { openReview() }
+        binding.btnNext.setOnClickListener { nextPhoto() }
+        binding.thumbnailContainer.setOnClickListener { nextPhoto() }
+        onBackPressedDispatcher.addCallback { backPage() }
 
         if (hasCameraPermission()) {
             startCamera()
@@ -303,6 +315,69 @@ class CamCaptureActivity : SpActivity<ActivityCamCaptureBinding>() {
 
     private fun getScanDir(): File {
         return File(cacheDir, "scan_capture").apply { mkdirs() }
+    }
+
+    var nextByType = 0 // 0返回 ，1 点击next到下一个页面
+    fun backPage(){
+        nextByType = 0
+        netCheck()
+    }
+
+    fun nextPhoto(){
+        nextByType = 1
+        netCheck()
+    }
+
+    fun netCheck(){
+        // 网络是否允许加载和显示广告
+        val allow = NetUtil.isUseNet_noVpn()
+        val isCanShow = InterShCount.isCanShow()
+        if (allow&& isCanShow){
+            binding.lyAd.root.visibility = View.VISIBLE
+            mockScan()
+        }else{
+            nextStep()
+        }
+    }
+
+    fun mockScan(){
+        ImpressionUtils.load(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN)
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val startTime = System.currentTimeMillis()
+            delay(200) // 模拟读取扫描耗时操作
+
+            var usedTime = System.currentTimeMillis() - startTime
+            if (usedTime < 2000){
+                delay(500)
+            }
+            usedTime = System.currentTimeMillis() - startTime
+            if (usedTime < 8000){
+                Tool.waitForCondition<Boolean>(8_000L - usedTime) { ImpressionUtils.loadSuccess(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN) }
+            }
+
+            withContext(Dispatchers.Main) {
+
+                ImpressionUtils.show(
+                    mActivity,
+                    CodeKeyAndEvent.zx_PLACE_INTER_ClEAN,
+                    CodeKeyAndEvent.bb_ACTION_INTER_CLEAN,
+                    binding.adCom
+                ) {
+                    nextStep()
+                }
+            }
+        }
+
+    }
+
+    fun nextStep(){
+        binding.lyAd.root.visibility = View.GONE
+        if (nextByType==0){
+            finish()
+        }else{
+            openReview()
+        }
     }
 
     companion object {

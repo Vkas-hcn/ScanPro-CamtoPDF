@@ -91,10 +91,11 @@
                 android:layout_marginTop="12dp" />
 
             <FrameLayout
-                android:id="@+id/ad_layout"
+                android:id="@+id/fl_nati"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp" />
+                android:layout_marginHorizontal="12dp"
+                android:layout_marginBottom="48dp" />
         </LinearLayout>
     </ScrollView>
 

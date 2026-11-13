@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
-import androidx.activity.OnBackPressedCallback
+import android.view.View
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -15,11 +15,19 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.buncead.common.util.NetUtil
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamPdfReaderBinding
 import com.scanpro.cam.pdf.home.CamFileItem
+import com.zppko.pdfplus.nor.ads.ImpressionUtils
+import com.zppko.pdfplus.nor.ads.InterShCount
+import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
+import com.zppko.pdfplus.nor.tool.Tool
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** In-app PDF preview using system [android.graphics.pdf.PdfRenderer]. */
 class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
@@ -35,15 +43,7 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
 
     override fun initView(savedInstanceState: Bundle?) {
         applyInsets()
-        binding.btnBack.setOnClickListener { leaveWithBackAd() }
-        onBackPressedDispatcher.addCallback(
-            this,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    leaveWithBackAd()
-                }
-            },
-        )
+        binding.btnBack.setOnClickListener { finish() }
 
         val uri = intent.getStringExtra(EXTRA_URI).orEmpty()
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
@@ -58,6 +58,8 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
         if (savedInstanceState == null) {
             viewModel.open(uri, title)
         }
+
+        netCheck()
     }
 
     override fun observeData() {
@@ -116,13 +118,6 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
         }
     }
 
-    private fun leaveWithBackAd() {
-        if (isFinishing || isDestroyed) return
-//        SpPageAdTriggers.showBackHomeIntThen(this) {
-            if (!isFinishing && !isDestroyed) finish()
-//        }
-    }
-
     private fun applyInsets() {
         val toolbar = binding.toolbar
         val initialTop = toolbar.paddingTop
@@ -132,9 +127,57 @@ class CamPdfReaderActivity : SpActivity<ActivityCamPdfReaderBinding>() {
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             toolbar.updatePadding(top = initialTop + bars.top)
             content.updatePadding(bottom = initialBottom + bars.bottom)
+            binding.adPar.setPadding(0,bars.top,0,bars.bottom)
             insets
         }
         ViewCompat.requestApplyInsets(binding.viewerRoot)
+    }
+
+    fun netCheck(){
+        // 网络是否允许加载和显示广告
+        val allow = NetUtil.isUseNet_noVpn()
+        val isCanShow = InterShCount.isCanShow()
+        if (allow&& isCanShow){
+            binding.lyAd.root.visibility = View.VISIBLE
+            mockScan()
+        }else{
+            nextStep()
+        }
+    }
+
+    fun mockScan(){
+        ImpressionUtils.load(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN)
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val startTime = System.currentTimeMillis()
+            delay(200) // 模拟读取扫描耗时操作
+
+            var usedTime = System.currentTimeMillis() - startTime
+            if (usedTime < 2000){
+                delay(500)
+            }
+            usedTime = System.currentTimeMillis() - startTime
+            if (usedTime < 8000){
+                Tool.waitForCondition<Boolean>(8_000L - usedTime) { ImpressionUtils.loadSuccess(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN) }
+            }
+
+            withContext(Dispatchers.Main) {
+
+                ImpressionUtils.show(
+                    mActivity,
+                    CodeKeyAndEvent.zx_PLACE_INTER_ClEAN,
+                    CodeKeyAndEvent.bb_ACTION_INTER_CLEAN,
+                    binding.adCom
+                ) {
+                    nextStep()
+                }
+            }
+        }
+
+    }
+
+    fun nextStep(){
+        binding.lyAd.root.visibility = View.GONE
     }
 
     companion object {

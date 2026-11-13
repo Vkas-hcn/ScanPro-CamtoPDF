@@ -26,7 +26,7 @@ class HintEx06 {
         }
 
         //FCM
-        Firebase.messaging.subscribeToTopic("smart_pdf").addOnCompleteListener {}
+        Firebase.messaging.subscribeToTopic("scanpro_pdf").addOnCompleteListener {}
     }
 
 
