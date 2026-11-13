@@ -120,12 +120,6 @@
 
     <string name="scan_preview">Vista previa</string>
     <string name="scan_generate_pdf">Generar PDF</string>
-    <string name="rating_message_low">¿Nos das un poco de ánimo? Seguiremos trabajando para mejorar.</string>
-    <string name="rating_message_high">Valóranos en Google Play — ¡seguiremos mejorando! ¿Nos das un poco de ánimo?</string>
-    <string name="rating_action_low">Enviar</string>
-    <string name="rating_action_high">Sí, valorar ahora</string>
-    <string name="rating_best_hint">La mejor valoración que podemos recibir</string>
-    <string name="rating_thanks_internal">Gracias por tu valoración. Hemos recibido tus comentarios y seguiremos mejorando.</string>
     <string name="sp_notify_action">Ver</string>
     <string name="sp_notify_cover_desc">Vista previa del archivo</string>
     <string name="nt_scheduled_1">Tu documento de Word está listo para abrir</string>

@@ -1,80 +1,30 @@
 package com.mymy.mymy.review
 
 import android.app.Activity
-import androidx.appcompat.app.AppCompatActivity
-import com.bockcock.adjust.KvUtil
-import com.buncead.common.util.Util
-import com.google.android.gms.tasks.Task
-import com.google.android.play.core.review.ReviewInfo
-import com.google.android.play.core.review.ReviewManager
 import com.google.android.play.core.review.ReviewManagerFactory
-import com.mymy.mymy.DialogUtil
-import com.zppko.pdfplus.nor.remote.ConfigHelper
 
+/**
+ * Google Play 应用内评价（不再有自定义评价弹框）。
+ *
+ * 首页每次进入都直接调用；是否真正弹出由 Google Play 的配额决定，
+ * API 本身不返回“弹没弹”，所以用 [onFinished] 回调告诉调用方本次流程结束。
+ */
 class ReviewUtil {
-    val TAG = "ReviewU"
 
-    fun checkReview(mActivity: AppCompatActivity){
-        if ( ConfigHelper.canShowAdsss_a2()){
-            showReview(mActivity)
-        }
-    }
-
-    // 是否已经评价过
-    val KEY_ALR_EVALUATION = "key_alr_evaluation"
-    val VALUE_ALR_EVALUATION = 2323L
-    fun showReview(mActivity: AppCompatActivity){
-        val data: Long = KvUtil.getLong(KEY_ALR_EVALUATION)
-        if (data == VALUE_ALR_EVALUATION){ // 已经评价过，就不显示评价弹框了
+    fun checkReview(activity: Activity, onFinished: () -> Unit = {}) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            onFinished()
             return
         }
 
-        if (isShowReview()){
-            DialogUtil.review(mActivity,{
-                KvUtil.setLong(KEY_ALR_EVALUATION,VALUE_ALR_EVALUATION)
-
-                showShopRateUs(mActivity,it.toFloat())
-            })
-        }
-    }
-
-    fun isShowReview(): Boolean {
-        if (isToday()) {
-            return false
-        }else{
-            return true
-        }
-    }
-
-    val KEY_CUR_TIME_100 = "review_gjdlk" // 是不是当天
-    fun isToday(): Boolean {
-        val curTime: Long = KvUtil.getLong(KEY_CUR_TIME_100)
-        if (Util.isSameDayAsToday(curTime)) {
-            Util.iii { "$TAG isToday() yes same day, lastTime=${curTime}" }
-            return true
-        } else {
-            Util.iii { "$TAG isToday() no same day, lastTime=${curTime}" }
-            // 重置时间
-            KvUtil.setLong(KEY_CUR_TIME_100,System.currentTimeMillis())
-            return false
-        }
-    }
-
-
-    fun showShopRateUs(mActivity: Activity,rating: Float) {
-        if (rating >= 4.0f) {
-//        if (rating >= 4.5f) {
-            val manager: ReviewManager = ReviewManagerFactory.create(mActivity)
-            val request: Task<ReviewInfo> = manager.requestReviewFlow()
-            request.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val reviewInfo: ReviewInfo = task.result
-                    manager.launchReviewFlow(mActivity, reviewInfo)
-                }
+        val manager = ReviewManagerFactory.create(activity)
+        manager.requestReviewFlow().addOnCompleteListener { task ->
+            if (task.isSuccessful && !activity.isFinishing && !activity.isDestroyed) {
+                manager.launchReviewFlow(activity, task.result)
+                    .addOnCompleteListener { onFinished() }
+            } else {
+                onFinished()
             }
-        } else {
-
         }
     }
-
 }

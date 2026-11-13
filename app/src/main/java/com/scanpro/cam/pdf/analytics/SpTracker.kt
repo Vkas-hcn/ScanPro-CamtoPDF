@@ -194,12 +194,6 @@ object SpTracker {
     const val SCAN_FINISH = "scan_finish"
     const val CONVERT_SUCCESS = "convert_success"
 
-    // region Rating
-    const val RATING_DIALOG_SHOW = "rating_dialog_show"
-    const val RATING_SUBMIT_LOW = "rating_submit_low"
-    const val RATING_SUBMIT_HIGH = "rating_submit_high"
-    // endregion
-
     const val USER_TYPE_PAID = "user_type_paid"
     const val USER_TYPE_ORGANIC = "user_type_organic"
     const val ADJUST_ATTRIBUTION_UPDATED = "adjust_attribution_updated"

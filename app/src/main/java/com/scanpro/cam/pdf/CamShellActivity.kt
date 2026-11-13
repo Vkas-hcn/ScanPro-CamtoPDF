@@ -38,6 +38,10 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     private var pendingNotificationFileType: FileType? = null
     private var appliedLocaleGeneration = SpLocale.generation
 
+    /** 评价流程是否正在展示，以及上一次流程结束的时间（防止弹框自身触发的 onResume 反复请求）。 */
+    private var reviewFlowActive = false
+    private var lastReviewFinishedAtMs = 0L
+
     /** 第二处通知权限申请（对齐 luow：启动页问过一次后，主界面再问一次并做二次引导）。 */
 
     override fun inflateBinding(inflater: LayoutInflater): ActivityCamShellBinding {
@@ -62,9 +66,7 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             refreshTabChrome(currentTab)
         }
 
-        PermNotifyUtil.check2requestNotificationPermission(mActivity,{
-            ReviewUtil().checkReview(mActivity)
-        })
+        PermNotifyUtil.check2requestNotificationPermission(mActivity, { })
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -75,16 +77,12 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        PermNotifyUtil.onRequestPermissionsResult(requestCode, permissions, grantResults, this, { isAllow: Boolean ->
-            ReviewUtil().checkReview(mActivity)
-        })
+        PermNotifyUtil.onRequestPermissionsResult(requestCode, permissions, grantResults, this, { })
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        PermNotifyUtil.onActivityResult(requestCode,resultCode,data,this,{ isAllow: Boolean ->
-            ReviewUtil().checkReview(mActivity)
-        })
+        PermNotifyUtil.onActivityResult(requestCode,resultCode,data,this,{ })
     }
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
@@ -152,11 +150,19 @@ class CamShellActivity : SpActivity<ActivityCamShellBinding>() {
             return
         }
         if (currentTab == Tab.HOME) {
-            // 首页直接走 Google Play 应用内评价，不再弹自定义评价框。
-            binding.root.post {
-                if (!isFinishing && !isDestroyed) {
-                }
-            }
+            // 每次进入首页直接调 Google Play 应用内评价，是否弹出由 Play 的配额决定。
+            maybeRequestReview()
+        }
+    }
+
+    private fun maybeRequestReview() {
+        if (reviewFlowActive) return
+        // 评价弹框关闭会立刻回 onResume，2 秒内不重复请求，避免自己把自己再拉起来。
+        if (System.currentTimeMillis() - lastReviewFinishedAtMs < 2_000L) return
+        reviewFlowActive = true
+        ReviewUtil().checkReview(this) {
+            reviewFlowActive = false
+            lastReviewFinishedAtMs = System.currentTimeMillis()
         }
     }
 

@@ -120,12 +120,6 @@
 
     <string name="scan_preview">पूर्वावलोकन</string>
     <string name="scan_generate_pdf">PDF बनाएँ</string>
-    <string name="rating_message_low">क्या आप हमारा हौसला बढ़ाएँगे? हम और बेहतर करने के लिए मेहनत करते रहेंगे।</string>
-    <string name="rating_message_high">Google Play पर हमें रेटिंग दें — हम सुधार करते रहेंगे! क्या आप हमारा हौसला बढ़ाएँगे?</string>
-    <string name="rating_action_low">भेजें</string>
-    <string name="rating_action_high">हाँ, अभी रेटिंग दें</string>
-    <string name="rating_best_hint">हमें मिलने वाली सबसे अच्छी रेटिंग</string>
-    <string name="rating_thanks_internal">आपकी रेटिंग के लिए धन्यवाद। हमें आपका फ़ीडबैक मिल गया है और हम सुधार करते रहेंगे।</string>
     <string name="sp_notify_action">देखें</string>
     <string name="sp_notify_cover_desc">फ़ाइल का पूर्वावलोकन</string>
     <string name="nt_scheduled_1">आपका Word दस्तावेज़ खोलने के लिए तैयार है</string>

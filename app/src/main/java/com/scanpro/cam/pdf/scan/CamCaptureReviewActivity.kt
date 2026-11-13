@@ -95,14 +95,6 @@ class CamCaptureReviewActivity : SpActivity<ActivityCamCaptureReviewBinding>() {
                 SpTracker.log(this@CamCaptureReviewActivity, SpTracker.CONVERT_SUCCESS)
                 Toast.makeText(this@CamCaptureReviewActivity, R.string.scan_saved, Toast.LENGTH_SHORT).show()
                 CamCaptureSession.clear()
-//                setResult(RESULT_OK)
-//                val shown = SpRateFlow.tryPromptAfterPdfSave(
-//                    activity = this@CamCaptureReviewActivity,
-//                    onDismissed = { finish() },
-//                )
-//                if (!shown) {
-//                    finish()
-//                }
             }.onFailure {
                 Toast.makeText(this@CamCaptureReviewActivity, R.string.scan_save_failed, Toast.LENGTH_SHORT).show()
             }

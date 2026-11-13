@@ -120,12 +120,6 @@
 
     <string name="scan_preview">Pratinjau</string>
     <string name="scan_generate_pdf">Buat PDF</string>
-    <string name="rating_message_low">Maukah Anda memberi kami semangat? Kami akan terus berusaha menjadi lebih baik.</string>
-    <string name="rating_message_high">Beri kami rating di Google Play — kami akan terus menjadi lebih baik! Maukah Anda memberi kami semangat?</string>
-    <string name="rating_action_low">Kirim</string>
-    <string name="rating_action_high">Ya, beri rating sekarang</string>
-    <string name="rating_best_hint">Rating terbaik yang bisa kami dapatkan</string>
-    <string name="rating_thanks_internal">Terima kasih atas rating Anda. Kami telah menerima masukan Anda dan akan terus melakukan perbaikan.</string>
     <string name="sp_notify_action">Lihat</string>
     <string name="sp_notify_cover_desc">Pratinjau file</string>
     <string name="nt_scheduled_1">Dokumen Word Anda siap dibuka</string>

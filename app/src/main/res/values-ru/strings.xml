@@ -120,12 +120,6 @@
 
     <string name="scan_preview">Предпросмотр</string>
     <string name="scan_generate_pdf">Создать PDF</string>
-    <string name="rating_message_low">Поддержите нас! Мы будем стараться стать лучше.</string>
-    <string name="rating_message_high">Оцените нас в Google Play — мы продолжим улучшать приложение! Поддержите нас!</string>
-    <string name="rating_action_low">Отправить</string>
-    <string name="rating_action_high">Да, оценить сейчас</string>
-    <string name="rating_best_hint">Лучшая оценка, которую мы можем получить</string>
-    <string name="rating_thanks_internal">Спасибо за вашу оценку. Мы получили ваш отзыв и продолжим улучшать приложение.</string>
     <string name="sp_notify_action">Посмотреть</string>
     <string name="sp_notify_cover_desc">Предпросмотр файла</string>
     <string name="nt_scheduled_1">Ваш документ Word готов к открытию</string>
