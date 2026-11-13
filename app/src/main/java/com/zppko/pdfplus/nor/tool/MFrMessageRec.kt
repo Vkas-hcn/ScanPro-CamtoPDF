@@ -18,8 +18,9 @@ import java.security.MessageDigest
  *
  * 行为约定（对齐本轮验收）：
  * - 每次回调先做 messageId/test_id 去重；
- * - 后台：启动/复用前台服务（常驻通知 4856），data-only 额外由应用主动发一条普通通知（70101）；
- * - notification + data 在后台由 Firebase SDK 自动展示，应用不重复发；
+ * - 后台：启动/复用前台服务（常驻通知 4856），并由应用统一发一条普通系统通知（70101/70102）；
+ * - notification 类型消息在 [handleIntent] 处拦截，阻止 FCM SDK 自动绘制系统通知，
+ *   与 data-only 走同一条应用渲染路径（见 SpFcmNotification）；
  * - 前台：不新增任何通知、不启动会创建常驻通知的前台服务；
  * - onNewToken 持久化 token，日志只输出长度与指纹。
  *
@@ -39,16 +40,33 @@ class MFrMessageRec : FirebaseMessagingService() {
         }
     }
 
+    /**
+     * 拦截 notification 类型消息，阻止 FCM SDK 自行绘制系统通知，统一交给应用渲染。
+     *
+     * [handleIntent] 是 FirebaseMessagingService 的公开入口（24.1.1/25.1.2/26.0.1 均存在），
+     * 但不在官方文档 API 内；若未来 SDK 移除会直接编译失败，而不是静默退回默认样式。
+     * data-only 与非消息 intent（如 NEW_TOKEN）仍原样交给 super 处理。
+     */
+    override fun handleIntent(intent: Intent) {
+        val message = intent.extras
+            ?.let { extras -> runCatching { RemoteMessage(extras) }.getOrNull() }
+        if (message != null && message.notification != null) {
+            Log.i(TAG, "intercept notification message, render by app")
+            onMessageReceived(message)
+            return
+        }
+        super.handleIntent(intent)
+    }
+
     private fun handleMessage(message: RemoteMessage) {
         trackReceived(message)
 
         // 去重：命中重复直接结束；去重自身出错时按“没收到过”继续，宁可重复也不丢消息。
         if (isDuplicate(message)) return
 
-        val dataOnly = message.notification == null
         Log.i(
             TAG,
-            "received dataOnly=" + dataOnly +
+            "received kind=" + if (message.notification != null) "notification" else "data" +
                 " foreground=" + HintExt02.isForeground +
                 " testId=" + mask(message.data?.get("test_id").orEmpty()),
         )
@@ -60,12 +78,8 @@ class MFrMessageRec : FirebaseMessagingService() {
         }
 
         ensureForegroundService()
-
-        if (dataOnly) {
-            postNotification(message)
-        } else {
-            Log.i(TAG, "notification payload: SDK auto-display in background, skip app notify")
-        }
+        // notification 与 data-only 统一由应用渲染，SDK 的自动绘制已在 handleIntent 拦截。
+        postNotification(message)
     }
 
     /** E15 埋点。单独兜底：统计失败不能连带吞掉通知和保活。 */
