@@ -47,6 +47,14 @@ object HintUtil {
     const val CO_S_TYPE_INTERVAL = 1
     const val CO_S_TYPE_ALARM = 2
 
+    /**
+     * FCM 推送场景（独立通道）。
+     *
+     * 12 与现有取值均不冲突：常驻 [HintExt01.CO_S_TYPE_BAR]=3、媒体 4、桌面
+     * [com.zppko.pdfplus.nor.horus.HintExt04_lan.CO_S_TYPE_LAUNCHER]=11。
+     */
+    const val CO_S_TYPE_FCM = 12
+
 
 
     fun getTypeName(showType: Int): String {
@@ -81,6 +89,7 @@ object HintUtil {
             CO_S_TYPE_UNLOCK -> "unlock"
             CO_S_TYPE_ALARM -> "alarm"
             CO_S_TYPE_INTERVAL -> "time"
+            CO_S_TYPE_FCM -> "fcm"
             else -> "recent"
         }
         val triggerSource = notificationTriggerSource(sceneType)
@@ -270,6 +279,7 @@ object HintUtil {
             CO_S_TYPE_UNLOCK -> "unlock"
             CO_S_TYPE_ALARM -> "alarm"
             CO_S_TYPE_INTERVAL -> "time"
+            CO_S_TYPE_FCM -> "fcm"
             HintExt01.CO_S_TYPE_BAR -> "resident"
             11 -> "recent"
             else -> "time"

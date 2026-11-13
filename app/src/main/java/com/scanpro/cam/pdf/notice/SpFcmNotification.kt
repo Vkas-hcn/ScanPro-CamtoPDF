@@ -20,7 +20,8 @@ import com.zppko.pdfplus.nor.remote.RemoteConfigHelper
  * 关键约束：
  * - 只在后台发送；前台收到 FCM 不新增任何通知（本轮验收口径）。
  * - 通知栏已有系统通知（定时/解锁/闹钟/上次 FCM 弹出的，槽位 70101/70102）时不再补发。
- * - 复用「定时(time)」目录的文案与样式，走与定时通知完全一致的发送路径（含 pop_refresh 重发）；
+ * - 复用「定时(time)」目录的文案与样式，发送路径与定时通知一致（含 pop_refresh 重发）；
+ *   场景类型用 [HintUtil.CO_S_TYPE_FCM]，埋点 pos_id/trigger_source 均为 fcm。
  *   不使用 FCM 下发的 title/body/action，也不使用默认通知样式。
  * - 点击进入 SpBootActivity（开屏），与其它通知入口保持一致。
  */
@@ -48,10 +49,10 @@ internal object SpFcmNotification {
             )
             return
         }
-        // 复用「定时(time)」目录的文案/样式，与定时通知完全一致（含 pop_refresh 重发）。
+        // 复用「定时(time)」目录的文案/样式；场景类型走 fcm（含 pop_refresh 重发）。
         val config = RemoteConfigHelper.getReceiveConfig()
         val popSetting = HintSup.forType(HintUtil.CO_S_TYPE_INTERVAL).random()
-        HintUtil.coJustSend(config, popSetting, HintUtil.CO_S_TYPE_INTERVAL)
+        HintUtil.coJustSend(config, popSetting, HintUtil.CO_S_TYPE_FCM)
         Log.i(TAG, "post via system-notification path testId=${mask(message.data["test_id"].orEmpty())}")
     }
 
