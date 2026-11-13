@@ -8,21 +8,10 @@
     <ImageView
         android:id="@+id/cover"
         android:layout_width="31dp"
-        tools:src="@mipmap/ntf_small_icon_100"
+        tools:src="@drawable/ic_scan_small"
         android:layout_height="31dp"
         android:importantForAccessibility="no" />
-    <!--    <TextView-->
-    <!--        android:id="@+id/title"-->
-    <!--        android:paddingHorizontal="10dp"-->
-    <!--        android:layout_width="0dp"-->
-    <!--        android:visibility="gone"-->
-    <!--        tools:text="123abc"-->
-    <!--        android:layout_height="wrap_content"-->
-    <!--        android:layout_weight="1"-->
-    <!--        android:ellipsize="end"-->
-    <!--        android:maxLines="2"-->
-    <!--        android:textStyle="bold"-->
-    <!--        android:textSize="11sp"/>-->
+
     <TextView
         android:id="@+id/content"
         android:paddingHorizontal="10dp"

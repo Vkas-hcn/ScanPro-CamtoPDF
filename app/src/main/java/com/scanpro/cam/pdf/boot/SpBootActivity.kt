@@ -2,6 +2,7 @@ package com.scanpro.cam.pdf.boot
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import androidx.activity.viewModels
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -282,15 +283,16 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         return ImpressionUtils.loadSuccess(taskName)
     }
 
-    fun stepnext1_ecpm(first: String, second: String) {
-        val ecpm1 = ImpressionUtils.getEcpm(first)
-        val ecpm2 = ImpressionUtils.getEcpm(second)
-
-        if (ecpm1>=ecpm2){
-            Util.iii { "$TAG compare ecpm : ${ecpm1} >= ${ecpm2}" }
+    /** 两个候选位都就绪：比 eCPM，单价高者展示（照 A `stepnext1_ecpm`）。 */
+    private fun stepnext1_ecpm(first: String, second: String) {
+        // 优先用 TradPlus 比价 SDK（recursiveComparePrice）探测真实 eCPM；失败回退到广告对象自带 eCPM。
+        val ecpm1 = ImpressionUtils.getComparePrice(first).takeIf { it > 0 } ?: ImpressionUtils.getEcpm(first)
+        val ecpm2 = ImpressionUtils.getComparePrice(second).takeIf { it > 0 } ?: ImpressionUtils.getEcpm(second)
+        if (ecpm1 >= ecpm2) {
+            Log.i(TAG, "compare ecpm : $ecpm1 >= $ecpm2")
             showAd(first)
-        }else{
-            Util.iii { "$TAG compare ecpm : ${ecpm1} < ${ecpm2}" }
+        } else {
+            Log.i(TAG, "compare ecpm : $ecpm1 < $ecpm2")
             showAd(second)
         }
     }

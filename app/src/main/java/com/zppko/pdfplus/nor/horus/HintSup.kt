@@ -14,7 +14,7 @@ object HintSup {
     //闹钟
     val text3 = arrayOf(
         CallingSetting(Route.Garbage, R.string.pop_tit_1,R.string.pop_msg_1,R.drawable.ic_home_list_ppt, R.string.pop_btn_1, R.drawable.ntf_btn_green,70101),
-        CallingSetting(Route.DuplicateFile, R.string.pop_tit_2,R.string.pop_msg_2, R.drawable.ic_home_list_txt, R.string.pop_btn_1, R.drawable.ntf_btn_green ,70101),
+        CallingSetting(Route.DuplicateFile, R.string.pop_tit_2,R.string.pop_msg_2, R.drawable.ic_home_list_txt, R.string.pop_btn_1, R.drawable.ntf_btn_green ,80101),
         CallingSetting(Route.LargeFile, R.string.pop_tit_3, R.string.pop_msg_3,R.drawable.ic_home_list_xls, R.string.pop_btn_1, R.drawable.ntf_btn_green, 70101),
     )
 

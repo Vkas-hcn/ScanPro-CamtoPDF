@@ -2,6 +2,8 @@ package com.mymy.mymy.http
 
 class BiDefaultConfig {
 
+    // 字段含义、单位与运营调参说明见：docs/本机下发配置-字段说明.md
+
     /*
         ,
     "ffsws":1,

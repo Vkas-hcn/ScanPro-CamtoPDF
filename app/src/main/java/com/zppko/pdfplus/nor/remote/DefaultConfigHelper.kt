@@ -90,7 +90,7 @@ object DefaultConfigHelper {
 {
   "cuu_launch": [
     {
-      "boxaxj": "D9118E91DD06DF6D322369455CAED618",
+      "boxaxj": "0D8D3A9B057C4827D87B426CB6474912",
       "opxmlf": "tradplus",
       "ujhscs": "op",
       "vksnx": 13800,
@@ -99,7 +99,7 @@ object DefaultConfigHelper {
   ],
   "co_scan_int":[
     {
-      "boxaxj": "E609A0A67AF53299F2176C3A7783C46D",
+      "boxaxj": "9F1231142C0FF2A55D6E72F414B4AC12",
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
@@ -117,7 +117,7 @@ object DefaultConfigHelper {
   ],
   "co_result_int": [
     {
-      "boxaxj": "",
+      "boxaxj": "B2CA3CE97BFE7EB5B5704495928C7112",
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
@@ -126,7 +126,7 @@ object DefaultConfigHelper {
   ],
   "co_main_nat":[
     {
-      "boxaxj": "DDBF26FBDA47FBE2765F1A089F1356BF",
+      "boxaxj": "923B0C2B262328595283C4B85C7DAD12",
       "opxmlf": "tradplus",
       "ujhscs": "nat",
       "vksnx": 3000,

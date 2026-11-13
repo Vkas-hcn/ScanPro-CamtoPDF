@@ -9,6 +9,7 @@ import com.mymy.mymy.ads.poi.ADBlockReason
 import com.mymy.mymy.ads.poi.TrackAd
 import com.mymy.mymy.ads.poi.TrackBean
 import com.buncead.common.ui.BaseActivity
+import com.tp.compareprice.ComparePriceUtil.recursiveComparePrice
 
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
 import com.zppko.pdfplus.nor.ads.mob.IntAdsLoad
@@ -79,6 +80,23 @@ object ImpressionUtils {
            return parseEcpm(unit.getEcpm())
         }
         return 0.0
+    }
+
+    /**
+     * TradPlus 比价 SDK 价格：取某位就绪广告对应 placement 的真实 eCPM（USD，两位小数）。
+     * 底层走 com.tp.compareprice.ComparePriceUtil.recursiveComparePrice(placementId)；
+     * 广告未就绪 / placement 为空 / 探测失败时返回 0.0（调用方应回退到 [getEcpm]）。
+     */
+    fun getComparePrice(place: String): Double {
+        val unit = myPoolzzdd[place] ?: return 0.0
+        if (!unit.zIsShowAds()) return 0.0
+        val placementId = unit.setting.zId
+        if (placementId.isEmpty()) return 0.0
+        return try {
+            recursiveComparePrice(placementId)
+        } catch (t: Throwable) {
+            0.0
+        }
     }
 
     fun show(act: BaseActivity?, place: String, point:String, container: FrameLayout, whenOnVisible:Boolean=true, finish: () -> Unit) {

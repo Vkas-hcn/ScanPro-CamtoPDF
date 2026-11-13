@@ -11,18 +11,7 @@
         android:layout_height="31dp"
         android:importantForAccessibility="no"
         tools:src="@drawable/ic_scan_small"/>
-    <!--    <TextView-->
-    <!--        android:id="@+id/title"-->
-    <!--        android:paddingHorizontal="10dp"-->
-    <!--        android:layout_width="0dp"-->
-    <!--        android:layout_height="wrap_content"-->
-    <!--        android:layout_weight="1"-->
-    <!--        android:visibility="gone"-->
-    <!--        android:ellipsize="end"-->
-    <!--        android:maxLines="2"-->
-    <!--        tools:text="123abc"-->
-    <!--        android:textSize="11sp"-->
-    <!--        android:textStyle="bold"/>-->
+
     <TextView
         android:id="@+id/content"
         android:paddingHorizontal="10dp"

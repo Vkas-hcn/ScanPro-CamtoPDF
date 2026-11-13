@@ -246,6 +246,11 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
         binding.emptyState.isVisible = state is CamListState.Empty
         binding.permissionState.isVisible = state is CamListState.NeedPermission
 
+        if (state is CamListState.NeedPermission) {
+            // 每次回到无权限态都滚回顶部，保证先看到文案和按钮（插画在下面）
+            binding.permissionState.scrollTo(0, 0)
+        }
+
         if (state is CamListState.ListFiles) {
             fileAdapter.submitList(state.files)
         }
