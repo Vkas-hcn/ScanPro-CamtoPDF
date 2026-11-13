@@ -150,7 +150,7 @@ object DefaultConfigHelper {
   ],
   "co_scan_int":[
     {
-      "boxaxj": "",
+      "boxaxj": "E609A0A67AF53299F2176C3A7783C46D",
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,

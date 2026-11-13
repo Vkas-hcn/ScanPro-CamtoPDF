@@ -182,12 +182,13 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
             val next = Intent(this, CamShellActivity::class.java)
 
+            // 桌面「卸载」快捷方式：action 由中转页原样带到这里，缺了这一步主界面就不知道该进挽留页。
             val act_pageType: String? = intent.getStringExtra(PageMgr.key_st_launch)
-            if(PageMgr.nav_to_uninstall.equals(act_pageType)){
+            if (SpLeaveEntry.isLeaveLaunch(intent) ||
+                PageMgr.nav_to_uninstall.equals(act_pageType)
+            ) {
                 SpLeaveEntry.markOpenLeave(next)
                 Util.iii { "finishToMain11111111111" }
-            }else{
-
             }
 
             startActivity(next)

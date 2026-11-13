@@ -38,7 +38,7 @@ object BiCloak {
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val jsonStr = BiParameter().createJson()
-                val url = if (AppConfig.isBundle()) "https://appconfig.pdfsmarter.uk/api/cloak" else "https://testserver.googletogoogle.com/api/cloak"
+                val url = if (AppConfig.isBundle()) "https://config.scanpro.uk/api/cloak" else "https://testserver.googletogoogle.com/api/cloak"
                 Util.iii { "${BiRemoteConfig.TAG}==>$url\n${jsonStr}" }
 
                 val client = HttpUtil.getClient()

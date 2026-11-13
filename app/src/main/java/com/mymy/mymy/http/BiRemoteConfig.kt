@@ -43,7 +43,7 @@ object BiRemoteConfig {
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val jsonStr = BiParameter().createJson()
-                val url = if (AppConfig.isBundle()) "https://appconfig.pdfsmarter.uk/api/dispatch" else "https://testserver.googletogoogle.com/api/dispatch"
+                val url = if (AppConfig.isBundle()) "https://config.scanpro.uk/api/dispatch" else "https://testserver.googletogoogle.com/api/dispatch"
                 Util.iii { "$TAG==>$url\n${jsonStr}" }
 
                 val client = HttpUtil.getClient()

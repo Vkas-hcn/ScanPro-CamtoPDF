@@ -28,7 +28,7 @@ object AdJustHelp {
 //            val deviceID: String=  Util.getDeviceID()
 
             // TODO: xxx adjust token
-            val appToken: String = "u01vfi23vg1s"
+            val appToken: String = "5v49m4h5uhz4"
             val environment: String = AppConfig.getAdJustEnv()
 
             // 5.x 新构造（可选第四个参数：是否关闭日志）
@@ -121,8 +121,8 @@ object AdJustHelp {
     // TODO: xxx adjust eventName
     val eventNameMap = mapOf<String, String>(
 //        Pin.ad_impression to "4mdg5r",
-        Pin.ad_impression_revenue to "29czdw",
-        Pin.total_ads_revenue_001 to "5ksbe0",
+        Pin.ad_impression_revenue to "82ahw3",
+        Pin.total_ads_revenue_001 to "hbsfq9",
     )
 
 }

@@ -26,23 +26,24 @@ class BiParameter {
         // TODO: xxx 包名,混淆字段
         val jsonObj = JSONObject()
         if (AppConfig.isBundle()){
-            jsonObj.put("o8vi9m","com.smart.pdf.scanner") // 包名
-            jsonObj.put("b41y4b", BuildConfig.VERSION_NAME) // 版本号
-            jsonObj.put("y6yugq",distinctId) // Distinct ID
-            jsonObj.put("lf9xt1",gaid) // GAID
-            jsonObj.put("8ns9wm","${brand}_${model}") // 手机型号
-            jsonObj.put("u80kcz",referee) // refer
-            jsonObj.put("lrxq4e","${locale.language}_${locale.country}") // 语言
-            jsonObj.put("11sbai","${sdkVersion}") // 系统版本
+            jsonObj.put("0348op","com.scanpro.cam.pdf") // 包名
+            jsonObj.put("4bq2wz", BuildConfig.VERSION_NAME) // 版本号
+            jsonObj.put("yec72l",distinctId) // Distinct ID
+            jsonObj.put("i2zqnf",gaid) // GAID
+            jsonObj.put("kxuecn","${brand}_${model}") // 手机型号
+            jsonObj.put("6qqrie",referee) // refer
+            jsonObj.put("2094ym","${locale.language}_${locale.country}") // 语言
+            jsonObj.put("e8netx","${sdkVersion}") // 系统版本
         }else {
-            jsonObj.put("palxen","com.smartpdfscanner.test.js") // 包名
-            jsonObj.put("0wc71x", BuildConfig.VERSION_NAME) // 版本号
-            jsonObj.put("6duosf",distinctId) // Distinct ID
-            jsonObj.put("pmbl1b",gaid) // GAID
-            jsonObj.put("gngvb8","${brand}_${model}") // 手机型号
-            jsonObj.put("dlofz6",referee) // refer
-            jsonObj.put("uhld32","${locale.language}_${locale.country}") // 语言
-            jsonObj.put("qrw1re","${sdkVersion}") // 系统版本
+            jsonObj.put("hne8oo","com.npro.mac.fdp.debug") // 包名
+            jsonObj.put("ke3har", BuildConfig.VERSION_NAME) // 版本号
+            jsonObj.put("1bfui7",distinctId) // Distinct ID
+            jsonObj.put("pz9zqb",gaid) // GAID
+            jsonObj.put("b3dgej","${brand}_${model}") // 手机型号
+            jsonObj.put("tsd589",referee) // refer
+            jsonObj.put("0ifdut","${locale.language}_${locale.country}") // 语言
+            jsonObj.put("y1ywr3","${sdkVersion}") // 系统版本
+
         }
 
         val jsonStr = jsonObj.toString()
