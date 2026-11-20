@@ -59,8 +59,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         private const val SHOWN_MAX_MS = 20_000L
         /** 广告盖过启动页后回到前台，给正常关闭回调的宽限 */
         private const val RESUME_GRACE_MS = 1_000L
-        /** 比价等第二个候选的上限：异常配置不应把开屏拖过启动页 15s 硬超时 */
-        private const val MAX_CMP_WAIT_MS = 5_000
+
     }
 
     private val TAG = "SpBootGate"
@@ -555,8 +554,9 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 }
                 Util.iii { "$TAG request first ad -> $first" }
 
-                // 收到第一个成功结果后，等待第二个成功结果，最多 AdsConf.open_cmp_wait ms（上限 5s）
-                val cmpWaitMs = AdsConf.open_cmp_wait.coerceIn(0, MAX_CMP_WAIT_MS)
+                // 收到第一个成功结果后，等待第二个成功结果
+                val cmpWaitMs = AdsConf.open_cmp_wait
+                Log.e(TAG, "runTasks: op_cmp_wt=${cmpWaitMs}", )
                 val second = withTimeoutOrNull(cmpWaitMs.milliseconds) {
                     successChannel.receiveCatching().getOrNull()
                 }

@@ -37,6 +37,8 @@ object ConfigBean {
             AdsConf.open_min_wait = jsonObject.getInt("op_min_wt")
             AdsConf.open_max_wait = jsonObject.getInt("op_max_wt")
             AdsConf.open_gap = jsonObject.getInt("op_gap")
+            // 可选字段：老配置没有时用 1500；不能用上面的 getInt，否则缺 key 会让整段解析失败
+            AdsConf.open_cmp_wait = jsonObject.optInt("op_cmp_wt", 1500)
 
             AdsConf.inter_min_wait = jsonObject.getInt("int_min_wt")
             AdsConf.inter_max_wait = jsonObject.getInt("int_max_wt")
@@ -60,6 +62,8 @@ object ConfigBean {
             AdsConf.open_min_wait = jsonObject.getInt("op_min_wt")
             AdsConf.open_max_wait = jsonObject.getInt("op_max_wt")
             AdsConf.open_gap = jsonObject.getInt("op_gap")
+            // 可选字段：老配置没有时用 1500；不能用上面的 getInt，否则缺 key 会让整段解析失败
+            AdsConf.open_cmp_wait = jsonObject.optInt("op_cmp_wt", 1500)
 
             AdsConf.inter_min_wait = jsonObject.getInt("int_min_wt")
             AdsConf.inter_max_wait = jsonObject.getInt("int_max_wt")
