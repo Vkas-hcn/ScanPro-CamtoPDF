@@ -2,6 +2,7 @@ package com.scanpro.cam.pdf.boot
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import android.view.LayoutInflater
 import androidx.activity.viewModels
@@ -18,6 +19,7 @@ import com.buncead.common.util.PageMgr
 import com.buncead.common.util.PermNotifyUtil
 import com.buncead.common.util.Util
 import com.mymy.mymy.ads.AdLog
+import com.mymy.mymy.ads.AdsConf
 import com.mymy.mymy.ads.count.AdCountOpen
 import com.mymy.mymy.ads.poi.AdTrackingHelperMy
 import com.mymy.mymy.ads.poi.TrackAd
@@ -49,17 +51,38 @@ import kotlin.time.Duration.Companion.milliseconds
 class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     companion object {
         private const val MIN_CREATIVE_WINDOW_MS = 6_000L
+        /** 插屏：启动页持续前台且无广告遮挡的最大等待，超时判定广告没展示 */
+        private const val NO_SHOW_TIMEOUT_MS = 3_000L
+        /** 开屏在容器内展示，Activity 不会失去前台；放宽到能覆盖正常开屏时长 */
+        private const val OPEN_NO_SHOW_TIMEOUT_MS = 15_000L
+        /** 已曝光后的最大展示时长（主要兜底容器内开屏的关闭回调丢失） */
+        private const val SHOWN_MAX_MS = 20_000L
+        /** 广告盖过启动页后回到前台，给正常关闭回调的宽限 */
+        private const val RESUME_GRACE_MS = 1_000L
+        /** 比价等第二个候选的上限：异常配置不应把开屏拖过启动页 15s 硬超时 */
+        private const val MAX_CMP_WAIT_MS = 5_000
     }
 
     private val TAG = "SpBootGate"
 
     private val viewModel: SpBootViewModel by viewModels()
     private var finished = false
-    private var openAdStarted = false
     private var adsFlowStarted = false
     private var splashStartedAtMs = 0L
     private var maxTimeoutMs = 15_000L
     private var minDelayMs = 3_000L
+
+    // ---- 展示看门狗：只在启动页前台且有焦点（即广告不在遮挡）时兜底放行 ----
+    private var adRequestedPlace: String? = null
+    private var adCovered = false
+    private var adDone = false
+    private var adShown = false
+    private var userLeft = false
+    private var foregroundSince = 0L
+    private var noShowTimeoutMs = NO_SHOW_TIMEOUT_MS
+    private var noShowJob: Job? = null
+    private var shownCapJob: Job? = null
+    private var graceJob: Job? = null
 
     override val applySystemBarsPadding: Boolean = false
 
@@ -135,7 +158,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
     // 进度结束
     private fun onBootTimeout() {
-        if (finished || !adsFlowStarted || openAdStarted) return
+        if (finished || !adsFlowStarted) return
         if (isFinishing) return
         finished = true
 //        SpAdsRuntime.getOrNull()?.markColdBootDone()
@@ -270,17 +293,154 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
 
     fun showAd(taskName: String){
+        if (adDone || finished) return
+        adRequestedPlace = taskName
+        adCovered = false
+        adDone = false
+        adShown = false
+        userLeft = false
+        foregroundSince = SystemClock.elapsedRealtime()
+        noShowTimeoutMs = if (ImpressionUtils.currentSetting(taskName)?.zType == CodeKeyAndEvent.xxdx_TYPE_OPEN) {
+            OPEN_NO_SHOW_TIMEOUT_MS
+        } else {
+            NO_SHOW_TIMEOUT_MS
+        }
+
         lifecycleScope.launch(Dispatchers.Main){
             ImpressionUtils.show(
                 mActivity,taskName,
                 CodeKeyAndEvent.bb_ACTION_LAUNCH_COLD,
                 binding.adCom,
+                onShown = { onAdShown() },
             ) {
-                nextStep()
+                finishAdFlow("ad_callback")
             }
 
             loadOther()
         }
+        startNoShowWatchdog()
+    }
+
+    /** 广告真正曝光（onAdShowed）：取消 no-show 计时，改用展示上限兜底 */
+    private fun onAdShown() {
+        runOnUiThread {
+            if (adDone || finished) return@runOnUiThread
+            adShown = true
+            noShowJob?.cancel()
+            startShownCapWatchdog()
+        }
+    }
+
+    /**
+     * 结束开屏广告流程（正常回调或看门狗）。
+     * 只有启动页在前台且广告不在遮挡时，看门狗才会调用到这里。
+     */
+    private fun finishAdFlow(reason: String) {
+        if (adDone || finished) return
+        adDone = true
+        noShowJob?.cancel()
+        shownCapJob?.cancel()
+        graceJob?.cancel()
+        if (reason != "ad_callback") {
+            AdLog.log("SHOW_WATCHDOG", adRequestedPlace ?: "-", null, "reason=$reason")
+        }
+        nextStep()
+    }
+
+    private fun isForegroundFocused(): Boolean {
+        return lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && hasWindowFocus()
+    }
+
+    /** 兜底 1：启动页持续前台且有焦点，超时内广告还没上屏/没结束 → 判定没展示，放行 */
+    private fun startNoShowWatchdog() {
+        noShowJob?.cancel()
+        noShowJob = lifecycleScope.launch {
+            while (isActive && !adDone && !finished) {
+                delay(200)
+                if (adShown) return@launch
+                if (adCovered) continue
+                if (!isForegroundFocused()) {
+                    foregroundSince = 0L
+                    continue
+                }
+                if (foregroundSince == 0L) {
+                    foregroundSince = SystemClock.elapsedRealtime()
+                }
+                if (SystemClock.elapsedRealtime() - foregroundSince >= noShowTimeoutMs) {
+                    finishAdFlow("no_show_timeout")
+                    return@launch
+                }
+            }
+        }
+    }
+
+    /**
+     * 兜底 1.5：广告已曝光后的最大展示时长。
+     * 主要针对容器内开屏（Activity 一直前台+有焦点，onAdClosed 丢失时没有其它信号）。
+     */
+    private fun startShownCapWatchdog() {
+        shownCapJob?.cancel()
+        shownCapJob = lifecycleScope.launch {
+            val shownAt = SystemClock.elapsedRealtime()
+            while (isActive && !adDone && !finished) {
+                delay(200)
+                if (isForegroundFocused() && SystemClock.elapsedRealtime() - shownAt >= SHOWN_MAX_MS) {
+                    finishAdFlow("shown_max_timeout")
+                    return@launch
+                }
+            }
+        }
+    }
+
+    /** 兜底 2：广告盖过启动页（onStop）后回到前台，给正常回调 [RESUME_GRACE_MS]，仍没结束则放行 */
+    private fun scheduleDismissFallback() {
+        graceJob?.cancel()
+        graceJob = lifecycleScope.launch {
+            delay(RESUME_GRACE_MS)
+            if (!adDone && !finished && isForegroundFocused()) {
+                finishAdFlow("dismiss_callback_lost")
+            }
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // 用户按 Home/最近任务主动离开：这次 stop 不算“被广告盖住”
+        if (adRequestedPlace != null) userLeft = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        userLeft = false
+        if (adRequestedPlace == null || adDone) return
+        foregroundSince = SystemClock.elapsedRealtime()
+        if (adCovered) scheduleDismissFallback()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (adRequestedPlace != null && !adDone && !userLeft) {
+            // 非用户主动离开的 stop：广告 Activity 盖住了启动页
+            adCovered = true
+        }
+        foregroundSince = 0L
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) {
+            foregroundSince = 0L
+        } else if (adRequestedPlace != null && !adDone) {
+            foregroundSince = SystemClock.elapsedRealtime()
+            if (adCovered) scheduleDismissFallback()
+        }
+    }
+
+    override fun onDestroy() {
+        noShowJob?.cancel()
+        shownCapJob?.cancel()
+        graceJob?.cancel()
+        super.onDestroy()
     }
 
 
@@ -395,16 +555,17 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 }
                 Util.iii { "$TAG request first ad -> $first" }
 
-                // 收到第一个成功结果后，等待第二个成功结果，最多 1500ms
-                val second = withTimeoutOrNull(1500L.milliseconds) {
+                // 收到第一个成功结果后，等待第二个成功结果，最多 AdsConf.open_cmp_wait ms（上限 5s）
+                val cmpWaitMs = AdsConf.open_cmp_wait.coerceIn(0, MAX_CMP_WAIT_MS)
+                val second = withTimeoutOrNull(cmpWaitMs.milliseconds) {
                     successChannel.receiveCatching().getOrNull()
                 }
 
                 if (second != null) {
-                    Util.iii { "$TAG request second 1500ms -> $first" }
+                    Util.iii { "$TAG request second ${cmpWaitMs}ms -> $first" }
                     stepnext1_ecpm(first,second)
                 } else {
-                    Util.iii { "$TAG wait 1500ms, no second ad" }
+                    Util.iii { "$TAG wait ${cmpWaitMs}ms, no second ad" }
                     stepnext2(first)
                 }
 

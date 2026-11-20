@@ -3,8 +3,6 @@ package com.zppko.pdfplus.nor.ads
 
 import android.util.Log
 import android.widget.FrameLayout
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
 import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.count.AdCountInter
 import com.mymy.mymy.ads.count.AdCountNati
@@ -21,6 +19,7 @@ import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
 import com.zppko.pdfplus.nor.ads.mob.OpenAdsLoad
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
+import com.zppko.pdfplus.nor.ads.tool.RunOnResumed
 import com.zppko.pdfplus.nor.remote.DefaultConfigHelper
 import com.zppko.pdfplus.nor.remote.RemoteConfigHelper
 
@@ -105,7 +104,15 @@ object ImpressionUtils {
         }
     }
 
-    fun show(act: BaseActivity?, place: String, point:String, container: FrameLayout, whenOnVisible:Boolean=true, finish: () -> Unit) {
+    fun show(
+        act: BaseActivity?,
+        place: String,
+        point: String,
+        container: FrameLayout,
+        whenOnVisible: Boolean = true,
+        onShown: (() -> Unit)? = null,
+        finish: () -> Unit
+    ) {
         if (act == null) {
             AdLog.log("SHOW_BLOCKED", place, myPoolzzdd[place]?.setting?.zId, "reason=activity_null point=$point")
             finish.invoke()
@@ -116,9 +123,11 @@ object ImpressionUtils {
         if (loadSuccess(place) && capOk) {
 //            myPoolzzdd[place] = null
 //            load(place)
+            unit?.zOnShown = onShown
             unit?.zShoweee(act, point,container,whenOnVisible, finish)
         } else if (!capOk) {
             // 已达该广告位当天上限：直接放行流程，不再等待下一次 onResume
+            unit?.zOnShown = null
             AdLog.log("SHOW_BLOCKED", place, unit?.setting?.zId, "reason=daily_cap point=$point")
             unit?.setting?.let { setting ->
                 TrackAd.blocked(
@@ -126,24 +135,16 @@ object ImpressionUtils {
                     ADBlockReason.daily_cap
                 )
             }
-            finish.invoke()
+            RunOnResumed.run(act, false) { finish.invoke() }
         } else {
+            unit?.zOnShown = null
             AdLog.log("SHOW_BLOCKED", place, unit?.setting?.zId, "reason=ad_not_ready point=$point")
             unit?.setting?.let { setting ->
                 TrackAd.blocked(TrackBean.getTradBean(setting.zType,setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId),ADBlockReason.disabled)
             }
 
-            if (whenOnVisible){
-                val observer = object : DefaultLifecycleObserver {
-                    override fun onResume(owner: LifecycleOwner) {
-                        act.lifecycle.removeObserver(this)
-                        finish.invoke()
-                    }
-                }
-                act.lifecycle.addObserver(observer)
-            }else{
-                finish.invoke()
-            }
+            // 已 RESUMED 立即执行，否则等下一次 RESUMED；避免 observer 永远等不到
+            RunOnResumed.run(act, whenOnVisible) { finish.invoke() }
         }
     }
 

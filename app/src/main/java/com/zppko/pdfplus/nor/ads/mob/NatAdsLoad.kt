@@ -58,6 +58,7 @@ class NatAdsLoad(
                 override fun onAdShowed() {
                     AdCountNati.nati_addShowCount(setting.zId)
                     AdLog.log("SHOW_SUCCESS", setting.zPlace, setting.zId, "type=${setting.zType}")
+                    zNotifyShown()
                     TrackAd.showSuccess(trBean)
                 }
                 override fun onAdClicked() {

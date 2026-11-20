@@ -3,8 +3,6 @@ package com.zppko.pdfplus.nor.ads.tool
 
 import android.util.Log
 import android.widget.FrameLayout
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
 import com.buncead.common.ui.BaseActivity
 import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.poi.ADBlockReason
@@ -18,6 +16,16 @@ import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import kotlin.Unit
 
 abstract class BaseAdsLoad(var setting: AdsSetting) {
+
+    /** 广告真正曝光（onAdShowed）时回调一次；由 ImpressionUtils.show 按次设置 */
+    var zOnShown: (() -> Unit)? = null
+
+    /** 子类在各自 onAdShowed 里调用，通知“广告已曝光” */
+    protected fun zNotifyShown() {
+        val callback = zOnShown
+        zOnShown = null
+        callback?.invoke()
+    }
 
     //广告加载失败
     protected fun zmyAdsLoadFFFF(msg: String) {
@@ -87,17 +95,8 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
 
     //关闭广告
     protected fun zDismiss(act: BaseActivity, whenOnVisible: Boolean = true, finish: () -> Unit) {
-        if (whenOnVisible) {
-            val observer = object : DefaultLifecycleObserver {
-                override fun onResume(owner: LifecycleOwner) {
-                    act.lifecycle.removeObserver(this)
-                    finish.invoke()
-                }
-            }
-            act.lifecycle.addObserver(observer)
-        } else {
-            finish.invoke()
-        }
+        // 已 RESUMED 立即执行；否则等下一次 RESUMED；避免关闭回调晚于 resume 时永久等待
+        RunOnResumed.run(act, whenOnVisible, finish)
     }
 
     //距离广告过期还有多久

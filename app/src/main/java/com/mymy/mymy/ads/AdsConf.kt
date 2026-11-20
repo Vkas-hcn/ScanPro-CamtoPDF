@@ -8,6 +8,8 @@ object AdsConf {
     var open_day_show = 50
     var open_day_click = 50
     var open_gap = 1000
+    // 开屏两个候选的比价等待：第一个就绪后等第二个多久（ms），0=不等直接展示第一个
+    var open_cmp_wait = 1500
 
     var inter_min_wait = 200
     var inter_max_wait = 8000

@@ -84,6 +84,7 @@ class OpenAdsLoad(
                 override fun onAdShowed() {
                     AdCountOpen.open_addShowCount(setting.zId)
                     AdLog.log("SHOW_SUCCESS", setting.zPlace, setting.zId, "type=${setting.zType}")
+                    zNotifyShown()
                     TrackAd.showSuccess(trBean)
 
                     if (zcanUsable()){
