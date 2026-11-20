@@ -6,6 +6,7 @@ import android.widget.FrameLayout
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.buncead.common.ui.BaseActivity
+import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.poi.ADBlockReason
 import com.mymy.mymy.ads.poi.TrackAd
 import com.mymy.mymy.ads.poi.TrackBean
@@ -21,6 +22,7 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
     //广告加载失败
     protected fun zmyAdsLoadFFFF(msg: String) {
         Log.e("hhhh广告", "加载失败 ${msg} ${setting.zPlace}-${setting.zFirm}-${setting.zType}-${setting.zId}")
+        AdLog.log("LOAD_FAILED", setting.zPlace, setting.zId, "type=${setting.zType} msg=${msg}")
         zIsLoadingAds = false
     }
 
@@ -36,6 +38,12 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
     //广告加载成功
     protected fun zmyAdsLoadSSSS() {
         Log.e("hhhh广告", "加载成功 ${setting.zPlace}-${setting.zFirm}-${setting.zType}-${setting.zId}")
+        AdLog.log(
+            "LOAD_SUCCESS",
+            setting.zPlace,
+            setting.zId,
+            "type=${setting.zType} caps=${setting.zDayShow}/${setting.zDayClick}"
+        )
         zIsLoadingAds = false
         zLoadedTimeForAds = System.currentTimeMillis()
     }
@@ -55,8 +63,15 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
     open fun zShoweee(act: BaseActivity, event: String, container: FrameLayout, whenOnVisible: Boolean = true, finish: () -> Unit) {
         if (!act.isHide() && zcanUsable()) {
             Log.e("hhhh广告", "展示广告 ${setting.zPlace}-${setting.zFirm}-${setting.zType}-${setting.zId}")
+            AdLog.log("SHOW_ACCEPT", setting.zPlace, setting.zId, "type=${setting.zType} point=$event")
             childShow(act, event, container, whenOnVisible, finish)
         } else {
+            AdLog.log(
+                "SHOW_BLOCKED",
+                setting.zPlace,
+                setting.zId,
+                "type=${setting.zType} reason=" + if (act.isHide()) "activity_hidden" else "ad_not_ready"
+            )
             TrackAd.blocked(TrackBean.getTradBean(setting.zType,setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId),ADBlockReason.disabled)
 
             zDismiss(act, whenOnVisible, finish)
@@ -95,7 +110,20 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
         if (!zIsLoadingAds && !zcanUsable()) {
             zIsLoadingAds = true
             Log.e("hhhh广告", "开始加载广告 ${setting.zPlace}-${setting.zFirm}-${setting.zType}-${setting.zId}",)
+            AdLog.log(
+                "LOAD_START",
+                setting.zPlace,
+                setting.zId,
+                "type=${setting.zType} caps=${setting.zDayShow}/${setting.zDayClick}"
+            )
             childLoad()
+        } else {
+            AdLog.log(
+                "LOAD_SKIP",
+                setting.zPlace,
+                setting.zId,
+                "type=${setting.zType} loading=$zIsLoadingAds ready=${zcanUsable()}"
+            )
         }
     }
 

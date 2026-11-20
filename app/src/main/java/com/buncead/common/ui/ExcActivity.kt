@@ -7,6 +7,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.buncead.common.util.NetUtil
 
+import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.count.AdCountInter
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.databinding.ActivityExcBinding
@@ -41,7 +42,16 @@ class ExcActivity : BaseActivity() {
     fun netCheck(){
         // 网络是否允许加载和显示广告
         val allow = NetUtil.isUseNet_noVpn()
-        val canShow = AdCountInter.interCanShow()
+        val setting = ImpressionUtils.currentSetting(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN)
+        val capOk = AdCountInter.inter_idCountCheck(setting)
+        val gapOk = AdCountInter.inter_checkTimeDiff()
+        val canShow = capOk && gapOk
+        AdLog.log(
+            "GATE_INTER",
+            CodeKeyAndEvent.zx_PLACE_INTER_ClEAN,
+            setting?.zId,
+            "allow=$allow capOk=$capOk gapOk=$gapOk show=${allow && canShow} caps=${setting?.zDayShow}/${setting?.zDayClick}"
+        )
         if (allow && canShow){
             binding.lyAd.icon.setImageResource(R.drawable.ic_scan_big)
             binding.lyAd.content.setText(R.string.op_camera_hiti)

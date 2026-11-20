@@ -3,6 +3,7 @@ package com.zppko.pdfplus.nor.ads.mob
 import android.widget.FrameLayout
 import com.buncead.common.ui.BaseActivity
 import com.buncead.common.util.Util
+import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.count.AdCountInter
 import com.mymy.mymy.ads.count.AdCountOpen
 import com.mymy.mymy.ads.poi.TrackAd
@@ -62,6 +63,7 @@ class OpenAdsLoad(
         }else{
             trad.setShowCallback(object: TradShowCallback() {
                 override fun onAdDismissed() {
+                    AdLog.log("SHOW_DISMISS", setting.zPlace, setting.zId, "type=${setting.zType}")
                     TrackAd.showDismiss(trBean)
 
                     container.removeAllViews()
@@ -75,11 +77,13 @@ class OpenAdsLoad(
                     }
                 }
                 override fun onAdFailedToShow() { // topon open没有show失败的call，下面代码没有意义
+                    AdLog.log("SHOW_FAILED", setting.zPlace, setting.zId, "type=${setting.zType}")
                     zDismiss(act,whenOnVisible, finish)
 
                 }
                 override fun onAdShowed() {
-                    AdCountOpen.open_addShowCount()
+                    AdCountOpen.open_addShowCount(setting.zId)
+                    AdLog.log("SHOW_SUCCESS", setting.zPlace, setting.zId, "type=${setting.zType}")
                     TrackAd.showSuccess(trBean)
 
                     if (zcanUsable()){
@@ -90,7 +94,8 @@ class OpenAdsLoad(
                     }
                 }
                 override fun onAdClicked() {
-                    AdCountOpen.open_addClickCount()
+                    AdCountOpen.open_addClickCount(setting.zId)
+                    AdLog.log("CLICK", setting.zPlace, setting.zId, "type=${setting.zType}")
                     TrackAd.showClick(trBean)
 
                 }

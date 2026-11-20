@@ -94,7 +94,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "op",
       "vksnx": 13800,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_scan_int":[
@@ -103,7 +105,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_done_int":[
@@ -112,7 +116,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_result_int": [
@@ -121,7 +127,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_main_nat":[
@@ -130,7 +138,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "nat",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 110,
+      "day_cli": 60
     }
   ]
 }
@@ -145,7 +155,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "op",
       "vksnx": 13800,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_scan_int":[
@@ -154,7 +166,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_done_int":[
@@ -163,7 +177,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_result_int": [
@@ -172,7 +188,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "int",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 60,
+      "day_cli": 60
     }
   ],
   "co_main_nat":[
@@ -181,7 +199,9 @@ object DefaultConfigHelper {
       "opxmlf": "tradplus",
       "ujhscs": "nat",
       "vksnx": 3000,
-      "gkqcx": 3
+      "gkqcx": 3,
+      "day_sh": 110,
+      "day_cli": 60
     }
   ]
 }

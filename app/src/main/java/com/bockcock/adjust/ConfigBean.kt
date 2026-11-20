@@ -36,18 +36,12 @@ object ConfigBean {
 
             AdsConf.open_min_wait = jsonObject.getInt("op_min_wt")
             AdsConf.open_max_wait = jsonObject.getInt("op_max_wt")
-            AdsConf.open_day_show = jsonObject.getInt("op_day_sh")
-            AdsConf.open_day_click = jsonObject.getInt("op_day_cli")
             AdsConf.open_gap = jsonObject.getInt("op_gap")
 
             AdsConf.inter_min_wait = jsonObject.getInt("int_min_wt")
             AdsConf.inter_max_wait = jsonObject.getInt("int_max_wt")
-            AdsConf.inter_day_show = jsonObject.getInt("int_day_sh")
-            AdsConf.inter_day_click = jsonObject.getInt("int_day_cli")
             AdsConf.inter_gap = jsonObject.getInt("int_gap")
 
-            AdsConf.native_day_show = jsonObject.getInt("nat_day_sh")
-            AdsConf.native_day_click = jsonObject.getInt("nat_day_cli")
             AdsConf.native_gap = jsonObject.getInt("nat_gap")
 
             ConfigBean.op_vpn_limit = jsonObject.optInt("bslcl",0)
@@ -65,18 +59,12 @@ object ConfigBean {
         runCatching {
             AdsConf.open_min_wait = jsonObject.getInt("op_min_wt")
             AdsConf.open_max_wait = jsonObject.getInt("op_max_wt")
-            AdsConf.open_day_show = jsonObject.getInt("op_day_sh")
-            AdsConf.open_day_click = jsonObject.getInt("op_day_cli")
             AdsConf.open_gap = jsonObject.getInt("op_gap")
 
             AdsConf.inter_min_wait = jsonObject.getInt("int_min_wt")
             AdsConf.inter_max_wait = jsonObject.getInt("int_max_wt")
-            AdsConf.inter_day_show = jsonObject.getInt("int_day_sh")
-            AdsConf.inter_day_click = jsonObject.getInt("int_day_cli")
             AdsConf.inter_gap = jsonObject.getInt("int_gap")
 
-            AdsConf.native_day_show = jsonObject.getInt("nat_day_sh")
-            AdsConf.native_day_click = jsonObject.getInt("nat_day_cli")
             AdsConf.native_gap = jsonObject.getInt("nat_gap")
 
             ConfigBean.op_vpn_limit = jsonObject.optInt("bslcl",0)

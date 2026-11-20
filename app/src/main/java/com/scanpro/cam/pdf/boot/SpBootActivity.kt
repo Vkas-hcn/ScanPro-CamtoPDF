@@ -17,6 +17,7 @@ import com.buncead.common.util.NetUtil
 import com.buncead.common.util.PageMgr
 import com.buncead.common.util.PermNotifyUtil
 import com.buncead.common.util.Util
+import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.count.AdCountOpen
 import com.mymy.mymy.ads.poi.AdTrackingHelperMy
 import com.mymy.mymy.ads.poi.TrackAd
@@ -40,6 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Cold start: consent → preload App Open → show (or timeout) → [CamShellActivity].
@@ -239,7 +241,16 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     fun netCheck(){
         // 网络是否允许加载和显示广告
         val allow = NetUtil.isUseNet_noVpn()
-        val canShow = AdCountOpen.openCanShow()
+        val setting = ImpressionUtils.currentSetting(CodeKeyAndEvent.zx_PLACE_OPEN)
+        val capOk = AdCountOpen.open_idCountCheck(setting)
+        val gapOk = AdCountOpen.open_checkTimeDiff()
+        val canShow = capOk && gapOk
+        AdLog.log(
+            "GATE_OPEN",
+            CodeKeyAndEvent.zx_PLACE_OPEN,
+            setting?.zId,
+            "allow=$allow capOk=$capOk gapOk=$gapOk show=${allow && canShow} caps=${setting?.zDayShow}/${setting?.zDayClick}"
+        )
         if (allow && canShow){
             startLoadTime = System.currentTimeMillis()
             runTasks()
@@ -283,8 +294,24 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         return ImpressionUtils.loadSuccess(taskName)
     }
 
-    /** 两个候选位都就绪：比 eCPM，单价高者展示（照 A `stepnext1_ecpm`）。 */
+    /** 两个候选位都就绪：先排除已达 per-ID 上限的候选，再比 eCPM，单价高者展示（照 A `stepnext1_ecpm`）。 */
     private fun stepnext1_ecpm(first: String, second: String) {
+        val firstOk = ImpressionUtils.canShowAd(first)
+        val secondOk = ImpressionUtils.canShowAd(second)
+        if (!firstOk) logCandidateSkip(first)
+        if (!secondOk) logCandidateSkip(second)
+        if (!firstOk && !secondOk) {
+            stepnextFoce()
+            return
+        }
+        if (!firstOk) {
+            showAd(second)
+            return
+        }
+        if (!secondOk) {
+            showAd(first)
+            return
+        }
         // 优先用 TradPlus 比价 SDK（recursiveComparePrice）探测真实 eCPM；失败回退到广告对象自带 eCPM。
         val ecpm1 = ImpressionUtils.getComparePrice(first).takeIf { it > 0 } ?: ImpressionUtils.getEcpm(first)
         val ecpm2 = ImpressionUtils.getComparePrice(second).takeIf { it > 0 } ?: ImpressionUtils.getEcpm(second)
@@ -297,7 +324,15 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         }
     }
     fun stepnext2(first: String) {
+        if (!ImpressionUtils.canShowAd(first)) {
+            logCandidateSkip(first)
+            stepnextFoce()
+            return
+        }
         showAd(first)
+    }
+    private fun logCandidateSkip(place: String) {
+        AdLog.log("CANDIDATE_SKIP", place, ImpressionUtils.currentSetting(place)?.zId, "reason=daily_cap")
     }
     fun stepnextFoce(){
         nextStep()
@@ -348,11 +383,12 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
             try {
                 // 3. 最多等待 15000ms，等待第一个任务成功
-                val first = withTimeoutOrNull(15000L) {
+                val first = withTimeoutOrNull(15000L.milliseconds) {
                     successChannel.receiveCatching().getOrNull()
                 }
                 if (first == null) {
                     // 15000ms 内没有任何任务成功
+                    AdLog.log("SHOW_TIMEOUT", CodeKeyAndEvent.zx_PLACE_OPEN, null, "waitMs=${System.currentTimeMillis() - startLoadTime}")
                     TrackAd.adShowTimeout(AdTrackingHelperMy.AdType.OPEN, CodeKeyAndEvent.zx_PLACE_OPEN,System.currentTimeMillis() - startLoadTime)
                     stepnextFoce()
                     return@launch
@@ -360,7 +396,7 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 Util.iii { "$TAG request first ad -> $first" }
 
                 // 收到第一个成功结果后，等待第二个成功结果，最多 1500ms
-                val second = withTimeoutOrNull(1500L) {
+                val second = withTimeoutOrNull(1500L.milliseconds) {
                     successChannel.receiveCatching().getOrNull()
                 }
 

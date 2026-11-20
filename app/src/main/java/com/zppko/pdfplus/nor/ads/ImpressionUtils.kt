@@ -5,6 +5,10 @@ import android.util.Log
 import android.widget.FrameLayout
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.mymy.mymy.ads.AdLog
+import com.mymy.mymy.ads.count.AdCountInter
+import com.mymy.mymy.ads.count.AdCountNati
+import com.mymy.mymy.ads.count.AdCountOpen
 import com.mymy.mymy.ads.poi.ADBlockReason
 import com.mymy.mymy.ads.poi.TrackAd
 import com.mymy.mymy.ads.poi.TrackBean
@@ -58,7 +62,9 @@ object ImpressionUtils {
                             gameJson.getString("ujhscs"),
                             gameJson.getLong("vksnx"),
                             gameJson.optInt("gkqcx", 0),
-                            it
+                            it,
+                            gameJson.optInt("day_sh", -1),
+                            gameJson.optInt("day_cli", -1)
                         )
                         gameList.add(adsSetting)
                     }
@@ -101,15 +107,28 @@ object ImpressionUtils {
 
     fun show(act: BaseActivity?, place: String, point:String, container: FrameLayout, whenOnVisible:Boolean=true, finish: () -> Unit) {
         if (act == null) {
+            AdLog.log("SHOW_BLOCKED", place, myPoolzzdd[place]?.setting?.zId, "reason=activity_null point=$point")
             finish.invoke()
             return
         }
         val unit = myPoolzzdd[place]
-        if (loadSuccess(place)) {
+        val capOk = capAvailable(unit?.setting)
+        if (loadSuccess(place) && capOk) {
 //            myPoolzzdd[place] = null
 //            load(place)
             unit?.zShoweee(act, point,container,whenOnVisible, finish)
+        } else if (!capOk) {
+            // 已达该广告位当天上限：直接放行流程，不再等待下一次 onResume
+            AdLog.log("SHOW_BLOCKED", place, unit?.setting?.zId, "reason=daily_cap point=$point")
+            unit?.setting?.let { setting ->
+                TrackAd.blocked(
+                    TrackBean.getTradBean(setting.zType,setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId),
+                    ADBlockReason.daily_cap
+                )
+            }
+            finish.invoke()
         } else {
+            AdLog.log("SHOW_BLOCKED", place, unit?.setting?.zId, "reason=ad_not_ready point=$point")
             unit?.setting?.let { setting ->
                 TrackAd.blocked(TrackBean.getTradBean(setting.zType,setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId),ADBlockReason.disabled)
             }
@@ -128,6 +147,19 @@ object ImpressionUtils {
         }
     }
 
+    /** 该位置当前/将展示广告的 per-ID 上限是否还有额度（供开屏 eCPM 选位、show 兜底使用）。 */
+    fun canShowAd(place: String): Boolean = capAvailable(currentSetting(place))
+
+    private fun capAvailable(setting: AdsSetting?): Boolean {
+        if (setting == null || setting.zId.isEmpty()) return true
+        return when (setting.zType) {
+            CodeKeyAndEvent.xxdx_TYPE_OPEN -> AdCountOpen.open_idCountCheck(setting)
+            CodeKeyAndEvent.xxdx_TYPE_INTER -> AdCountInter.inter_idCountCheck(setting)
+            CodeKeyAndEvent.xxdx_TYPE_NATIVE -> AdCountNati.nati_idCountCheck(setting)
+            else -> true
+        }
+    }
+
     fun getNewLoadConfig(place: String, weight: Int): AdsSetting? {
         val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
         var list = loadAdsSettingList(data)
@@ -135,6 +167,29 @@ object ImpressionUtils {
             list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
         }
         return list.filter { it.zPlace == place && it.zWeight < weight }.maxByOrNull { it.zWeight }
+    }
+
+    /** 读取最新广告位配置；解析失败/为空时回退本地默认配置。 */
+    private fun adList(): MutableList<AdsSetting> {
+        val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
+        var list = loadAdsSettingList(data)
+        if (list.isEmpty()) {
+            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
+        }
+        return list
+    }
+
+    /** 与 [load] 一致的选位规则：同位置取 gkqcx 最大且 boxaxj 非空的条目。 */
+    fun pickConfig(place: String): AdsSetting? {
+        return adList()
+            .sortedByDescending { it.zWeight }
+            .filter { it.zId.isNotEmpty() }
+            .find { it.zPlace == place }
+    }
+
+    /** 已加载对象优先，未加载时取将要加载的对象；频控上限判定使用它的 zId 与 day_sh/day_cli。 */
+    fun currentSetting(place: String): AdsSetting? {
+        return myPoolzzdd[place]?.setting ?: pickConfig(place)
     }
 
 
@@ -158,32 +213,30 @@ object ImpressionUtils {
 //        if (unit != null && !unit.canReloadAds()) {
             if (unit.zIsShowAds()){
                 Log.e("hhhh广告", "${place}: 有加载好的，不需要加载")
+                AdLog.log("LOAD_SKIP_READY", place, unit.setting.zId, "type=${unit.setting.zType}")
             }else{
                 Log.e("hhhh广告", "${place}: 没有广告，需要加载")
+                AdLog.log("LOAD_RELOAD", place, unit.setting.zId, "type=${unit.setting.zType}")
                 unit.zLoadeee()
             }
             return
         }
 
-        val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
-        var list = loadAdsSettingList(data)
-        if (list.isEmpty()) {
-            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
-        }
-        Log.e("hhhh广告", "获取最新广告配置")
-        list.forEach {
-            Log.e("hhhh广告", "配置：${it}")
-        }
-
-//        val config = list.sortedByDescending { it.zWeight }.find { it.zPlace == place }
-        val config = list.sortedByDescending { it.zWeight }.filter { !it.zId.isNullOrEmpty() }.find { it.zPlace == place }
+        val config = pickConfig(place)
+        Log.e("hhhh广告", "获取最新广告配置，选中：${config}")
         if (config != null) {
+            AdLog.log(
+                "LOAD_PICK",
+                place,
+                config.zId,
+                "type=${config.zType} weight=${config.zWeight} caps=${config.zDayShow}/${config.zDayClick}"
+            )
             myPoolzzdd[place] = convertBaseAds(config).apply { this?.zLoadeee() }
         } else {
             Log.e("hhhh广告", "找不到该广告位配置：${place}")
+            AdLog.log("LOAD_NO_ID", place, null, "no non-empty boxaxj")
         }
     }
-
 
 
     fun parseEcpm(rawStr: String?): Double {

@@ -7,7 +7,9 @@ data class AdsSetting public constructor(
     val zType: String, // 广告类型 // op , int , nat
     val zTime: Long, // 广告过期时间，admob,op:4小时，设13800秒，int:1小时，设3000秒
     val zWeight: Int, // 广告优先级，从最高的请求
-    val zPlace: String // 自定义的广告位置，open_laun,inte_back_result
+    val zPlace: String, // 自定义的广告位置，open_laun,inte_back_result
+    val zDayShow: Int = -1, // 该广告位每日展示上限，-1=未配置，用内置兜底值
+    val zDayClick: Int = -1 // 该广告位每日点击上限，-1=未配置，用内置兜底值
 ) {
 
     override fun equals(other: Any?): Boolean {
