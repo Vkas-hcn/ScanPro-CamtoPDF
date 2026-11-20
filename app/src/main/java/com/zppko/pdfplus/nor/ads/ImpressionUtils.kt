@@ -208,6 +208,19 @@ object ImpressionUtils {
 
 
     fun load(place: String) {
+        // 每日上限已达：该广告位当天不再加载（需求：各自上限达到就不加载、不展示）。
+        // 展示侧 [show] 还会用 capAvailable 再兜底一次，这里只是不再发无意义的请求。
+        val current = currentSetting(place)
+        if (!capAvailable(current)) {
+            AdLog.log(
+                "LOAD_SKIP_CAP",
+                place,
+                current?.zId,
+                "reason=daily_cap caps=${current?.zDayShow}/${current?.zDayClick}"
+            )
+            return
+        }
+
         val unit = myPoolzzdd[place]
 
         if (unit != null ) {

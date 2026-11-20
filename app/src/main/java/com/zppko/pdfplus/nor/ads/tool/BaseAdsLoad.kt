@@ -90,6 +90,9 @@ abstract class BaseAdsLoad(var setting: AdsSetting) {
         return zcanUsable() && !zisTimeOut()
     }
 
+    /** 该广告位当天是否还有展示额度；达到上限后不再预加载下一次（各 ID 独立判定）。 */
+    protected fun zHasDailyQuota(): Boolean = ImpressionUtils.canShowAd(setting.zPlace)
+
     private var zIsLoadingAds = false
 
 

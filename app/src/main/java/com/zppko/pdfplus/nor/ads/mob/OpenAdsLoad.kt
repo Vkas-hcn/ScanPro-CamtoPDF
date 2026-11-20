@@ -71,6 +71,10 @@ class OpenAdsLoad(
 
                     if (zcanUsable()){
                         Util.eee { "$TAG ad close, ad isRead=true, no load" }
+                    }else if (!zHasDailyQuota()) {
+                        // 当天额度已用尽：不再预加载下一次
+                        AdLog.log("LOAD_SKIP_CAP", setting.zPlace, setting.zId, "reason=daily_cap_after_dismiss")
+                        Util.eee { "$TAG ad close, daily cap reached, no load=${setting.zId}" }
                     }else{
                         Util.eee { "$TAG ad close, ad isRead=false, start load=${setting.zId}" }
                         splashAd.loadAd(null)
@@ -89,6 +93,10 @@ class OpenAdsLoad(
 
                     if (zcanUsable()){
                         Util.eee { "$TAG ad show, ad isRead=true, no load" }
+                    }else if (!zHasDailyQuota()) {
+                        // 本次曝光刚好用掉当天最后一个额度：不再预加载下一次
+                        AdLog.log("LOAD_SKIP_CAP", setting.zPlace, setting.zId, "reason=daily_cap_after_show")
+                        Util.eee { "$TAG ad show, daily cap reached, no load=${setting.zId}" }
                     }else{
                         Util.eee { "$TAG ad show, ad isRead=false, start load=${setting.zId}" }
                         splashAd.loadAd(null)

@@ -41,7 +41,7 @@ object DefaultConfigHelper {
           "op_max_wt":16000,
           "op_day_sh":60,
           "op_day_cli":60,
-          "op_gap":1000,
+          "op_gap":0,
           "op_cmp_wt":1500,
           
           "int_min_wt":1000,
