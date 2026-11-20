@@ -27,14 +27,14 @@ class BiDefaultConfig {
     val defaultConfig = """
 {
   "pps_refer_data":{
-    "op_min_wt":200,
-    "op_max_wt":15000,
+    "op_min_wt":1000,
+    "op_max_wt":16000,
     "op_day_sh":60,
     "op_day_cli":60,
     "op_gap":1000,
     
-    "int_min_wt":200,
-    "int_max_wt":8000,
+    "int_min_wt":1000,
+    "int_max_wt":16000,
     "int_day_sh":60,
     "int_day_cli":60,
     "int_gap":1000,

@@ -19,7 +19,6 @@ import com.buncead.common.util.PageMgr
 import com.buncead.common.util.PermNotifyUtil
 import com.buncead.common.util.Util
 import com.mymy.mymy.ads.AdLog
-import com.mymy.mymy.ads.AdsConf
 import com.mymy.mymy.ads.count.AdCountOpen
 import com.mymy.mymy.ads.poi.AdTrackingHelperMy
 import com.mymy.mymy.ads.poi.TrackAd
@@ -30,6 +29,7 @@ import com.scanpro.cam.pdf.databinding.ActivitySpBootBinding
 import com.scanpro.cam.pdf.leave.SpLeaveEntry
 
 import com.zppko.pdfplus.nor.RAction
+import com.zppko.pdfplus.nor.ads.AdWait
 import com.zppko.pdfplus.nor.ads.ImpressExt
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
@@ -50,9 +50,8 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     companion object {
-        private const val MIN_CREATIVE_WINDOW_MS = 6_000L
         /** 插屏：启动页持续前台且无广告遮挡的最大等待，超时判定广告没展示 */
-        private const val NO_SHOW_TIMEOUT_MS = 3_000L
+        private const val NO_SHOW_TIMEOUT_MS = 8_000L
         /** 开屏在容器内展示，Activity 不会失去前台；放宽到能覆盖正常开屏时长 */
         private const val OPEN_NO_SHOW_TIMEOUT_MS = 15_000L
         /** 已曝光后的最大展示时长（主要兜底容器内开屏的关闭回调丢失） */
@@ -60,6 +59,12 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         /** 广告盖过启动页后回到前台，给正常关闭回调的宽限 */
         private const val RESUME_GRACE_MS = 1_000L
 
+        /** 启动页候选位：开屏 + 两个插屏位（按 eCPM 选一个展示） */
+        private val SPLASH_PLACES = listOf(
+            CodeKeyAndEvent.zx_PLACE_OPEN,
+            CodeKeyAndEvent.zx_PLACE_INTER_SCAN,
+            CodeKeyAndEvent.zx_PLACE_INTER_DONE
+        )
     }
 
     private val TAG = "SpBootGate"
@@ -68,8 +73,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     private var finished = false
     private var adsFlowStarted = false
     private var splashStartedAtMs = 0L
-    private var maxTimeoutMs = 15_000L
-    private var minDelayMs = 3_000L
+    private var maxTimeoutMs = AdWait.openMaxMs()
+    private var minDelayMs = AdWait.openMinMs()
 
     // ---- 展示看门狗：只在启动页前台且有焦点（即广告不在遮挡）时兜底放行 ----
     private var adRequestedPlace: String? = null
@@ -231,7 +236,9 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
     fun mockWait(){
         lifecycleScope.launch {
-            delay(1200L)
+            // 没有可展示的候选：也要至少停留 op_min_wt，避免启动页"闪一下"
+            AdLog.log("WAIT_SPLASH", "-", null, "no_candidate min=${minDelayMs}ms")
+            delay(minDelayMs)
             nextStep()
         }
     }
@@ -263,21 +270,30 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
     fun netCheck(){
         // 网络是否允许加载和显示广告
         val allow = NetUtil.isUseNet_noVpn()
-        val setting = ImpressionUtils.currentSetting(CodeKeyAndEvent.zx_PLACE_OPEN)
-        val capOk = AdCountOpen.open_idCountCheck(setting)
-        val gapOk = AdCountOpen.open_checkTimeDiff()
-        val canShow = capOk && gapOk
+        // 启动页准入按“候选”判断：开屏封顶/为空时，插屏候选仍有额度也可以继续
+        val eligible = eligibleSplashPlaces()
+        // open_gap 只在开屏本身仍是候选时生效，避免开屏的间隔把插屏候选一起挡掉
+        val gapOk = !eligible.contains(CodeKeyAndEvent.zx_PLACE_OPEN) || AdCountOpen.open_checkTimeDiff()
+        val canShow = eligible.isNotEmpty() && gapOk
         AdLog.log(
-            "GATE_OPEN",
-            CodeKeyAndEvent.zx_PLACE_OPEN,
-            setting?.zId,
-            "allow=$allow capOk=$capOk gapOk=$gapOk show=${allow && canShow} caps=${setting?.zDayShow}/${setting?.zDayClick}"
+            "GATE_SPLASH",
+            "-",
+            null,
+            "allow=$allow eligible=$eligible gapOk=$gapOk show=${allow && canShow}"
         )
         if (allow && canShow){
             startLoadTime = System.currentTimeMillis()
-            runTasks()
+            runTasks(eligible)
         }else{
             mockWait()
+        }
+    }
+
+    /** 启动页可用候选：boxaxj 非空且该广告位当天还有额度 */
+    private fun eligibleSplashPlaces(): List<String> {
+        return SPLASH_PLACES.filter { place ->
+            val setting = ImpressionUtils.currentSetting(place)
+            setting != null && setting.zId.isNotEmpty() && ImpressionUtils.canShowAd(place)
         }
     }
 
@@ -298,14 +314,28 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         adDone = false
         adShown = false
         userLeft = false
-        foregroundSince = SystemClock.elapsedRealtime()
         noShowTimeoutMs = if (ImpressionUtils.currentSetting(taskName)?.zType == CodeKeyAndEvent.xxdx_TYPE_OPEN) {
             OPEN_NO_SHOW_TIMEOUT_MS
         } else {
             NO_SHOW_TIMEOUT_MS
         }
 
+        AdLog.log(
+            "WAIT_SPLASH",
+            taskName,
+            ImpressionUtils.currentSetting(taskName)?.zId,
+            "min=${minDelayMs}ms max=${maxTimeoutMs}ms elapsed=${elapsedMs()}ms"
+        )
         lifecycleScope.launch(Dispatchers.Main){
+            // op_min_wt：启动页最短停留。广告就绪得早也要等够 min 再展示，避免一闪而过
+            val remainMs = minDelayMs - elapsedMs()
+            if (remainMs > 0) {
+                delay(remainMs)
+                if (adDone || finished || isFinishing) return@launch
+            }
+            // 看门狗在真正发起展示时才启动：否则 min 配大了会被"没展示"超时提前判死
+            foregroundSince = SystemClock.elapsedRealtime()
+            startNoShowWatchdog()
             ImpressionUtils.show(
                 mActivity,taskName,
                 CodeKeyAndEvent.bb_ACTION_LAUNCH_COLD,
@@ -317,7 +347,6 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
 
             loadOther()
         }
-        startNoShowWatchdog()
     }
 
     /** 广告真正曝光（onAdShowed）：取消 no-show 计时，改用展示上限兜底 */
@@ -497,24 +526,13 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         nextStep()
     }
 
-    fun runTasks(){
-        val placeArr = arrayOf(
-            CodeKeyAndEvent.zx_PLACE_OPEN,
-            CodeKeyAndEvent.zx_PLACE_INTER_SCAN,
-            CodeKeyAndEvent.zx_PLACE_INTER_DONE
-        )
-        val pointArr = arrayOf(
-            CodeKeyAndEvent.bb_ACTION_LAUNCH_COLD,
-            CodeKeyAndEvent.bb_ACTION_INTER_CLEAN,
-            CodeKeyAndEvent.bb_ACTION_INTER_CLEAN
-        )
-
+    fun runTasks(places: List<String>){
         // 任务成功通知
         val successChannel = Channel<String>(Channel.UNLIMITED)
 
         // 1. 依次启动任务，耗时任务放到 IO 线程执行
         val taskJob: Job = lifecycleScope.launch(Dispatchers.IO) {
-            for (taskName in placeArr) {
+            for (taskName in places) {
                 tast(taskName)
             }
         }
@@ -524,8 +542,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
             // 避免同一个任务重复上报成功
             val checked: MutableSet<String> = mutableSetOf<String>()
 
-            while (isActive && checked.size < placeArr.size) {
-                for (taskName in placeArr) {
+            while (isActive && checked.size < places.size) {
+                for (taskName in places) {
                     if (taskName !in checked && tastResult(taskName)) {
                         checked.add(taskName)
                         successChannel.send(taskName)
@@ -541,13 +559,13 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
         lifecycleScope.launch(Dispatchers.IO) {
 
             try {
-                // 3. 最多等待 15000ms，等待第一个任务成功
-                val first = withTimeoutOrNull(15000L.milliseconds) {
+                // 3. 最多等 op_max_wt（默认 16s），等待第一个候选就绪
+                val first = withTimeoutOrNull(maxTimeoutMs.milliseconds) {
                     successChannel.receiveCatching().getOrNull()
                 }
                 if (first == null) {
-                    // 15000ms 内没有任何任务成功
-                    AdLog.log("SHOW_TIMEOUT", CodeKeyAndEvent.zx_PLACE_OPEN, null, "waitMs=${System.currentTimeMillis() - startLoadTime}")
+                    // maxTimeoutMs 内没有任何候选就绪：放弃展示，直接进首页
+                    AdLog.log("SHOW_TIMEOUT", places.firstOrNull() ?: CodeKeyAndEvent.zx_PLACE_OPEN, null, "waitMs=${System.currentTimeMillis() - startLoadTime} maxMs=${maxTimeoutMs}")
                     TrackAd.adShowTimeout(AdTrackingHelperMy.AdType.OPEN, CodeKeyAndEvent.zx_PLACE_OPEN,System.currentTimeMillis() - startLoadTime)
                     stepnextFoce()
                     return@launch
@@ -555,8 +573,8 @@ class SpBootActivity : SpActivity<ActivitySpBootBinding>() {
                 Util.iii { "$TAG request first ad -> $first" }
 
                 // 收到第一个成功结果后，等待第二个成功结果
-                val cmpWaitMs = AdsConf.open_cmp_wait
-                Log.e(TAG, "runTasks: op_cmp_wt=${cmpWaitMs}", )
+                val cmpWaitMs = AdWait.cmpMs()
+                AdLog.log("WAIT_CMP", first, null, "cmp=${cmpWaitMs}ms")
                 val second = withTimeoutOrNull(cmpWaitMs.milliseconds) {
                     successChannel.receiveCatching().getOrNull()
                 }

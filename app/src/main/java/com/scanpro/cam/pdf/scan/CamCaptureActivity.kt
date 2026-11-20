@@ -33,10 +33,10 @@ import com.buncead.common.util.NetUtil
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.base.SpActivity
 import com.scanpro.cam.pdf.databinding.ActivityCamCaptureBinding
+import com.zppko.pdfplus.nor.ads.AdWait
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import com.zppko.pdfplus.nor.ads.InterShCount
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
-import com.zppko.pdfplus.nor.tool.Tool
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,7 +44,6 @@ import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -344,17 +343,8 @@ class CamCaptureActivity : SpActivity<ActivityCamCaptureBinding>() {
         ImpressionUtils.load(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN)
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val startTime = System.currentTimeMillis()
-            delay(200) // 模拟读取扫描耗时操作
-
-            var usedTime = System.currentTimeMillis() - startTime
-            if (usedTime < 2000){
-                delay(500)
-            }
-            usedTime = System.currentTimeMillis() - startTime
-            if (usedTime < 8000){
-                Tool.waitForCondition<Boolean>(8_000L - usedTime) { ImpressionUtils.loadSuccess(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN) }
-            }
+            // int_min_wt / int_max_wt：最多等到 max，就绪即返回；再补足最短停留 min
+            AdWait.awaitInterstitial(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN)
 
             withContext(Dispatchers.Main) {
 
