@@ -4,6 +4,7 @@ import android.widget.FrameLayout
 import com.buncead.common.ui.BaseActivity
 import com.buncead.common.util.Util
 import com.facebook.ads.InterstitialAd
+import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.count.AdCountInter
 import com.mymy.mymy.ads.poi.TrackAd
 import com.mymy.mymy.ads.poi.TrackBean
@@ -61,6 +62,7 @@ class IntAdsLoad(
         }else{
             trad.setShowCallback(object: TradShowCallback() {
                 override fun onAdDismissed() {
+                    AdLog.log("SHOW_DISMISS", setting.zPlace, setting.zId, "type=${setting.zType}")
                     TrackAd.showDismiss(trBean)
 
                     container.removeAllViews()
@@ -68,28 +70,40 @@ class IntAdsLoad(
 
                     if (zcanUsable()){
                         Util.eee { "$TAG ad close, ad isRead=true, no load" }
+                    }else if (!zHasDailyQuota()) {
+                        // 当天额度已用尽：不再预加载下一次
+                        AdLog.log("LOAD_SKIP_CAP", setting.zPlace, setting.zId, "reason=daily_cap_after_dismiss")
+                        Util.eee { "$TAG ad close, daily cap reached, no load=${setting.zId}" }
                     }else{
                         Util.eee { "$TAG ad close, ad isRead=false, start load=${setting.zId}" }
                         nowAd.loadAd()
                     }
                 }
                 override fun onAdFailedToShow() { // topon open没有show失败的call，下面代码没有意义
+                    AdLog.log("SHOW_FAILED", setting.zPlace, setting.zId, "type=${setting.zType}")
                     zDismiss(act,whenOnVisible, finish)
 
                 }
                 override fun onAdShowed() {
-                    AdCountInter.inter_addShowCount()
+                    AdCountInter.inter_addShowCount(setting.zId)
+                    AdLog.log("SHOW_SUCCESS", setting.zPlace, setting.zId, "type=${setting.zType}")
+                    zNotifyShown()
                     TrackAd.showSuccess(trBean)
 
                     if (zcanUsable()){
                         Util.eee { "$TAG ad show, ad isRead=true, no load" }
+                    }else if (!zHasDailyQuota()) {
+                        // 本次曝光刚好用掉当天最后一个额度：不再预加载下一次
+                        AdLog.log("LOAD_SKIP_CAP", setting.zPlace, setting.zId, "reason=daily_cap_after_show")
+                        Util.eee { "$TAG ad show, daily cap reached, no load=${setting.zId}" }
                     }else{
                         Util.eee { "$TAG ad show, ad isRead=false, start load=${setting.zId}" }
                         nowAd.loadAd()
                     }
                 }
                 override fun onAdClicked() {
-                    AdCountInter.inter_addClickCount()
+                    AdCountInter.inter_addClickCount(setting.zId)
+                    AdLog.log("CLICK", setting.zPlace, setting.zId, "type=${setting.zType}")
                     TrackAd.showClick(trBean)
                 }
             })

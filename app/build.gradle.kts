@@ -132,20 +132,49 @@ dependencies {
     implementation("androidx.media:media:1.7.0")
 
     // ---- TradPlus 聚合（照 SmartPdfScan_luow app/build.gradle，16.9.0.1 系列） ----
+    // TradPlus
     implementation("com.tradplusad:tradplus:16.9.0.1")
     // Meta
     implementation("com.facebook.android:audience-network-sdk:6.22.0")
     implementation("com.tradplusad:tradplus-facebook:1.16.9.0.1")
+    // Applovin
+    implementation("com.applovin:applovin-sdk:13.6.4")
+    implementation("com.tradplusad:tradplus-applovin:9.16.9.0.1")
+    implementation("com.google.android.gms:play-services-ads-identifier:18.2.0")
     // Pangle
     implementation("com.tradplusad:tradplus-pangle:19.16.9.0.1")
     implementation("com.pangle.global:pag-sdk:8.2.0.4")
+    // UnityAds
+    implementation("com.tradplusad:tradplus-unity:5.16.9.0.2")
+    implementation("com.unity3d.ads:unity-ads:4.20.0")
+    // Inmobi
+    implementation("com.tradplusad:tradplus-inmobix:23.16.9.0.1")
+    implementation("com.inmobi.monetization:inmobi-ads-kotlin:11.4.1")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+    //optional dependency for better targeting
+    implementation("androidx.browser:browser:1.8.0")
+    implementation("com.squareup.picasso:picasso:2.8")
+    implementation("com.google.android.gms:play-services-appset:16.0.2")
+    //optional dependency for better targeting
+    implementation("com.google.android.gms:play-services-tasks:18.0.2")
+    //optional dependency for better targeting
+    implementation("com.squareup.okhttp3:okhttp:3.14.9")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.21")
+    implementation("com.squareup.okio:okio:3.7.0")
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
     // Mintegral
     implementation("com.tradplusad:tradplus-mintegralx_overseas:18.16.9.0.1")
+    implementation("androidx.recyclerview:recyclerview:1.1.0")
     implementation("com.mbridge.msdk.oversea:mbridge_android_sdk:17.1.81")
+    // Bigo
+    implementation("com.bigossp:bigo-ads:6.0.0")
+    implementation("com.tradplusad:tradplus-bigo:57.16.9.0.1")
     // TP Exchange
+    // 请注意保持与主包版本同步更新
     implementation("com.google.code.gson:gson:2.8.6")
     implementation("com.tradplusad:tp_exchange:40.16.9.0.1")
-    // GMA Next-Gen（AdMob 作为聚合渠道，替换旧 play-services-ads）
+    // GMA Next Gen
     implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.4.0")
     implementation("com.tradplusad:tradplus-gma-nextgen:2.16.9.0.1")
 

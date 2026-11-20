@@ -50,6 +50,13 @@ object KvUtil {
         getPrefs().edit().putString(key, data).apply()
     }
 
+    fun removeKeysByPrefix(prefix: String) {
+        val p = getPrefs()
+        val editor = p.edit()
+        p.all.keys.filter { it.startsWith(prefix) }.forEach { editor.remove(it) }
+        editor.apply()
+    }
+
     fun getDouble(key: String, defaultValue: Double = 0.0): Double {
         val ss = getPrefs().getString(key, "${defaultValue}")
         if (ss==null){

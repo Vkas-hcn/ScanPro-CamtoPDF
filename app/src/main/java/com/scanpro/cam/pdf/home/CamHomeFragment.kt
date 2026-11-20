@@ -25,6 +25,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.buncead.common.util.NetUtil
+import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.count.AdCountNati
 import com.scanpro.cam.pdf.R
 import com.scanpro.cam.pdf.base.SpFragment
@@ -356,7 +357,16 @@ class CamHomeFragment : SpFragment<FragmentCamHomeBinding>() {
     fun nativeNetCheck(){
         // 网络是否允许加载和显示广告
         val allow = NetUtil.isUseNet_noVpn()
-        val canShow = AdCountNati.natiCanShow()
+        val setting = ImpressionUtils.currentSetting(CodeKeyAndEvent.zx_PLACE_NATIVE_MAIN)
+        val capOk = AdCountNati.nati_idCountCheck(setting)
+        val gapOk = AdCountNati.nati_checkTimeDiff()
+        val canShow = capOk && gapOk
+        AdLog.log(
+            "GATE_NATIVE",
+            CodeKeyAndEvent.zx_PLACE_NATIVE_MAIN,
+            setting?.zId,
+            "allow=$allow capOk=$capOk gapOk=$gapOk show=${allow && canShow} caps=${setting?.zDayShow}/${setting?.zDayClick}"
+        )
         if (allow && canShow){
             prepareLoadNative()
         }else{

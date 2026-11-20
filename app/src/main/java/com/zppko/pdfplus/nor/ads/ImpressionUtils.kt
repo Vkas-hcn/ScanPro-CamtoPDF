@@ -3,8 +3,10 @@ package com.zppko.pdfplus.nor.ads
 
 import android.util.Log
 import android.widget.FrameLayout
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
+import com.mymy.mymy.ads.AdLog
+import com.mymy.mymy.ads.count.AdCountInter
+import com.mymy.mymy.ads.count.AdCountNati
+import com.mymy.mymy.ads.count.AdCountOpen
 import com.mymy.mymy.ads.poi.ADBlockReason
 import com.mymy.mymy.ads.poi.TrackAd
 import com.mymy.mymy.ads.poi.TrackBean
@@ -17,6 +19,7 @@ import com.zppko.pdfplus.nor.ads.mob.NatAdsLoad
 import com.zppko.pdfplus.nor.ads.mob.OpenAdsLoad
 import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 import com.zppko.pdfplus.nor.ads.tool.BaseAdsLoad
+import com.zppko.pdfplus.nor.ads.tool.RunOnResumed
 import com.zppko.pdfplus.nor.remote.DefaultConfigHelper
 import com.zppko.pdfplus.nor.remote.RemoteConfigHelper
 
@@ -58,7 +61,9 @@ object ImpressionUtils {
                             gameJson.getString("ujhscs"),
                             gameJson.getLong("vksnx"),
                             gameJson.optInt("gkqcx", 0),
-                            it
+                            it,
+                            gameJson.optInt("day_sh", -1),
+                            gameJson.optInt("day_cli", -1)
                         )
                         gameList.add(adsSetting)
                     }
@@ -99,32 +104,60 @@ object ImpressionUtils {
         }
     }
 
-    fun show(act: BaseActivity?, place: String, point:String, container: FrameLayout, whenOnVisible:Boolean=true, finish: () -> Unit) {
+    fun show(
+        act: BaseActivity?,
+        place: String,
+        point: String,
+        container: FrameLayout,
+        whenOnVisible: Boolean = true,
+        onShown: (() -> Unit)? = null,
+        finish: () -> Unit
+    ) {
         if (act == null) {
+            AdLog.log("SHOW_BLOCKED", place, myPoolzzdd[place]?.setting?.zId, "reason=activity_null point=$point")
             finish.invoke()
             return
         }
         val unit = myPoolzzdd[place]
-        if (loadSuccess(place)) {
+        val capOk = capAvailable(unit?.setting)
+        if (loadSuccess(place) && capOk) {
 //            myPoolzzdd[place] = null
 //            load(place)
+            unit?.zOnShown = onShown
             unit?.zShoweee(act, point,container,whenOnVisible, finish)
+        } else if (!capOk) {
+            // 已达该广告位当天上限：直接放行流程，不再等待下一次 onResume
+            unit?.zOnShown = null
+            AdLog.log("SHOW_BLOCKED", place, unit?.setting?.zId, "reason=daily_cap point=$point")
+            unit?.setting?.let { setting ->
+                TrackAd.blocked(
+                    TrackBean.getTradBean(setting.zType,setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId),
+                    ADBlockReason.daily_cap
+                )
+            }
+            RunOnResumed.run(act, false) { finish.invoke() }
         } else {
+            unit?.zOnShown = null
+            AdLog.log("SHOW_BLOCKED", place, unit?.setting?.zId, "reason=ad_not_ready point=$point")
             unit?.setting?.let { setting ->
                 TrackAd.blocked(TrackBean.getTradBean(setting.zType,setting.zPlace, CodeKeyAndEvent.ddd_FIRM_TRADPLUS,setting.zId),ADBlockReason.disabled)
             }
 
-            if (whenOnVisible){
-                val observer = object : DefaultLifecycleObserver {
-                    override fun onResume(owner: LifecycleOwner) {
-                        act.lifecycle.removeObserver(this)
-                        finish.invoke()
-                    }
-                }
-                act.lifecycle.addObserver(observer)
-            }else{
-                finish.invoke()
-            }
+            // 已 RESUMED 立即执行，否则等下一次 RESUMED；避免 observer 永远等不到
+            RunOnResumed.run(act, whenOnVisible) { finish.invoke() }
+        }
+    }
+
+    /** 该位置当前/将展示广告的 per-ID 上限是否还有额度（供开屏 eCPM 选位、show 兜底使用）。 */
+    fun canShowAd(place: String): Boolean = capAvailable(currentSetting(place))
+
+    private fun capAvailable(setting: AdsSetting?): Boolean {
+        if (setting == null || setting.zId.isEmpty()) return true
+        return when (setting.zType) {
+            CodeKeyAndEvent.xxdx_TYPE_OPEN -> AdCountOpen.open_idCountCheck(setting)
+            CodeKeyAndEvent.xxdx_TYPE_INTER -> AdCountInter.inter_idCountCheck(setting)
+            CodeKeyAndEvent.xxdx_TYPE_NATIVE -> AdCountNati.nati_idCountCheck(setting)
+            else -> true
         }
     }
 
@@ -135,6 +168,29 @@ object ImpressionUtils {
             list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
         }
         return list.filter { it.zPlace == place && it.zWeight < weight }.maxByOrNull { it.zWeight }
+    }
+
+    /** 读取最新广告位配置；解析失败/为空时回退本地默认配置。 */
+    private fun adList(): MutableList<AdsSetting> {
+        val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
+        var list = loadAdsSettingList(data)
+        if (list.isEmpty()) {
+            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
+        }
+        return list
+    }
+
+    /** 与 [load] 一致的选位规则：同位置取 gkqcx 最大且 boxaxj 非空的条目。 */
+    fun pickConfig(place: String): AdsSetting? {
+        return adList()
+            .sortedByDescending { it.zWeight }
+            .filter { it.zId.isNotEmpty() }
+            .find { it.zPlace == place }
+    }
+
+    /** 已加载对象优先，未加载时取将要加载的对象；频控上限判定使用它的 zId 与 day_sh/day_cli。 */
+    fun currentSetting(place: String): AdsSetting? {
+        return myPoolzzdd[place]?.setting ?: pickConfig(place)
     }
 
 
@@ -152,38 +208,49 @@ object ImpressionUtils {
 
 
     fun load(place: String) {
+        // 每日上限已达：该广告位当天不再加载（需求：各自上限达到就不加载、不展示）。
+        // 展示侧 [show] 还会用 capAvailable 再兜底一次，这里只是不再发无意义的请求。
+        val current = currentSetting(place)
+        if (!capAvailable(current)) {
+            AdLog.log(
+                "LOAD_SKIP_CAP",
+                place,
+                current?.zId,
+                "reason=daily_cap caps=${current?.zDayShow}/${current?.zDayClick}"
+            )
+            return
+        }
+
         val unit = myPoolzzdd[place]
 
         if (unit != null ) {
 //        if (unit != null && !unit.canReloadAds()) {
             if (unit.zIsShowAds()){
                 Log.e("hhhh广告", "${place}: 有加载好的，不需要加载")
+                AdLog.log("LOAD_SKIP_READY", place, unit.setting.zId, "type=${unit.setting.zType}")
             }else{
                 Log.e("hhhh广告", "${place}: 没有广告，需要加载")
+                AdLog.log("LOAD_RELOAD", place, unit.setting.zId, "type=${unit.setting.zType}")
                 unit.zLoadeee()
             }
             return
         }
 
-        val data = RemoteConfigHelper.getRecentData(RemoteConfigHelper.KEY_ADS_CONFIG)
-        var list = loadAdsSettingList(data)
-        if (list.isEmpty()) {
-            list = loadAdsSettingList(DefaultConfigHelper.getDefAds())
-        }
-        Log.e("hhhh广告", "获取最新广告配置")
-        list.forEach {
-            Log.e("hhhh广告", "配置：${it}")
-        }
-
-//        val config = list.sortedByDescending { it.zWeight }.find { it.zPlace == place }
-        val config = list.sortedByDescending { it.zWeight }.filter { !it.zId.isNullOrEmpty() }.find { it.zPlace == place }
+        val config = pickConfig(place)
+        Log.e("hhhh广告", "获取最新广告配置，选中：${config}")
         if (config != null) {
+            AdLog.log(
+                "LOAD_PICK",
+                place,
+                config.zId,
+                "type=${config.zType} weight=${config.zWeight} caps=${config.zDayShow}/${config.zDayClick}"
+            )
             myPoolzzdd[place] = convertBaseAds(config).apply { this?.zLoadeee() }
         } else {
             Log.e("hhhh广告", "找不到该广告位配置：${place}")
+            AdLog.log("LOAD_NO_ID", place, null, "no non-empty boxaxj")
         }
     }
-
 
 
     fun parseEcpm(rawStr: String?): Double {

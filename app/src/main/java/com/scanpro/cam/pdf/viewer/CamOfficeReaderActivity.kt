@@ -20,12 +20,11 @@ import com.scanpro.cam.pdf.home.CamFileItem
 import com.seapeak.docviewer.DocViewerFragment
 import com.seapeak.docviewer.config.DocConfig
 import com.seapeak.docviewer.config.DocType
+import com.zppko.pdfplus.nor.ads.AdWait
 import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import com.zppko.pdfplus.nor.ads.InterShCount
 import com.zppko.pdfplus.nor.ads.helper.CodeKeyAndEvent
-import com.zppko.pdfplus.nor.tool.Tool
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -117,17 +116,8 @@ class CamOfficeReaderActivity : SpActivity<ActivityCamOfficeReaderBinding>() {
         ImpressionUtils.load(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN)
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val startTime = System.currentTimeMillis()
-            delay(200) // 模拟读取扫描耗时操作
-
-            var usedTime = System.currentTimeMillis() - startTime
-            if (usedTime < 2000){
-                delay(500)
-            }
-            usedTime = System.currentTimeMillis() - startTime
-            if (usedTime < 8000){
-                Tool.waitForCondition<Boolean>(8_000L - usedTime) { ImpressionUtils.loadSuccess(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN) }
-            }
+            // int_min_wt / int_max_wt：最多等到 max，就绪即返回；再补足最短停留 min
+            AdWait.awaitInterstitial(CodeKeyAndEvent.zx_PLACE_INTER_ClEAN)
 
             withContext(Dispatchers.Main) {
 

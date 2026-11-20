@@ -4,7 +4,6 @@ package com.mymy.mymy.ads.count
 import android.content.Context
 import com.bockcock.adjust.KvUtil
 import com.buncead.common.util.Util
-import com.mymy.mymy.ads.count.AdCountInter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,10 +24,6 @@ object ADManagerMy {
     fun getCount(){
         CoroutineScope(Dispatchers.IO).launch {
             mSaveTime = KvUtil.getLong(KEY_SAVE_TIME)
-
-            AdCountOpen.open_getCount()
-            AdCountInter.inter_getCount()
-            AdCountNati.nati_getCount()
         }
     }
 
@@ -42,9 +37,7 @@ object ADManagerMy {
             mSaveTime = System.currentTimeMillis()
             KvUtil.setLong(KEY_SAVE_TIME, mSaveTime)
 
-            AdCountOpen.open_resetCount()
-            AdCountInter.inter_resetCount()
-            AdCountNati.nati_resetCount()
+            AdIdCount.reset()
             return false
         }
     }

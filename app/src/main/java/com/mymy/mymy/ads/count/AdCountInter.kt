@@ -1,51 +1,30 @@
 package com.mymy.mymy.ads.count
 
-import com.bockcock.adjust.KvUtil
 import com.buncead.common.util.Util
 import com.mymy.mymy.ads.AdsConf
+import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 
 
 object AdCountInter {
     val TAG = "AdCountInter"
 
-
-    var interShowCount = 0
-    var interClickCount = 0
-
-    val KEY_INTER_SHOW_COUNT = "KEY_INTER_SHOW_COUNT"
-    val KEY_INTER_CLICK_COUNT = "KEY_INTER_CLICK_COUNT"
-
-    fun inter_resetCount(){
-        interShowCount = 0
-        interClickCount = 0
-        KvUtil.setInt(KEY_INTER_SHOW_COUNT,interShowCount)
-        KvUtil.setInt(KEY_INTER_CLICK_COUNT,interClickCount)
-    }
-
-    fun inter_getCount(){
-        interShowCount = KvUtil.getInt(KEY_INTER_SHOW_COUNT)
-        interClickCount = KvUtil.getInt(KEY_INTER_CLICK_COUNT)
-    }
-
-    fun inter_addShowCount(){
+    fun inter_addShowCount(id: String){
         interLastShowTime = System.currentTimeMillis()
-        interShowCount++
-        KvUtil.setInt(KEY_INTER_SHOW_COUNT,interShowCount)
+        AdIdCount.addShowCount(id)
     }
 
-    fun inter_addClickCount(){
-        interClickCount++
-        KvUtil.setInt(KEY_INTER_CLICK_COUNT,interClickCount)
+    fun inter_addClickCount(id: String){
+        AdIdCount.addClickCount(id)
     }
 
-    fun inter_time2CountCheck(): Boolean {
-        if (ADManagerMy.isToday()){
-            val canShow: Boolean = interShowCount < AdsConf.inter_day_show &&  interClickCount < AdsConf.inter_day_click
-            Util.iii { "$TAG inter_time2CountCheck() canShow=${canShow}, ${interShowCount}<${AdsConf.inter_day_show} && ${interClickCount}<${AdsConf.inter_day_click}" }
-            return canShow
-        }else{
+    /** 每个广告位（boxaxj）单独计数；条目未配 day_sh/day_cli 时用 AdsConf 内置兜底值。 */
+    fun inter_idCountCheck(setting: AdsSetting?): Boolean {
+        if (setting == null || setting.zId.isEmpty()) {
             return true
         }
+        val showCap = if (setting.zDayShow >= 0) setting.zDayShow else AdsConf.inter_day_show
+        val clickCap = if (setting.zDayClick >= 0) setting.zDayClick else AdsConf.inter_day_click
+        return AdIdCount.canShow(setting.zId, showCap, clickCap)
     }
 
     var interLastShowTime = 0L
@@ -59,9 +38,8 @@ object AdCountInter {
         return false
     }
 
-
-    fun interCanShow(): Boolean {
-        return  inter_time2CountCheck() && inter_checkTimeDiff()
+    fun interCanShow(setting: AdsSetting?): Boolean {
+        return  inter_idCountCheck(setting) && inter_checkTimeDiff()
     }
 
 }

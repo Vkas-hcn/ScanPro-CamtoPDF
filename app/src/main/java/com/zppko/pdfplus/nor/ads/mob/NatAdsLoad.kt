@@ -4,6 +4,7 @@ import android.widget.FrameLayout
 import com.buncead.common.ui.BaseActivity
 import com.buncead.common.util.Util
 import com.google.android.gms.ads.nativead.NativeAd
+import com.mymy.mymy.ads.AdLog
 import com.mymy.mymy.ads.count.AdCountInter
 import com.mymy.mymy.ads.count.AdCountNati
 import com.mymy.mymy.ads.poi.TrackAd
@@ -55,11 +56,14 @@ class NatAdsLoad(
 
                 }
                 override fun onAdShowed() {
-                    AdCountNati.nati_addShowCount()
+                    AdCountNati.nati_addShowCount(setting.zId)
+                    AdLog.log("SHOW_SUCCESS", setting.zPlace, setting.zId, "type=${setting.zType}")
+                    zNotifyShown()
                     TrackAd.showSuccess(trBean)
                 }
                 override fun onAdClicked() {
-                    AdCountNati.nati_addClickCount()
+                    AdCountNati.nati_addClickCount(setting.zId)
+                    AdLog.log("CLICK", setting.zPlace, setting.zId, "type=${setting.zType}")
                     TrackAd.showClick(trBean)
                 }
             })

@@ -1,50 +1,30 @@
 package com.mymy.mymy.ads.count
 
-import com.bockcock.adjust.KvUtil
 import com.buncead.common.util.Util
 import com.mymy.mymy.ads.AdsConf
+import com.zppko.pdfplus.nor.ads.sett.AdsSetting
 
 
 object AdCountNati {
     val TAG = "AdCountNati"
 
-    var nati_showCount = 0
-    var nati_clickCount = 0
-
-    val KEY_NATI_SHOW_COUNT = "KEY_NATI_SHOW_COUNT"
-    val KEY_NATI_CLICK_COUNT = "KEY_NATI_CLICK_COUNT"
-
-    fun nati_resetCount(){
-        nati_showCount = 0
-        nati_clickCount = 0
-        KvUtil.setInt(KEY_NATI_SHOW_COUNT,nati_showCount)
-        KvUtil.setInt(KEY_NATI_CLICK_COUNT,nati_clickCount)
-    }
-
-    fun nati_getCount(){
-        nati_showCount = KvUtil.getInt(KEY_NATI_SHOW_COUNT)
-        nati_clickCount = KvUtil.getInt(KEY_NATI_CLICK_COUNT)
-    }
-
-    fun nati_addShowCount(){
+    fun nati_addShowCount(id: String){
         natiLastShowTime = System.currentTimeMillis()
-        nati_showCount++
-        KvUtil.setInt(KEY_NATI_SHOW_COUNT,nati_showCount)
+        AdIdCount.addShowCount(id)
     }
 
-    fun nati_addClickCount(){
-        nati_clickCount++
-        KvUtil.setInt(KEY_NATI_CLICK_COUNT,nati_clickCount)
+    fun nati_addClickCount(id: String){
+        AdIdCount.addClickCount(id)
     }
 
-    fun nati_time2CountCheck(): Boolean {
-        if (ADManagerMy.isToday()){
-            val canShow: Boolean = nati_showCount < AdsConf.native_day_show && nati_clickCount < AdsConf.native_day_click
-            Util.iii { "$TAG nati_time2CountCheck() canShow=${canShow}, ${nati_showCount}<${AdsConf.inter_day_show} && ${nati_clickCount}<${AdsConf.inter_day_click}" }
-            return canShow
-        }else{
+    /** 每个广告位（boxaxj）单独计数；条目未配 day_sh/day_cli 时用 AdsConf 内置兜底值。 */
+    fun nati_idCountCheck(setting: AdsSetting?): Boolean {
+        if (setting == null || setting.zId.isEmpty()) {
             return true
         }
+        val showCap = if (setting.zDayShow >= 0) setting.zDayShow else AdsConf.native_day_show
+        val clickCap = if (setting.zDayClick >= 0) setting.zDayClick else AdsConf.native_day_click
+        return AdIdCount.canShow(setting.zId, showCap, clickCap)
     }
 
     var natiLastShowTime = 0L
@@ -58,8 +38,8 @@ object AdCountNati {
         return false
     }
 
-    fun natiCanShow(): Boolean {
-        return  nati_time2CountCheck() && nati_checkTimeDiff()
+    fun natiCanShow(setting: AdsSetting?): Boolean {
+        return  nati_idCountCheck(setting) && nati_checkTimeDiff()
     }
 
 
