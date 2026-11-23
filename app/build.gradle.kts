@@ -40,8 +40,8 @@ android {
         applicationId = "com.scanpro.cam.pdf"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.0.6"
+        versionCode = 12
+        versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Overridden per buildType; debug keeps Google sample App ID.

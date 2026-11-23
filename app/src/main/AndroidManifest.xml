@@ -25,6 +25,15 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
+    <!-- Play 会从 Activity 的 screenOrientation 推断"隐式硬件特性"：
+         portrait → android.hardware.screen.portrait，landscape → android.hardware.screen.landscape。
+         广告 SDK（Bigo 等）带了一堆竖屏/横屏 Activity，若不显式声明 required="false"，
+         Play 就把这两个特性当成必需项，从而收窄分发范围（报"硬件功能标记为必需"）。
+         本应用自身可随系统旋转自适应，横竖屏都不是硬需求。 -->
+    <uses-feature
+        android:name="android.hardware.screen.portrait"
+        android:required="false"
+        tools:replace="android:required" />
     <uses-feature
         android:name="android.hardware.screen.landscape"
         android:required="false"

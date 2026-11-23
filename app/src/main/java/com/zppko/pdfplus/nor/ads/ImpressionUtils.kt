@@ -193,6 +193,18 @@ object ImpressionUtils {
         return myPoolzzdd[place]?.setting ?: pickConfig(place)
     }
 
+    /**
+     * ad_id(boxaxj) -> pos_id(位置Key) 反查，供 BI 曝光收益上报使用。
+     *
+     * 数据源与 [pickConfig] 完全一致（远端 pps_ad_data 优先、本地默认配置兜底），
+     * 所以远端重新配置广告位 ID 后会自动跟随，不需要再维护一份写死的映射表。
+     * 注意：同一 boxaxj 配到多个位置时只能返回其中一个，配置上应保证一个位置一个广告位 ID。
+     */
+    fun posIdOf(adUnitId: String?): String? {
+        if (adUnitId.isNullOrEmpty()) return null
+        return adList().firstOrNull { it.zId == adUnitId }?.zPlace
+    }
+
 
     fun fireAnative(place: String): NatAdsLoad? {
         if (myPoolzzdd[place] != null && myPoolzzdd[place]?.zIsShowAds() == true) {

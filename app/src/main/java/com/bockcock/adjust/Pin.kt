@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.buncead.common.util.Util
@@ -50,8 +51,28 @@ object Pin {
         AdJustHelp.event(eventName,pt?.map)
 //
         TrackSDK.track(eventName,pt?.map?.toMap(), TrackPolicy.IMMEDIATE)
+        val mapString = pt?.map?.toString() ?: ""
+        Log.e(TAG, "event: eventName=$eventName----map=${mapString}", )
     }
 
+    fun biAdPriceData(format:String,adSource: String,adID: String,posId: String? = null): Pt{
+        val pt= Pt()
+            // 广告位：优先用调用方从远端广告配置反查到的位置，静态表仅作兜底（切忌再写死新 id）
+            .put("pos_id", posId ?: AppConfig.getTradPlusEventName(adID) ?: "") // 广告位
+            .put("sdk_name","tradplus")
+            .put("ad_source",adSource)
+            .put("ad_id",adID)
+
+        if (format.equals("splash")){
+            return  pt.put("ad_type","open")// 广告类型
+        }else if (format.equals("interstitial")){
+            return     pt.put("ad_type","interstitial")
+        }else if (format.equals("native")){
+            return   pt.put("ad_type","native")
+        }else {
+            return  pt.put("ad_type","unknown")
+        }
+    }
 
     fun myTrack(eventName: String, properties:MutableMap<String,Any>,policy: TrackPolicy ){
         TrackSDK.track(eventName, properties, TrackPolicy.IMMEDIATE)

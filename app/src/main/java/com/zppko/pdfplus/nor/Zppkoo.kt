@@ -3,6 +3,8 @@ package com.zppko.pdfplus.nor
 import android.app.Application
 import android.content.Context
 import android.util.Log
+import com.bockcock.adjust.AppConfig
+import com.bockcock.adjust.Pin
 import com.scanpro.cam.pdf.CamPdfApp
 import com.buncead.common.util.Util
 import com.tradplus.ads.base.bean.TPAdInfo
@@ -10,6 +12,7 @@ import com.tradplus.ads.core.GlobalImpressionManager
 import com.tradplus.ads.open.TradPlusSdk
 import com.tradplus.ads.open.TradPlusSdk.TradPlusInitListener
 import com.zppko.pdfplus.nor.ads.ImpressExt
+import com.zppko.pdfplus.nor.ads.ImpressionUtils
 import com.zppko.pdfplus.nor.ads.tool.SpUtil
 import com.zppko.pdfplus.nor.ads.tool.UserReferrer
 import com.zppko.pdfplus.nor.horus.HintEx06
@@ -72,15 +75,12 @@ class Zppkoo {
 //            })
             // TODO: xxx tradplus app id
             // 初始化SDK
-            TradPlusSdk.initSdk(context, "44273068BFF4D8A8AFF3D5B11CBA3ADE")
-
-            // 自动加载:适用的广告类型 ：插屏广告、激励视频广告、原生广告
-            // TODO: xxx 自动加载广告
-//            val settingParam: MutableMap<String?, Any?> = HashMap<String?, Any?>()
-//            val unitIds = arrayOf<String?>("D9118E91DD06DF6D322369455CAED618", "E609A0A67AF53299F2176C3A7783C46D", "DDBF26FBDA47FBE2765F1A089F1356BF")
-//            settingParam.put("autoload_close", unitIds)
-//            TradPlusSdk.setSettingDataParam(settingParam)
-
+            val appId = if(AppConfig.isBundle()){
+                "5B26CB2F679AD608EA4014F72E3F4311"
+            } else {
+                "44273068BFF4D8A8AFF3D5B11CBA3ADE"
+            }
+            TradPlusSdk.initSdk(context, appId)
 
             TradPlusSdk.setGlobalImpressionListener(object : GlobalImpressionManager.GlobalImpressionListener{
                 override fun onImpressionSuccess(info: TPAdInfo?) {
@@ -101,16 +101,15 @@ class Zppkoo {
 
                     // 单次展示预估收益
                     val revenue = BigDecimal.valueOf(ecpm).divide(BigDecimal.valueOf(1000), 6, RoundingMode.DOWN).toDouble()
-//                    val revenue = ecpm / 1000.0
-                    val country = info.isoCode // 国家码
-                    val network = info.adSourceName // 三方广告平台名称
-                    val adSourceId = info.adSourceId // 三方广告位ID
-                    val loadTime = info.loadTime // 加载时长
-                    val adUnitId = info.tpAdUnitId // 广告位
-                    val impressionId = info.impressionId
-//                    Util.iii { "AdRevenue ==> network=" + network + ", ecpm=" + ecpm + ", revenue=" + revenue }
+                    // pos_id 由远端广告配置（pps_ad_data 的 boxaxj -> 位置Key）反查，远端换 ID 也不会丢
+                    val biAdPrice = Pin.biAdPriceData(
+                        info.format,
+                        info.adSourceName,
+                        info.tpAdUnitId,
+                        ImpressionUtils.posIdOf(info.tpAdUnitId)
+                    )
 
-                    ImpressExt.price(revenue,"usd")
+                    ImpressExt.price(revenue,"usd",biAdPrice)
                 }
             });
         }

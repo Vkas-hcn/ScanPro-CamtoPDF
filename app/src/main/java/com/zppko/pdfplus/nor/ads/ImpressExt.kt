@@ -80,7 +80,7 @@ object ImpressExt {
 
 
 
-    fun price(microsVVV: Double, currencyVVV: String ){
+    fun price(microsVVV: Double, currencyVVV: String,pt:Pt ){
 
         // TODO: test value code
         var valueMicros = 0.0
@@ -105,7 +105,7 @@ object ImpressExt {
         AdJustHelp.sendRevenue(usd,"$currency") // 3
 
         // 收益每个平台在报一次
-        Pin.event(Pin.ad_impression_revenue, Pt().put(FirebaseAnalytics.Param.VALUE,usd).put(FirebaseAnalytics.Param.CURRENCY,"${currency}"))
+        Pin.event(Pin.ad_impression_revenue, pt.put(FirebaseAnalytics.Param.VALUE,usd).put(FirebaseAnalytics.Param.CURRENCY,"${currency}"))
 
         // 后台
         CoroutineScope(Dispatchers.IO).launch {
