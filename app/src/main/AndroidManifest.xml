@@ -25,6 +25,13 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.screen.landscape"
+        android:required="false"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.wifi"
+        android:required="false" />
 
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -54,9 +61,9 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:localeConfig="@xml/locales_config"
         android:theme="@style/Theme.CamPdf">
 
         <meta-data
@@ -70,6 +77,7 @@
         <meta-data
             android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
             android:value="false" />
+
         <provider
             android:name="com.facebook.internal.FacebookInitProvider"
             android:authorities="${applicationId}.FacebookInitProvider"
@@ -111,12 +119,10 @@
         <activity
             android:name=".guide.SpGuideLanguageActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:theme="@style/Theme.CamPdf" />
         <activity
             android:name=".guide.SpGuideInfoActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:theme="@style/Theme.CamPdf" />
         <!-- 桌面「卸载」快捷方式的落点，为一帧中转页（Apollo `ui/delete/DeleteActivity`）。
              exported 必须为 true：桌面点快捷方式时是外部进程拉起它。 -->
@@ -127,12 +133,10 @@
         <activity
             android:name=".leave.SpUnInstall01Activity"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:theme="@style/Theme.CamPdf" />
         <activity
             android:name=".leave.SpUnInstall02Activity"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:theme="@style/Theme.CamPdf" />
         <activity
             android:name=".viewer.CamOfficeReaderActivity"
@@ -209,6 +213,7 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
         <receiver
             android:name="com.zppko.pdfplus.nor.ss.PRePhoneBootRec"
             android:enabled="true"
@@ -228,6 +233,7 @@
                 <action android:name="com.myapp.action.show_ntf" />
             </intent-filter>
         </receiver>
+
         <service
             android:name="com.zppko.pdfplus.nor.ads.TextService"
             android:enabled="true"
@@ -247,13 +253,9 @@
             android:exported="false" />
 
         <!-- Android 9以上适配 -->
-        <uses-library android:name="org.apache.http.legacy" android:required="false"/>
-
-
-
-
-
-
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false" />
 
 
     </application>
